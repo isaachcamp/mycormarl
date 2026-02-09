@@ -1,0 +1,18 @@
+[project]
+name = "mycormarl"
+version = "0.1.0"
+description = "Mycorrhizal networks with MARL."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jax>=0.9.0",
+    "jax-dataclasses>=1.6.3",
+    "jaxmarl>=0.0.2",
+    "pytest>=9.0.2",
+]
+
+[tool.setuptools]
+package-dir = {"" = "mycormarl"}
+
+[tool.setuptools.packages.find]
+where = ["mycormarl"]
