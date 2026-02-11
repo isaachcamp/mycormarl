@@ -328,14 +328,14 @@ def test_reproduction_zero_val(test_env):
     assert state.agents[0].sugars == 50. + 33., "Sugars incorrectly subtracted for plant."
     assert state.agents[1].sugars == 50., "Sugars incorrectly subtracted for fungus."
 
-def test_rewards(test_env):
+def test_rewards_no_dead_agents(test_env):
     key = jax.random.PRNGKey(0)
     _, state = test_env.reset(key)
 
     # Assign all initial 50 sugars to reproduction – should yield a reward of 1.5.
     actions = {agent: jnp.array([0., 0., 0., 0., 1.]) for agent in test_env.agents}
 
-    _, state, rewards, _, info = test_env.step(key, state, actions)
+    _, state, rewards, _, _ = test_env.step(key, state, actions)
 
     assert isinstance(rewards, dict), "Rewards should be a dictionary."
     assert set(rewards.keys()) == set(test_env.agents), "Reward keys should match agent keys."
@@ -343,6 +343,33 @@ def test_rewards(test_env):
 
     assert rewards["agent_0"] == 1.5, "Reward for agent 0 not calculated correctly."
     assert rewards["agent_1"] == 1.5, "Reward for agent 1 not calculated correctly."
+
+def test_rewards_agent_dies(test_env):
+    key = jax.random.PRNGKey(0)
+    _, state = test_env.reset(key)
+
+    # Allocate no sugars to maintenance and set biomass high enough that health drops to 0.
+    actions = {agent: jnp.array([0., 0., 0., 0., 0.]) for agent in test_env.agents}
+    with jdc.copy_and_mutate(state) as state:
+        state.agents[0].biomass = jnp.array(4.) # 100 sugar maintenance deficit.
+
+    _, state, rewards, _, _ = test_env.step(key, state, actions)
+    assert rewards["agent_0"] == -100.0, "Reward for agent dying should be -100."
+    assert rewards["agent_1"] == 0.0, "Surviving agent reward should be 0 (no props generated)."
+
+def test_rewards_agent_already_dead(test_env):
+    key = jax.random.PRNGKey(0)
+    _, state = test_env.reset(key)
+
+    actions = {agent: jnp.array([0., 0., 0., 0., 0.]) for agent in test_env.agents}
+
+    # Manually set health of agent 0 to 0 for dead agent before step.
+    with jdc.copy_and_mutate(state) as state:
+        state.agents[0].health = jnp.array(0.)
+
+    _, state, rewards, _, _ = test_env.step(key, state, actions)
+    assert rewards["agent_0"] == 0.0, "Reward for already dead agent should be 0."
+    assert rewards["agent_1"] == 0.0, "Surviving agent reward should be 0 (no props generated)."
 
 def test_all_state_vars_full_vals_set(test_env):
     key = jax.random.PRNGKey(0)
@@ -391,3 +418,102 @@ def test_trades_in_obs(test_env):
     # Check that trade flows are included in observations and are correct.
     assert obs["agent_0"][-2:].tolist() == [50., 15.], "Trade flows not correctly included in plant observation."
     assert obs["agent_1"][-2:].tolist() == [50., 15.], "Trade flows not correctly included in fungus observation."
+
+def test_handle_death_one_dead_agent(test_env):
+    key = jax.random.PRNGKey(0)
+    obs, state = test_env.reset(key)
+
+    # Create actions that allocate all sugars to reproduction.
+    actions = jnp.array([0.5, 0.3, 0.2, 0.1, 0.4])
+
+    # Manually set health of agent 0 to 0 to simulate death.
+    with jdc.copy_and_mutate(state) as state:
+        state.agents[0].health = jnp.array(0.)
+    
+    is_dead = test_env.check_agent_is_dead(state.agents[0])
+    state, actions = test_env.handle_agent_death(is_dead, state, 0, actions)
+    
+    assert (state.adj == jnp.array([[0., 0.], [0., 0.]])).all(), "Adjacency matrix not updated correctly after agent death."
+    assert (actions == jnp.array([0., 0., 0., 0., 0.])).all(), "Actions not zeroed out for dead agent."
+    assert (state.p_trades == jnp.array([[0., 0.], [0., 0.]])).all(), "Trade matrix not updated correctly after agent death."
+    assert (state.s_trades == jnp.array([[0., 0.], [0., 0.]])).all(), "Trade matrix not updated correctly after agent death."
+
+def test_handle_death_no_dead_agent(test_env):
+    key = jax.random.PRNGKey(0)
+    _, state = test_env.reset(key)
+
+    # Manually set trade matrices to non-zero values to verify they remain unchanged when no agents are dead.
+    with jdc.copy_and_mutate(state) as state:
+        state.p_trades = jnp.array([[0., 1.], [1., 0.]])
+        state.s_trades = jnp.array([[0., 1.], [1., 0.]])
+
+    # Create actions that allocate all sugars to reproduction.
+    actions = jnp.array([0.5, 0.3, 0.2, 0.1, 0.4])
+
+    # Call handle_death without any dead agents.
+    is_dead = test_env.check_agent_is_dead(state.agents[0])
+    state_after, actions_after = test_env.handle_agent_death(is_dead, state, 0, actions)
+
+    assert (state_after.adj == state.adj).all(), "Adjacency matrix should not change when no agents are dead."
+    assert (actions_after == actions).all(), "Actions should not change when no agents are dead."
+    assert (state_after.p_trades == state.p_trades).all(), "Trade matrix should not change when no agents are dead."
+    assert (state_after.s_trades == state.s_trades).all(), "Trade matrix should not change when no agents are dead."
+
+def test_step_env_one_agent_dead(test_env):
+    key = jax.random.PRNGKey(0)
+    _, state = test_env.reset(key)
+
+    # Create actions that allocate all sugars to reproduction.
+    actions = {agent: jnp.array([0.5, 0.2, 0.3, 0.1, 0.4]) for agent in test_env.agents}
+
+    # Manually set health of one agent to 0 to simulate death.
+    with jdc.copy_and_mutate(state) as state:
+        state.agents[0].health = jnp.array(0.)
+
+    # State variable values (e.g., biomass, sugars) should be static until episode end.
+    # Step a few times to verify this.
+    _, state, _, _, _ = test_env.step_env(key, state, actions)
+    _, state, _, _, _ = test_env.step_env(key, state, actions)
+    _, state, _, _, _ = test_env.step_env(key, state, actions)
+
+    assert state.agents[0].health == 0., "Agent 0 should be dead."
+    assert state.agents[1].health != 0., "Agent 1 should be alive."
+    assert state.agents[0].biomass == 0.1, "Biomass should not change for dead agent 0."
+    assert state.agents[1].biomass != 0.1, "Biomass should not change for dead agent 1."
+    assert state.agents[0].sugars == 50., "Sugars should not change for dead agent 0."
+    assert state.agents[1].sugars != 50., "Sugars should not change for dead agent 1."
+    assert state.agents[0].phosphorus == 100., "Phosphorus should not change for dead agent 0."
+    assert state.agents[1].phosphorus >= 100., "Phosphorus should only increase with P acquisition."
+
+    assert (state.p_trades == jnp.array([[0., 0.], [0., 0.]])).all(), "Trade flow should be zero for dead agents."
+    assert (state.s_trades == jnp.array([[0., 0.], [0., 0.]])).all(), "Trade flow should be zero for dead agents."
+
+def test_step_env_both_agents_dead(test_env):
+    key = jax.random.PRNGKey(0)
+    _, state = test_env.reset(key)
+
+    # Create actions that allocate all sugars to reproduction.
+    actions = {agent: jnp.array([0.5, 0.2, 0.3, 0.1, 0.4]) for agent in test_env.agents}
+
+    # Manually set health of both agents to 0 to simulate death.
+    with jdc.copy_and_mutate(state) as state:
+        state.agents[0].health = jnp.array(0.)
+        state.agents[1].health = jnp.array(0.)
+
+    # State variable values (e.g., biomass, sugars) should be static until episode end.
+    # Step a few times to verify this.
+    _, state, _, _, _ = test_env.step_env(key, state, actions)
+    _, state, _, _, _ = test_env.step_env(key, state, actions)
+    _, state, _, _, _ = test_env.step_env(key, state, actions)
+
+    assert state.agents[0].health == 0., "Agent 0 should be dead."
+    assert state.agents[1].health == 0., "Agent 1 should be dead."
+    assert state.agents[0].biomass == 0.1, "Biomass should not change for dead agent 0."
+    assert state.agents[1].biomass == 0.1, "Biomass should not change for dead agent 1."
+    assert state.agents[0].sugars == 50., "Sugars should not change for dead agent 0."
+    assert state.agents[1].sugars == 50., "Sugars should not change for dead agent 1."
+    assert state.agents[0].phosphorus == 100., "Phosphorus should not change for dead agent 0."
+    assert state.agents[1].phosphorus == 100., "Phosphorus should be unchanged as no trade can occur."
+
+    assert (state.p_trades == jnp.array([[0., 0.], [0., 0.]])).all(), "Trade flow should be zero for dead agents."
+    assert (state.s_trades == jnp.array([[0., 0.], [0., 0.]])).all(), "Trade flow should be zero for dead agents."
