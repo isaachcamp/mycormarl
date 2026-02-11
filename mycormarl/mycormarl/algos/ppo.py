@@ -41,7 +41,7 @@ class ActorCritic(nn.Module):
         return pi, jnp.squeeze(critic, axis=-1)
 
 
-class ExperienceBuffer(NamedTuple):
+class Trajectory(NamedTuple):
     done: jnp.ndarray
     action: jnp.ndarray
     value: jnp.ndarray
@@ -167,8 +167,8 @@ def make_train(env, config):
                     rng_step, env_state, env_act
                 )
 
-                # Collect ExperienceBuffer object
-                tree_transition = ExperienceBuffer(
+                # Collect Trajectory object
+                tree_transition = Trajectory(
                     done['agent_0'].squeeze(),
                     tree_action,
                     jnp.array(tree_value),
@@ -177,7 +177,7 @@ def make_train(env, config):
                     tree_obs_batch,
                     info=info['agent_0']
                 )
-                fungus_transition = ExperienceBuffer(
+                fungus_transition = Trajectory(
                     done['agent_1'].squeeze(),
                     fungus_action,
                     jnp.array(fungus_value),
@@ -383,19 +383,18 @@ def make_train(env, config):
             )
 
             train_state = {'tree': update_tree_state[0], 'fungus': update_fungus_state[0]}
-            metric = jnp.stack([tree_traj.reward, fungus_traj.reward])
             rng = update_fungus_state[-1]
 
             runner_state = (train_state, env_state, last_obs, rng)
-            return runner_state, (tree_traj, fungus_traj, metric)
+            return runner_state, (tree_traj, fungus_traj)
 
         # Scan over update steps.
         rng, _rng = jax.random.split(rng)
         runner_state = (train_state, env_state, obs, _rng)
-        runner_state, info = jax.lax.scan(
+        runner_state, (tree_traj, fungus_traj) = jax.lax.scan(
             _update_step, runner_state, None, NUM_UPDATES
         )
         # metric shape (NUM_UPDATES, NUM_ACTORS, NUM_STEPS, NUM_ENVS)
-        return {"runner_state": runner_state, "info": info}
+        return {"runner_state": runner_state, "trajectories": (tree_traj, fungus_traj)}
 
     return train
