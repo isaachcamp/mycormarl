@@ -13,6 +13,7 @@ import jax_dataclasses as jdc
 from mycormarl.agents.agent import AgentState
 
 
+# TODO: add AgentState inits with configurable parameters (e.g. initial health, biomass, etc.)
 # TODO: consider more complex allocation strategies based on past allocations.
 
 
@@ -153,8 +154,7 @@ class BaseMycorMarl(MultiAgentEnv):
                 key, i, state, actions[agent]
             )
 
-            # Check if an agent is dead.
-            # At the moment, agent death also causes terminal state.
+            # Check if an agent is dead. If so, set done flag for that agent.
             dones[agent] = self.check_agent_is_dead(state.agents[i])
 
             rewards[agent] = jnp.array(reward)
@@ -173,6 +173,7 @@ class BaseMycorMarl(MultiAgentEnv):
         state = jdc.replace(state, step=state.step + 1)
 
         done = self.is_terminal(state)
+        dones = {agent: done for agent in self.agents}
         dones["__all__"] = done
 
         # Get observations for next state
@@ -231,6 +232,13 @@ class BaseMycorMarl(MultiAgentEnv):
         # Execute agent-specific function for extra biology, returns modified agent state.
         agent_mod = jax.lax.switch(agt_id, step_fns, key, state, action, state.agents[agt_id])
 
+        # Update state with agent and trade values
+        with jdc.copy_and_mutate(state) as state:
+            state.agents[agt_id].health = new_health
+            state.agents[agt_id].biomass += biomass_increase
+            state.agents[agt_id].phosphorus = agent_mod.phosphorus + p_acquired
+            state.agents[agt_id].sugars = agent_mod.sugars - s_used
+
         info = {
             "props_generated": props_generated,
             "growth": growth,
@@ -240,14 +248,11 @@ class BaseMycorMarl(MultiAgentEnv):
             "p_trade": p_trade,
             "phosphorus_acquired": p_acquired,
             "sugars_generated": agent_mod.sugars - state.agents[agt_id].sugars,
+            "health": new_health,
+            "biomass": state.agents[agt_id].biomass,
+            "avail_sugars": state.agents[agt_id].sugars,
+            "avail_phosphorus": state.agents[agt_id].phosphorus
         }
-
-        # Update state with agent and trade values
-        with jdc.copy_and_mutate(state) as state:
-            state.agents[agt_id].health = new_health
-            state.agents[agt_id].biomass += biomass_increase
-            state.agents[agt_id].phosphorus = agent_mod.phosphorus + p_acquired
-            state.agents[agt_id].sugars = agent_mod.sugars - s_used
 
         # Rewards for agent based on allocation (simplified)
         reward = 0.0
