@@ -201,7 +201,8 @@ class BaseMycorMarl(MultiAgentEnv):
         action: [p_trade, s_trade, growth, maintenance, reproduction]
         """
         # Check if agent is already dead before processing actions, zero out actions if so.
-        # state, action = self.handle_agent_death(state, agt_id, action)
+        already_dead = self.check_agent_is_dead(state.agents[agt_id])
+        state, action = self.handle_agent_death(already_dead, state, agt_id, action)
 
         [p_trade, s_trade, growth, maintenance, reproduction] = action
 
@@ -227,7 +228,8 @@ class BaseMycorMarl(MultiAgentEnv):
         p_acquired = jnp.floor(
             self.p_uptake_max_rate \
             * state.agents[agt_id].p_uptake_efficiency \
-            * state.agents[agt_id].biomass
+            * state.agents[agt_id].biomass \
+            * (1 - already_dead) # If agent is dead, no P is acquired.
         )
 
         # --- Update agent state ---
@@ -251,7 +253,8 @@ class BaseMycorMarl(MultiAgentEnv):
             state.agents[agt_id].sugars = agent_mod.sugars - s_used
 
         # Check if agent is dead after health update.
-        is_dead = self.check_agent_is_dead(state.agents[agt_id])
+        now_dead = self.check_agent_is_dead(state.agents[agt_id]).astype(jnp.float32)
+        dead_this_step = now_dead - already_dead.astype(jnp.float32)
 
         info = {
             "props_generated": props_generated,
@@ -272,7 +275,7 @@ class BaseMycorMarl(MultiAgentEnv):
         reward = 0.0
         shaped_rewards = {}
         reward += props_generated * 1.5 # Reward for each seed produced
-        reward += -100 * is_dead # Large penalty for death
+        reward += -100 * dead_this_step # Large penalty for death
 
         return state, reward, shaped_rewards, info
 
@@ -378,6 +381,27 @@ class BaseMycorMarl(MultiAgentEnv):
 
         return jnp.array([p_trade, *s_allocations])
 
+    @staticmethod
+    def handle_agent_death(
+            is_dead: bool, state: State, agt_id: int, action: jax.Array
+        ) -> Tuple[State, jax.Array]:
+        """Set agent state to dead and remove connections if health <= 0."""
+        with jdc.copy_and_mutate(state) as new_state:
+            # Remove connections if agent is dead.
+            new_state.adj = new_state.adj.at[agt_id, :].multiply(1 - is_dead)
+            new_state.adj = new_state.adj.at[:, agt_id].multiply(1 - is_dead)
+
+            # Remove any incoming trades from agents already stepped.
+            new_state.p_trades = new_state.p_trades.at[:].multiply(new_state.adj)
+            new_state.s_trades = new_state.s_trades.at[:].multiply(new_state.adj)
+
+        action = jax.lax.cond(
+            is_dead,
+            lambda x: jnp.zeros_like(x), # If dead, zero out all actions.
+            lambda x: x, # If alive, keep actions unchanged.
+            action
+        )
+        return new_state, action
 
     def agent_obs_space(self, size: int) -> spaces.Space:
         return spaces.Box(-jnp.inf, jnp.inf, shape=(size,), dtype=jnp.float32)
@@ -387,8 +411,8 @@ class BaseMycorMarl(MultiAgentEnv):
 
     def is_terminal(self, state: State) -> jax.Array:
         return state.terminal | \
-               (state.step >= self.max_episode_steps) | \
-               jnp.any(jnp.array([agent.health <= 0.0 for agent in state.agents]))
+               (state.step >= self.max_episode_steps) #| \
+            #    jnp.any(jnp.array([agent.health <= 0.0 for agent in state.agents]))
 
     def check_agent_is_dead(self, agent: AgentState) -> jax.Array:
         return jnp.array(agent.health <= 0.0)
