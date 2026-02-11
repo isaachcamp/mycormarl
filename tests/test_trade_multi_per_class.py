@@ -18,8 +18,6 @@ def test_env(cfg: DictConfig):
     env = BaseMycorMarl(
         num_agents=3,
         agent_types={"plant": 1, "fungus": 2},
-        obs_size=4,
-        action_size=5,
         growth_cost=cfg.control_params.GROWTH_COST,
         reproduction_cost=cfg.control_params.REPRODUCTION_COST,
         maintenance_cost_ratio=cfg.control_params.MAINTENANCE_COST_RATIO,
@@ -112,7 +110,6 @@ def test_step_trade_pos_val(test_env):
     state, _, _, _ = test_env.step_agent(key, 1, state, allocated_actions)
     state, _, _, _ = test_env.step_agent(key, 2, state, allocated_actions)
 
-    print(info["sugars_generated"])
     # Trades subtracted from each agent before processing incoming trades, i.e.,
     # traded resources are only available next step.
     # Fungus agents acquire 3 P from environment at 0.1 biomass.

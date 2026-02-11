@@ -18,8 +18,6 @@ def test_env(cfg: DictConfig):
     env = BaseMycorMarl(
         num_agents=2,
         agent_types={"plant": 1, "fungus": 1},
-        obs_size=4,
-        action_size=5,
         growth_cost=cfg.control_params.GROWTH_COST,
         reproduction_cost=cfg.control_params.REPRODUCTION_COST,
         maintenance_cost_ratio=cfg.control_params.MAINTENANCE_COST_RATIO,

@@ -18,8 +18,6 @@ def test_env(cfg: DictConfig):
     env = BaseMycorMarl(
         num_agents=2,
         agent_types={"plant": 1, "fungus": 1},
-        obs_size=4,
-        action_size=5,
         growth_cost=cfg.control_params.GROWTH_COST,
         reproduction_cost=cfg.control_params.REPRODUCTION_COST,
         maintenance_cost_ratio=cfg.control_params.MAINTENANCE_COST_RATIO,
@@ -381,3 +379,15 @@ def test_all_state_vars_full_vals_set(test_env):
     #            minus 10 for trade given, plus 10 for trade received.
     assert state.agents[0].sugars == 50. + 16. - 5. - 15. - 10. + 10., "Sugars incorrectly updated for plant."
     assert state.agents[1].sugars == 50. - 5. - 15. - 10. + 10., "Sugars incorrectly updated for fungus."
+
+def test_trades_in_obs(test_env):
+    key = jax.random.PRNGKey(0)
+    obs, state = test_env.reset(key)
+
+    # Create actions that allocate all sugars to reproduction.
+    actions = {agent: jnp.array([0.5, 0.3, 0.2, 0.1, 0.4]) for agent in test_env.agents}
+    obs, state, _, _, _ = test_env.step_env(key, state, actions)
+
+    # Check that trade flows are included in observations and are correct.
+    assert obs["agent_0"][-2:].tolist() == [50., 15.], "Trade flows not correctly included in plant observation."
+    assert obs["agent_1"][-2:].tolist() == [50., 15.], "Trade flows not correctly included in fungus observation."

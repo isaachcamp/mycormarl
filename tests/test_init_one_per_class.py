@@ -18,8 +18,6 @@ def test_env(cfg: DictConfig):
     env = BaseMycorMarl(
         num_agents=2,
         agent_types={"plant": 1, "fungus": 1},
-        obs_size=4,
-        action_size=5,
         growth_cost=cfg.control_params.GROWTH_COST,
         reproduction_cost=cfg.control_params.REPRODUCTION_COST,
         maintenance_cost_ratio=cfg.control_params.MAINTENANCE_COST_RATIO,
@@ -52,10 +50,10 @@ def test_env_initialisation(test_env):
     assert test_env.agents == ["agent_0", "agent_1"], "Agent names not initialized correctly."
     assert test_env.agent_types == [0, 1], "Agent types not initialized correctly."
 
-    assert test_env.observation_spaces["agent_0"].shape == (4,), "Observation space shape not initialized correctly."
+    assert test_env.observation_spaces["agent_0"].shape == (6,), "Observation space shape not initialized correctly."
     assert test_env.action_spaces["agent_0"].shape == (5,), "Action space size not initialized correctly."
 
-    assert test_env.observation_spaces["agent_1"].shape == (4,), "Observation space shape not initialized correctly."
+    assert test_env.observation_spaces["agent_1"].shape == (6,), "Observation space shape not initialized correctly."
     assert test_env.action_spaces["agent_1"].shape == (5,), "Action space size not initialized correctly."
 
     assert test_env.max_episode_steps == 5, "Max episode steps not initialized correctly."
@@ -73,11 +71,11 @@ def test_env_reset(test_env):
     assert state.s_trades.shape == (2, 2), "Sugar trade matrix not initialized correctly on reset."
     assert state.p_trades.shape == (2, 2), "Phosphorus trade matrix not initialized correctly on reset."
 
-    assert obs["agent_0"].shape == (4,), "Observation for agent 0 not initialized correctly on reset."
-    assert obs["agent_1"].shape == (4,), "Observation for agent 1 not initialized correctly on reset."
+    assert obs["agent_0"].shape == (6,), "Observation for agent 0 not initialized correctly on reset."
+    assert obs["agent_1"].shape == (6,), "Observation for agent 1 not initialized correctly on reset."
 
-    assert (obs["agent_0"] == jnp.array([100.0, 0.1, 100.0, 50.0])).all(), "Observations incorrect upon reset."
-    assert (obs["agent_1"] == jnp.array([100.0, 0.1, 100.0, 50.0])).all(), "Observations incorrect upon reset."
+    assert (obs["agent_0"] == jnp.array([100.0, 0.1, 100.0, 50.0, 0.0, 0.0])).all(), "Observations incorrect upon reset."
+    assert (obs["agent_1"] == jnp.array([100.0, 0.1, 100.0, 50.0, 0.0, 0.0])).all(), "Observations incorrect upon reset."
 
     assert not state.terminal, "Terminal state incorrectly reset."
 
@@ -127,11 +125,11 @@ def test_get_obs(test_env):
 
     assert set(test_env.agents) == set(obs.keys()), "Observation keys do not match agent keys."
 
-    assert obs["agent_0"].shape == (4,), "Observation for agent 0 not initialized correctly on reset."
-    assert obs["agent_1"].shape == (4,), "Observation for agent 1 not initialized correctly on reset."
+    assert obs["agent_0"].shape == (6,), "Observation for agent 0 not initialized correctly on reset."
+    assert obs["agent_1"].shape == (6,), "Observation for agent 1 not initialized correctly on reset."
 
-    assert (obs["agent_0"] == jnp.array([100.0, 0.1, 100.0, 50.0])).all(), "Observations incorrect upon reset."
-    assert (obs["agent_1"] == jnp.array([100.0, 0.1, 100.0, 50.0])).all(), "Observations incorrect upon reset."
+    assert (obs["agent_0"] == jnp.array([100.0, 0.1, 100.0, 50.0, 0.0, 0.0])).all(), "Observations incorrect upon reset."
+    assert (obs["agent_1"] == jnp.array([100.0, 0.1, 100.0, 50.0, 0.0, 0.0])).all(), "Observations incorrect upon reset."
 
 def test_is_terminal_manual(test_env):
     key = jax.random.PRNGKey(0)

@@ -44,8 +44,6 @@ class BaseMycorMarl(MultiAgentEnv):
         self,
         num_agents: int,
         agent_types: Dict[str, int],
-        obs_size: int,
-        action_size: int,
         growth_cost: float = 100.0,
         reproduction_cost: float = 50.0,
         maintenance_cost_ratio: float = 0.5,
@@ -77,6 +75,9 @@ class BaseMycorMarl(MultiAgentEnv):
         self.p_cost_per_sugar = p_cost_per_sugar
         self.trade_flow_constant = trade_flow_constant
 
+        obs_size = 4 + (num_agents - 1) * 2 # Add space for incoming trade flows in observations.
+        action_size = 5 # [p_trade, s_trade, growth, maintenance, reproduction]
+
         self.observation_spaces = {agent: self.agent_obs_space(obs_size) for agent in self.agents}
         self.action_spaces = {agent: self.agent_action_space(action_size) for agent in self.agents}
 
@@ -94,6 +95,13 @@ class BaseMycorMarl(MultiAgentEnv):
                 agent_state.phosphorus,
                 agent_state.sugars
             ])
+
+            # Add received resource trades to observations, select all but self.
+            s_trades = state.s_trades[:, i].flatten() # Sugars received from other agents
+            s_trades = jnp.delete(s_trades, i) # Remove self-trade
+            p_trades = state.p_trades[:, i].flatten() # Phosphorus received from other agents
+            p_trades = jnp.delete(p_trades, i) # Remove self-trade
+            obs_vector = jnp.concatenate((obs_vector, p_trades, s_trades))
 
             assert obs_vector.shape[0] == self.observation_spaces[agent].shape[0], \
                 "Observation size mismatch"
@@ -154,20 +162,16 @@ class BaseMycorMarl(MultiAgentEnv):
                 key, i, state, actions[agent]
             )
 
-            # Check if an agent is dead. If so, set done flag for that agent.
-            dones[agent] = self.check_agent_is_dead(state.agents[i])
+            # Set done flag to True for agent if dead.
+            # dones[agent] = self.check_agent_is_dead(state.agents[i])
 
             rewards[agent] = jnp.array(reward)
             shaped_rewards[agent] = shaped_rewards
-            infos[agent] = {**info, **extra_info}  # combine extra_info with info if needed
+            infos[agent] = {**info, **extra_info} # combine extra_info with info if needed
 
         # After agents have stepped, process trade flows to update states based on trades.
         for i, agent in enumerate(self.agents):
             state = self.step_trade(state, i)
-
-        # Reset trade matrices for next step.
-        state = jdc.replace(state, p_trades=jnp.zeros_like(state.p_trades))
-        state = jdc.replace(state, s_trades=jnp.zeros_like(state.s_trades))
 
         # Update step and terminal state
         state = jdc.replace(state, step=state.step + 1)
@@ -178,6 +182,10 @@ class BaseMycorMarl(MultiAgentEnv):
 
         # Get observations for next state
         obs = self._get_obs(state)
+
+        # Reset trade matrices for next step.
+        state = jdc.replace(state, p_trades=jnp.zeros_like(state.p_trades))
+        state = jdc.replace(state, s_trades=jnp.zeros_like(state.s_trades))
 
         return (
             jax.lax.stop_gradient(obs),
@@ -239,6 +247,15 @@ class BaseMycorMarl(MultiAgentEnv):
             state.agents[agt_id].phosphorus = agent_mod.phosphorus + p_acquired
             state.agents[agt_id].sugars = agent_mod.sugars - s_used
 
+        # Check if agent is dead after health update.
+        is_dead = self.check_agent_is_dead(state.agents[agt_id])
+
+        # Set states vars to 0 if agent is dead.
+        # with jdc.copy_and_mutate(state) as state:
+        #     state.agents[agt_id].biomass *= (1 - is_dead)
+        #     state.agents[agt_id].phosphorus *= (1 - is_dead)
+        #     state.agents[agt_id].sugars *= (1 - is_dead)
+
         info = {
             "props_generated": props_generated,
             "growth": growth,
@@ -258,6 +275,7 @@ class BaseMycorMarl(MultiAgentEnv):
         reward = 0.0
         shaped_rewards = {}
         reward += props_generated * 1.5 # Reward for each seed produced
+        reward += -100 * is_dead # Large penalty for death
 
         return state, reward, shaped_rewards, info
 
