@@ -107,21 +107,13 @@ def test_step_trade_pos_val(test_env):
     s_trade = 50.
 
     state, _, _, _ = test_env.step_agent(key, 0, state, allocated_actions)
-    state, _, _, _ = test_env.step_agent(key, 1, state, allocated_actions)
-
-    # Trades subtracted from each agent before processing incoming trades, i.e.,
-    # traded resources are only available next step.
-    assert state.agents[0].phosphorus == 0., "Traded P incorrectly subtracted."
-    assert state.agents[0].sugars == 0., "Traded Sugars incorrectly subtracted."
-
-    # Fungus agent acquires 3 P from environment at 0.1 biomass.
-    assert state.agents[1].phosphorus == 3., "Traded P incorrectly subtracted."
-    assert state.agents[1].sugars == 0., "Traded Sugars incorrectly subtracted."
+    # Only trade half for second agent to test non-symmetric trades.
+    state, _, _, _ = test_env.step_agent(key, 1, state, allocated_actions / 2)
 
     state = test_env.step_trade(state, 0)
     state = test_env.step_trade(state, 1)
 
-    assert state.agents[0].phosphorus == p_trade, "Traded P incorrectly added."
-    assert state.agents[0].sugars == s_trade, "Traded Sugars incorrectly added."
-    assert state.agents[1].phosphorus == p_trade + 3, "Traded P incorrectly added."
-    assert state.agents[1].sugars == s_trade, "Traded Sugars incorrectly added."
+    assert state.agents[0].phosphorus == p_trade / 2, "Traded P incorrectly added."
+    assert state.agents[0].sugars == s_trade / 2, "Traded Sugars incorrectly added."
+    assert state.agents[1].phosphorus == (p_trade * 1.5) + 3, "Traded P incorrectly added."
+    assert state.agents[1].sugars == (s_trade * 1.5), "Traded Sugars incorrectly added."

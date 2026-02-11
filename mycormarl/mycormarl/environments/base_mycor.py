@@ -147,7 +147,7 @@ class BaseMycorMarl(MultiAgentEnv):
 
         rewards = {}
         shaped_rewards = {}
-        dones = {agent: False for agent in self.agents}
+        dones = {agent: jnp.array(False) for agent in self.agents}
         infos = {}
 
         for i, agent in enumerate(self.agents):
@@ -163,7 +163,7 @@ class BaseMycorMarl(MultiAgentEnv):
             )
 
             # Set done flag to True for agent if dead.
-            # dones[agent] = self.check_agent_is_dead(state.agents[i])
+            dones[agent] = self.check_agent_is_dead(state.agents[i])
 
             rewards[agent] = jnp.array(reward)
             shaped_rewards[agent] = shaped_rewards
@@ -177,7 +177,7 @@ class BaseMycorMarl(MultiAgentEnv):
         state = jdc.replace(state, step=state.step + 1)
 
         done = self.is_terminal(state)
-        dones = {agent: done for agent in self.agents}
+        # dones = {agent: done for agent in self.agents}
         dones["__all__"] = done
 
         # Get observations for next state
@@ -200,6 +200,9 @@ class BaseMycorMarl(MultiAgentEnv):
         Step basic functions and additional agent-specific biology.
         action: [p_trade, s_trade, growth, maintenance, reproduction]
         """
+        # Check if agent is already dead before processing actions, zero out actions if so.
+        # state, action = self.handle_agent_death(state, agt_id, action)
+
         [p_trade, s_trade, growth, maintenance, reproduction] = action
 
         # List of agent-specific step functions for lax.switch
@@ -250,12 +253,6 @@ class BaseMycorMarl(MultiAgentEnv):
         # Check if agent is dead after health update.
         is_dead = self.check_agent_is_dead(state.agents[agt_id])
 
-        # Set states vars to 0 if agent is dead.
-        # with jdc.copy_and_mutate(state) as state:
-        #     state.agents[agt_id].biomass *= (1 - is_dead)
-        #     state.agents[agt_id].phosphorus *= (1 - is_dead)
-        #     state.agents[agt_id].sugars *= (1 - is_dead)
-
         info = {
             "props_generated": props_generated,
             "growth": growth,
@@ -279,9 +276,14 @@ class BaseMycorMarl(MultiAgentEnv):
 
         return state, reward, shaped_rewards, info
 
-    def step_plant(self, key: jax.Array, state, action: Dict[str, jax.Array], agent: AgentState):
-        # Sugars generated from sunlight, constrained by available phosphorus
-        p_use = agent.phosphorus // self.p_cost_per_sugar
+    def step_plant(self, key: jax.Array, state, action: jax.Array, agent: AgentState):
+        # Check agent is alive before processing plant-specific logic.
+        is_dead = self.check_agent_is_dead(agent)
+        p_trade = action[0]
+
+        # Sugars generated from sunlight, constrained by available phosphorus.
+        # If agent is dead, no sugars are generated and phosphorus is not used.
+        p_use = (agent.phosphorus * (1 - is_dead) - p_trade) // self.p_cost_per_sugar
         s_gen = self.max_sugar_gen_rate * agent.biomass * p_use
 
         with jdc.copy_and_mutate(agent) as agent_mod:
@@ -290,7 +292,7 @@ class BaseMycorMarl(MultiAgentEnv):
 
         return agent_mod
 
-    def step_fungus(self, key: jax.Array, state, action: Dict[str, jax.Array], agent: AgentState):
+    def step_fungus(self, key: jax.Array, state, action: jax.Array, agent: AgentState):
         # Placeholder implementation for stepping a fungus agent.
         return agent
 
@@ -306,7 +308,7 @@ class BaseMycorMarl(MultiAgentEnv):
         # Splits total allocation evenly to each partner.
         # If agent has zero connections, the trade allocation has no effect.
         no_of_partners = state.adj[agt_id].sum()
-        no_of_partners = jnp.where(no_of_partners > 0, no_of_partners, 1.0)  # Avoid division by zero
+        no_of_partners = jnp.where(no_of_partners > 0, no_of_partners, 1.0) # Avoid division by 0.
 
         outgoing_p = (p_trade * state.adj[agt_id]) / no_of_partners
         outgoing_s = (s_trade * state.adj[agt_id]) / no_of_partners
@@ -316,22 +318,20 @@ class BaseMycorMarl(MultiAgentEnv):
             new_state.p_trades = state.p_trades.at[agt_id, :].add(outgoing_p)
             new_state.s_trades = state.s_trades.at[agt_id, :].add(outgoing_s)
 
-            # Remove phosphorus and sugars from agent based on total trade allocation.
-            # Prevents automatic sugar generation.
-            new_state.agents[agt_id].phosphorus -= p_trade
-            new_state.agents[agt_id].sugars -= s_trade
-
         return new_state
 
     @staticmethod
     def step_trade(state: State, agt_id: int) -> State:
         """Update agent states based on trade flows."""
-        p_trade = state.p_trades[:, agt_id].sum()
-        s_trade = state.s_trades[:, agt_id].sum()
+        p_trade_in = state.p_trades[:, agt_id].sum()
+        s_trade_in = state.s_trades[:, agt_id].sum()
+
+        p_trade_out = state.p_trades[agt_id, :].sum()
+        s_trade_out = state.s_trades[agt_id, :].sum()
 
         with jdc.copy_and_mutate(state) as new_state:
-            new_state.agents[agt_id].phosphorus += p_trade
-            new_state.agents[agt_id].sugars += s_trade
+            new_state.agents[agt_id].phosphorus += p_trade_in - p_trade_out
+            new_state.agents[agt_id].sugars += s_trade_in - s_trade_out
 
         return new_state
 
@@ -377,6 +377,7 @@ class BaseMycorMarl(MultiAgentEnv):
         s_allocations = jnp.floor(actions[1:] * agent.sugars)
 
         return jnp.array([p_trade, *s_allocations])
+
 
     def agent_obs_space(self, size: int) -> spaces.Space:
         return spaces.Box(-jnp.inf, jnp.inf, shape=(size,), dtype=jnp.float32)
