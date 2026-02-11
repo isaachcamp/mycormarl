@@ -10,10 +10,6 @@ import distrax
 import optax
 
 
-ACTIONS = 5
-OBSERVATIONS = 4
-
-
 class ActorCritic(nn.Module):
     action_dim: int = 5
     activation: str = 'relu'  # Activation function for the network
@@ -96,12 +92,12 @@ def make_train(env, config):
         Note: This function assumes a single environment and does not handle multiple environments.
         """
         # Initialize independent tree and fungus networks
-        tree_policy = ActorCritic(ACTIONS, activation=config.ACTIVATION)
-        fungus_policy = ActorCritic(ACTIONS, activation=config.ACTIVATION)
+        tree_policy = ActorCritic(env.action_spaces["agent_0"].shape[0], activation=config.ACTIVATION)
+        fungus_policy = ActorCritic(env.action_spaces["agent_1"].shape[0], activation=config.ACTIVATION)
 
         rng, tree_rng, fungus_rng = jax.random.split(rng, 3)
         # init_x = jnp.zeros(env.observation_space("agent_0").shape).flatten()
-        init_x = jnp.zeros((1, OBSERVATIONS)) # same for both agents
+        init_x = jnp.zeros((1, env.observation_spaces["agent_0"].shape[0])) # same for both agents
 
         tree_tx = optax.adam(learning_rate=config.LR) # Adam optimizer with static learning rate
         fungus_tx = optax.adam(learning_rate=config.LR)
