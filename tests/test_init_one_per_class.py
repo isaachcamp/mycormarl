@@ -147,7 +147,7 @@ def test_is_terminal_max_steps(test_env):
 
     assert test_env.is_terminal(state), "Environment did not recognize terminal state after max episode steps."
 
-def test_is_terminal_agent_death(test_env):
+def test_is_terminal_one_agent_dead(test_env):
     key = jax.random.PRNGKey(0)
     _, state = test_env.reset(key)
 
@@ -155,7 +155,18 @@ def test_is_terminal_agent_death(test_env):
     with jdc.copy_and_mutate(state) as state:
         state.agents[0].health = jnp.array(0.0)
 
-    assert test_env.is_terminal(state), "Environment did not recognize terminal state after agent death."
+    assert not test_env.is_terminal(state), "Environment terminated after one agent's death."
+
+def test_is_terminal_all_agents_dead(test_env):
+    key = jax.random.PRNGKey(0)
+    _, state = test_env.reset(key)
+
+    # Manually set one agent's health to 0 and check.
+    with jdc.copy_and_mutate(state) as state:
+        state.agents[0].health = jnp.array(0.0)
+        state.agents[1].health = jnp.array(0.0)
+
+    assert test_env.is_terminal(state), "Environment did not recognize terminal state after all agents' death."
 
 def test_is_terminal_no_terminal_conditions(test_env):
     key = jax.random.PRNGKey(0)

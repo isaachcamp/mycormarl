@@ -15,6 +15,7 @@ from mycormarl.agents.agent import AgentState
 
 # TODO: add AgentState inits with configurable parameters (e.g. initial health, biomass, etc.)
 # TODO: consider more complex allocation strategies based on past allocations.
+# TODO: decouple constraints from the environment step function.
 
 
 class AgentType(IntEnum):
@@ -407,12 +408,12 @@ class BaseMycorMarl(MultiAgentEnv):
         return spaces.Box(-jnp.inf, jnp.inf, shape=(size,), dtype=jnp.float32)
 
     def agent_action_space(self, size: int) -> spaces.Space:
-        return spaces.Box(-.1, 1.0, shape=(size,), dtype=jnp.float32)
+        return spaces.Box(0., 1.0, shape=(size,), dtype=jnp.float32)
 
     def is_terminal(self, state: State) -> jax.Array:
         return state.terminal | \
-               (state.step >= self.max_episode_steps) #| \
-            #    jnp.any(jnp.array([agent.health <= 0.0 for agent in state.agents]))
+               (state.step >= self.max_episode_steps) | \
+               jnp.all(jnp.array([agent.health <= 0.0 for agent in state.agents]))
 
     def check_agent_is_dead(self, agent: AgentState) -> jax.Array:
         return jnp.array(agent.health <= 0.0)

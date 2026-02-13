@@ -101,15 +101,28 @@ def test_get_obs(test_env):
     assert (obs["agent_1"] == jnp.array([100.0, 0.1, 100.0, 50.0, 0.0, 0.0, 0.0, 0.0])).all(), "Observations incorrect upon reset."
     assert (obs["agent_2"] == jnp.array([100.0, 0.1, 100.0, 50.0, 0.0, 0.0, 0.0, 0.0])).all(), "Observations incorrect upon reset."
 
-def test_is_terminal_agent_death(test_env):
+def test_is_terminal_some_agents_dead(test_env):
     key = jax.random.PRNGKey(0)
-    obs, state = test_env.reset(key)
+    _, state =test_env.reset(key)
 
     # Manually set one agent's health to 0 and check.
     with jdc.copy_and_mutate(state) as state:
+        state.agents[0].health = jnp.array(0.0)
+        state.agents[1].health = jnp.array(0.0)
+
+    assert not test_env.is_terminal(state), "Environment terminated when only some agents are dead."
+
+def test_is_terminal_all_agents_dead(test_env):
+    key = jax.random.PRNGKey(0)
+    _, state = test_env.reset(key)
+
+    # Manually set one agent's health to 0 and check.
+    with jdc.copy_and_mutate(state) as state:
+        state.agents[0].health = jnp.array(0.0)
+        state.agents[1].health = jnp.array(0.0)
         state.agents[2].health = jnp.array(0.0)
 
-    assert test_env.is_terminal(state), "Environment did not recognize terminal state after agent death."
+    assert test_env.is_terminal(state), "Environment did not recognize terminal state after all agents' death."
 
 def test_create_adj_matrix_fc_interclass(test_env):
     key = jax.random.PRNGKey(0)
