@@ -38,13 +38,14 @@ class ActorCritic(nn.Module):
 
 
 class Trajectory(NamedTuple):
-    done: jnp.ndarray
+    done: jnp.ndarray # Flag whether agent is done at this step; shape (NUM_STEPS, NUM_ENVS).
     action: jnp.ndarray
     value: jnp.ndarray
     reward: jnp.ndarray
     log_prob: jnp.ndarray
     obs: jnp.ndarray
     info: jnp.ndarray
+    terminal: jnp.ndarray  # Environment-level termination flag (e.g. global done like done['__all__']); differs from per-agent `done` and is used where we need to know if the entire episode has ended rather than a single agent.
 
 
 def batchify(
@@ -171,7 +172,8 @@ def make_train(env, config):
                     reward['agent_0'].squeeze(),
                     tree_log_prob,
                     tree_obs_batch,
-                    info=info['agent_0']
+                    info=info['agent_0'],
+                    terminal=done["__all__"].squeeze()
                 )
                 fungus_transition = Trajectory(
                     done['agent_1'].squeeze(),
@@ -180,7 +182,8 @@ def make_train(env, config):
                     reward['agent_1'].squeeze(),
                     fungus_log_prob,
                     fungus_obs_batch,
-                    info=info['agent_1']
+                    info=info['agent_1'],
+                    terminal=done["__all__"].squeeze()
                 )
 
                 runner_state = (train_state, env_state, obs, rng)
