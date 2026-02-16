@@ -272,7 +272,7 @@ class BaseMycorMarl(MultiAgentEnv):
             "avail_phosphorus": state.agents[agt_id].phosphorus
         }
 
-        # Rewards for agent based on allocation (simplified)
+        # Rewards for agent based on allocation.
         reward = 0.0
         shaped_rewards = {}
         reward += props_generated * 1.5 # Reward for each seed produced
@@ -287,12 +287,12 @@ class BaseMycorMarl(MultiAgentEnv):
 
         # Sugars generated from sunlight, constrained by available phosphorus.
         # If agent is dead, no sugars are generated and phosphorus is not used.
-        p_use = (agent.phosphorus * (1 - is_dead) - p_trade) // self.p_cost_per_sugar
-        s_gen = self.max_sugar_gen_rate * agent.biomass * p_use
+        p_use = agent.phosphorus * (1 - is_dead) - p_trade
+        s_gen = jnp.clip(self.max_sugar_gen_rate * agent.biomass, 0, p_use // self.p_cost_per_sugar)
 
         with jdc.copy_and_mutate(agent) as agent_mod:
             agent_mod.sugars += s_gen
-            agent_mod.phosphorus -= (p_use * self.p_cost_per_sugar)
+            agent_mod.phosphorus -= s_gen * self.p_cost_per_sugar # Remove P based on sugars generated.
 
         return agent_mod
 

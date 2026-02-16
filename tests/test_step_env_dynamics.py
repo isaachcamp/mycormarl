@@ -145,10 +145,29 @@ def test_sugar_generation_pos_val(test_env):
     actions = {agent: jnp.array([0., 0., 0., 0., 0.]) for agent in test_env.agents}
     _, state, _, _, _ = test_env.step_env(key, state, actions)
 
-    p_use = 100.0 // test_env.p_cost_per_sugar
-    expected_sugar_gen = test_env.max_sugar_gen_rate * 0.1 * p_use  # Initial biomass of 0.1
+    # p_use = 100.0 // test_env.p_cost_per_sugar
+    expected_sugar_gen = test_env.max_sugar_gen_rate * 0.1  # Initial biomass of 0.1
 
     assert state.agents[0].sugars == expected_sugar_gen + 50., "Sugar generation incorrectly calculated for plant."
+    assert state.agents[0].phosphorus == 100.0 - (expected_sugar_gen * test_env.p_cost_per_sugar), "Phosphorus incorrectly subtracted for plant."
+
+def test_sugar_generation_exceeds_P_supply(test_env):
+    key = jax.random.PRNGKey(0)
+    _, state = test_env.reset(key)
+
+    # Inflate biomass so that capacity for sugar generation exceeds P supply.
+    with jdc.copy_and_mutate(state) as state:
+        state.agents[0].biomass = jnp.array(10.)
+
+    # Create actions that allocate all phosphorus to uptake and no sugars.
+    actions = {agent: jnp.array([0., 0., 0., 0., 0.]) for agent in test_env.agents}
+    _, state, _, _, _ = test_env.step_env(key, state, actions)
+
+    # Should activate clipped function –> initial phosphorus supply * cost per sugar.
+    expected_sugar_gen = 100.0 // test_env.p_cost_per_sugar
+
+    assert state.agents[0].sugars == expected_sugar_gen + 50., "Sugar generation incorrectly calculated when exceeding phosphorus supply."
+    assert state.agents[0].phosphorus == 100.0 - (expected_sugar_gen * test_env.p_cost_per_sugar), "Phosphorus incorrectly subtracted for plant."
 
 def test_sugar_generation_no_P(test_env):
     key = jax.random.PRNGKey(0)
@@ -165,6 +184,7 @@ def test_sugar_generation_no_P(test_env):
     expected_sugar_gen = 0.0
 
     assert state.agents[0].sugars == expected_sugar_gen + 50., "Sugar generation incorrectly calculated for plant with zero phosphorus."
+    assert state.agents[0].phosphorus == 0.0, "Phosphorus should be unchanged for plant."
 
 def test_sugar_generation_trade_all_P(test_env):
     key = jax.random.PRNGKey(0)
@@ -181,6 +201,7 @@ def test_sugar_generation_trade_all_P(test_env):
     expected_sugar_gen = 0.0
 
     assert state.agents[0].sugars == expected_sugar_gen + 50., "Sugar generation incorrectly calculated for plant with zero phosphorus."
+    assert state.agents[0].phosphorus == 100.0, "Phosphorus should be unchanged for plant."
 
 def test_health_update_full_maintenance(test_env):
     key = jax.random.PRNGKey(0)
@@ -246,7 +267,7 @@ def test_health_update_excess_maintenance(test_env):
     assert state.agents[0].health <= expected_health, "Health cannot be greater than 100."
     assert state.agents[1].health <= expected_health, "Health cannot be greater than 100."
 
-    assert state.agents[0].sugars == 33., "Sugars remaining should only be those generated this step for plant."
+    assert state.agents[0].sugars == 10., "Sugars remaining should only be those generated this step for plant."
     assert state.agents[1].sugars == 0., "All sugars should be allocated to maintenance for fungus."
 
 def test_health_recovery(test_env):
@@ -295,7 +316,7 @@ def test_reproduction_greater_than_one_prop(test_env):
     assert info["agent_1"]["props_generated"] == 1.0, "Propagules generated incorrect for fungus."
 
     # 33 sugars generated from initial P.
-    assert state.agents[0].sugars == 30. + 33., "Sugars incorrectly subtracted for plant."
+    assert state.agents[0].sugars == 30. + 10., "Sugars incorrectly subtracted for plant."
     assert state.agents[1].sugars == 0., "Sugars incorrectly subtracted for fungus."
 
 def test_reproduction_part_prop(test_env):
@@ -310,7 +331,7 @@ def test_reproduction_part_prop(test_env):
     assert info["agent_1"]["props_generated"] == 0., "Propagules generated incorrect for fungus."
 
     # 33 sugars generated from initial P.
-    assert state.agents[0].sugars == 50. + 33., "Sugars incorrectly subtracted for plant."
+    assert state.agents[0].sugars == 50. + 10., "Sugars incorrectly subtracted for plant."
     assert state.agents[1].sugars == 50., "Sugars incorrectly subtracted for fungus."
 
 def test_reproduction_zero_val(test_env):
@@ -324,8 +345,8 @@ def test_reproduction_zero_val(test_env):
     assert info["agent_0"]["props_generated"] == 0., "Propagules generated incorrect for plant."
     assert info["agent_1"]["props_generated"] == 0., "Propagules generated incorrect for fungus."
 
-    # 33 sugars generated from initial P.
-    assert state.agents[0].sugars == 50. + 33., "Sugars incorrectly subtracted for plant."
+    # 10 sugars generated from initial P.
+    assert state.agents[0].sugars == 50. + 10., "Sugars incorrectly subtracted for plant."
     assert state.agents[1].sugars == 50., "Sugars incorrectly subtracted for fungus."
 
 def test_rewards_no_dead_agents(test_env):
@@ -386,9 +407,9 @@ def test_all_state_vars_full_vals_set(test_env):
     assert state.agents[0].health == 100.0, "Health incorrectly updated for plant."
     assert state.agents[1].health == 100.0, "Health incorrectly updated for fungus."
 
-    # Plant should use (50 // 3) * 3 = 48 P for sugar generation, not acquire any P,
-    # and receive 50 from trade.
-    assert state.agents[0].phosphorus == 50.0 + 2., "Phosphorus incorrectly updated for plant."
+    # Plant should use 10 * 3 = 30 P for sugar generation, not acquire any P,
+    # and receive and give away 50 from trade.
+    assert state.agents[0].phosphorus == 100. - 50. + 50.0 - 30., "Phosphorus incorrectly updated for plant."
     # Fungus gives 50 P away, receives 50 P from trade and acquires 3 P from environment.
     p_acquired = test_env.p_uptake_max_rate * test_env.fungus_p_uptake_efficiency * 0.1  # Initial biomass of 0.1
     assert state.agents[1].phosphorus == 50.0 + 50.0 + p_acquired, "Phosphorus incorrectly updated for fungus."
@@ -404,7 +425,7 @@ def test_all_state_vars_full_vals_set(test_env):
     # For fungus, minus 5 for maintenance,
     #            minus 15 for growth,
     #            minus 10 for trade given, plus 10 for trade received.
-    assert state.agents[0].sugars == 50. + 16. - 5. - 15. - 10. + 10., "Sugars incorrectly updated for plant."
+    assert state.agents[0].sugars == 50. + 10. - 5. - 15. - 10. + 10., "Sugars incorrectly updated for plant."
     assert state.agents[1].sugars == 50. - 5. - 15. - 10. + 10., "Sugars incorrectly updated for fungus."
 
 def test_trades_in_obs(test_env):

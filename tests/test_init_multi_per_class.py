@@ -42,7 +42,7 @@ def test_env_initialisation(test_env):
     assert test_env.fungus_p_uptake_efficiency == jnp.array(1.0), "Fungus P uptake efficiency not initialized correctly."
     assert test_env.plant_p_uptake_efficiency == jnp.array(0.0), "Plant P uptake efficiency not initialized correctly."
 
-    assert test_env.max_sugar_gen_rate == jnp.array(10.), "Max sugar generation rate not initialized correctly."
+    assert test_env.max_sugar_gen_rate == jnp.array(100.), "Max sugar generation rate not initialized correctly."
     assert test_env.p_cost_per_sugar == jnp.array(3.), "P cost per sugar not initialized correctly."
     assert test_env.trade_flow_constant == jnp.array(100.), "Trade flow constant not initialized correctly."
 
