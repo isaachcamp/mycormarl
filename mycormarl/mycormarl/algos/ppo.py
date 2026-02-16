@@ -115,7 +115,7 @@ def make_train(env, config):
             tx=fungus_tx
         )
 
-        train_state = {"tree": tree_train_state, "fungus": fungus_train_state}
+        train_state = {"plant": tree_train_state, "fungus": fungus_train_state}
 
         # Initialize parallel environments
         rng, _rng = jax.random.split(rng)
@@ -144,7 +144,7 @@ def make_train(env, config):
                 tree_obs_batch, fungus_obs_batch = obs_batch[0], obs_batch[1]
 
                 # Get actions from tree and fungus networks
-                tree_pi, tree_value = tree_policy.apply(train_state["tree"].params, tree_obs_batch)
+                tree_pi, tree_value = tree_policy.apply(train_state["plant"].params, tree_obs_batch)
                 tree_action = tree_pi.sample(seed=tree_act_rng)
                 tree_log_prob = tree_pi.log_prob(tree_action)
 
@@ -199,7 +199,7 @@ def make_train(env, config):
             # Get last observations and apply the policy networks to get the last values.
             train_state, env_state, last_obs, rng = runner_state
             last_obs_batch = batchify(last_obs, env.agents, config.NUM_ENVS, config.NUM_ACTORS)
-            _, tree_last_val = tree_policy.apply(train_state['tree'].params, last_obs_batch[0])
+            _, tree_last_val = tree_policy.apply(train_state['plant'].params, last_obs_batch[0])
             _, fungus_last_val = fungus_policy.apply(train_state['fungus'].params, last_obs_batch[1])
 
             def _calculate_gae(traj_batch, last_val):
@@ -366,7 +366,7 @@ def make_train(env, config):
                 return update_state, total_loss
 
             # Update the tree policy network.
-            update_tree_state = (train_state['tree'], tree_traj, tree_advantages, tree_targets, rng)
+            update_tree_state = (train_state['plant'], tree_traj, tree_advantages, tree_targets, rng)
             update_tree_state, tree_loss_info = jax.lax.scan(
                 _update_epoch, update_tree_state, None, config.UPDATE_EPOCHS
             )
@@ -381,7 +381,7 @@ def make_train(env, config):
                 _update_epoch, update_fungus_state, None, config.UPDATE_EPOCHS
             )
 
-            train_state = {'tree': update_tree_state[0], 'fungus': update_fungus_state[0]}
+            train_state = {'plant': update_tree_state[0], 'fungus': update_fungus_state[0]}
             rng = update_fungus_state[-1]
 
             runner_state = (train_state, env_state, last_obs, rng)
@@ -393,7 +393,7 @@ def make_train(env, config):
         runner_state, (tree_traj, fungus_traj) = jax.lax.scan(
             _update_step, runner_state, None, NUM_UPDATES
         )
-        # metric shape (NUM_UPDATES, NUM_ACTORS, NUM_STEPS, NUM_ENVS)
+
         return {"runner_state": runner_state, "trajectories": (tree_traj, fungus_traj)}
 
     return train
