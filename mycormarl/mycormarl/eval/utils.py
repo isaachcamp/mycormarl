@@ -1,7 +1,17 @@
 
+from typing import Dict
 
-import jax
 import numpy as np
+import jax
+import jax.numpy as jnp
+from flax.training.train_state import TrainState
+
+from mycormarl.environments.base_mycor import BaseMycorMarl
+from mycormarl.algos import ppo
+
+
+# TODO: Run evaluation episode only until terminal state reached.
+
 
 def extract_episodes(qoi_traj: jax.Array, done_traj: jax.Array) -> np.ndarray:
     """
@@ -53,8 +63,6 @@ def extract_episodes(qoi_traj: jax.Array, done_traj: jax.Array) -> np.ndarray:
             if len(episode) < max_episode_length:
                 qoi_arr[env_idx, episode_idx, len(episode):] = np.nan
 
-    # Drop final 30 episodes – they contain a lot of zero rewards, but not sure why?
-    # return np.array(qoi_arr[:, :-30, :])
     return np.array(qoi_arr)
 
 def get_terminal_values(data_episodes: np.ndarray) -> np.ndarray:
@@ -71,7 +79,12 @@ def get_terminal_values(data_episodes: np.ndarray) -> np.ndarray:
 
     # Find index of first terminal nan for each episode (axis=0)
     first_terminal_nan_idx = np.argmax(terminal_nans, axis=-1)
-    data_episodes_idx = np.where(first_terminal_nan_idx == 0, -1, first_terminal_nan_idx) - 1
+
+    # If there are no NaNs, set index to the last valid step (episode_length - 1)
+    data_episodes_idx = np.where(first_terminal_nan_idx == 0, -1, first_terminal_nan_idx)
+
+    # Last step will have reset the environment, so take the value from the step before.
+    data_episodes_idx -= 1
 
     # Select data at the terminal step for each episode
     terminal_data = np.take_along_axis(
@@ -80,6 +93,37 @@ def get_terminal_values(data_episodes: np.ndarray) -> np.ndarray:
         axis=-1
     ).squeeze(-1)  # Remove the extra dimension
 
-    # Convert 0s to NaNs for use of nanmean
-    # terminal_vals = np.where(terminal_data == 0, np.nan, terminal_data)
     return terminal_data
+
+def collect_eval_traj(rng, env: BaseMycorMarl, train_state: Dict[str, TrainState]):
+    first_obs, env_state = env.reset(rng)
+
+    def env_step(runner_state, x):
+        train_state, env_state, last_obs, rng = runner_state
+        rng, plant_act_rng, fungus_act_rng = jax.random.split(rng, 3)
+
+        obs_batch = ppo.batchify(last_obs, env.agents, 1, env.num_agents)
+        plant_pi, _ = train_state['plant'].apply_fn(train_state["plant"].params, obs_batch[0])
+        fungus_pi, _ = train_state['fungus'].apply_fn(train_state["fungus"].params, obs_batch[1])
+
+        plant_action = plant_pi.sample(seed=plant_act_rng)
+        fungus_action = fungus_pi.sample(seed=fungus_act_rng)
+
+        env_act = ppo.unbatchify(
+            jnp.stack([plant_action, fungus_action]),
+            env.agents, 1, env.num_agents
+        )
+        env_act = jax.tree.map(lambda x: jnp.squeeze(x, axis=0), env_act)
+
+        rng, rng_step = jax.random.split(rng)
+        obs, env_state, _, done, info = env.step(rng_step, env_state, env_act)
+
+        runner_state = (train_state, env_state, obs, rng)
+        return runner_state, (env_state, done, info)
+
+    runner_state = (train_state, env_state, first_obs, rng)
+    runner_state, (env_state_traj, done_traj, info_traj) = jax.lax.scan(
+        env_step, runner_state, None, env.max_episode_steps
+    )
+    _, final_env_state, _, _ = runner_state
+    return final_env_state, env_state_traj, done_traj, info_traj
