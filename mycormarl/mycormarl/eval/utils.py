@@ -1,7 +1,11 @@
 
-from typing import Dict
+from typing import Dict, Union
+from datetime import datetime
+import logging
+import sys
 
 import numpy as np
+import git
 import jax
 import jax.numpy as jnp
 from flax.training.train_state import TrainState
@@ -127,3 +131,43 @@ def collect_eval_traj(rng, env: BaseMycorMarl, train_state: Dict[str, TrainState
     )
     _, final_env_state, _, _ = runner_state
     return final_env_state, env_state_traj, done_traj, info_traj
+
+def get_creation_attributes(
+        script_path: str = None
+    ) -> Dict[str, str]:
+    """
+    Collect dict of attributes for logging what code version used to create output files. 
+    Includes Git-related information (remote URL, relative path, Git SHA), creation date, 
+    author. 
+    
+    Returns:
+        Outputs dictionary for the creation of a JSON file.
+    """
+    out_dict = {}
+
+    if script_path is None:
+        script_path = sys.argv[0]
+
+    # Try fetch Git information, but if not a Git repo, just skip.
+    try:
+        repo = git.Repo(script_path, search_parent_directories=True)
+
+        out_dict['git_remote'] = repo.remote("origin").url
+
+        git_path = repo.git.rev_parse("--show-toplevel")
+        out_dict['relative_path'] = script_path.replace(git_path + '/', "")
+
+        logging.warning('Make sure you commit your code before adding the version control hash')
+        git_sha = repo.head.object.hexsha
+        out_dict['git_sha'] = git_sha
+
+        reader = repo.config_reader()
+        out_dict['author'] = reader.get_value("user","name")
+
+    except (git.InvalidGitRepositoryError, git.NoSuchPathError):
+        print(f"Could not find repo on {script_path}")
+        repo = None
+
+    out_dict['creation_date'] = datetime.now().strftime("%Y/%m/%d, %H:%M")
+
+    return out_dict
