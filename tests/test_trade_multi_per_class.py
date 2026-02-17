@@ -16,7 +16,6 @@ def cfg():
 @pytest.fixture(scope="session")
 def test_env(cfg: DictConfig):
     env = BaseMycorMarl(
-        num_agents=3,
         agent_types={"plant": 1, "fungus": 2},
         growth_cost=cfg.control_params.GROWTH_COST,
         reproduction_cost=cfg.control_params.REPRODUCTION_COST,

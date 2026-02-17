@@ -43,7 +43,6 @@ class State:
 class BaseMycorMarl(MultiAgentEnv):
     def __init__(
         self,
-        num_agents: int,
         agent_types: Dict[str, int],
         growth_cost: float = 100.0,
         reproduction_cost: float = 50.0,
@@ -57,12 +56,12 @@ class BaseMycorMarl(MultiAgentEnv):
         trade_flow_constant: float = 100.0,
         max_episode_steps: int = 1000,
     ):
-        self.num_agents: int = num_agents
-        self.agents = [f"agent_{i}" for i in range(num_agents)]
+        self.num_agents: int = sum(agent_types.values())
+        self.agents = [f"agent_{i}" for i in range(self.num_agents)]
         self.agent_types: List[AgentType] = [AgentType.PLANT] * agent_types.get("plant", 0) + \
                                             [AgentType.FUNGUS] * agent_types.get("fungus", 0)
 
-        assert len(self.agent_types) == num_agents,\
+        assert len(self.agent_types) == self.num_agents,\
             "Sum of agent types must equal num_agents"
 
         self.growth_cost = growth_cost
@@ -76,7 +75,7 @@ class BaseMycorMarl(MultiAgentEnv):
         self.p_cost_per_sugar = p_cost_per_sugar
         self.trade_flow_constant = trade_flow_constant
 
-        obs_size = 4 + (num_agents - 1) * 2 # Add space for incoming trade flows in observations.
+        obs_size = 4 + (self.num_agents - 1) * 2 # Add space for incoming trade flows in observations.
         action_size = 5 # [p_trade, s_trade, growth, maintenance, reproduction]
 
         self.observation_spaces = {agent: self.agent_obs_space(obs_size) for agent in self.agents}
