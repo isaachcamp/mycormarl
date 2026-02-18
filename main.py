@@ -64,6 +64,23 @@ def main(cfg: DictConfig):
         train_state_i = jax.tree.map(lambda x: x[i], train_state) # get train state for seed i
         train_trajs_i = jax.tree.map(lambda x: x[i], train_trajs) # get train trajs for seed i
 
+        # Save model weights for seed i if enabled.
+        if SAVE_WEIGHTS:
+            opath_params = os.path.join(os.getcwd(), "params")
+            ckpt_dir = os.path.join(opath_params, f"seed{i}")
+            os.makedirs(ckpt_dir, exist_ok=True)
+
+            checkpoints.save_checkpoint(
+                os.path.join(ckpt_dir, "plant"),
+                train_state_i["plant"],
+                int(train_state_i["plant"].step)
+            )
+            checkpoints.save_checkpoint(
+                os.path.join(ckpt_dir, "fungus"),
+                train_state_i["fungus"],
+                int(train_state_i["fungus"].step)
+            )
+
         # Run evaluation for seed i and save plots.
         base_eval(
             key=key_seeds[i],
