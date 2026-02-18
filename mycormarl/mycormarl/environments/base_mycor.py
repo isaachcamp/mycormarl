@@ -73,7 +73,7 @@ class BaseMycorMarl(MultiAgentEnv):
         self.plant_p_uptake_efficiency = plant_p_uptake_efficiency
         self.max_sugar_gen_rate = max_sugar_gen_rate
         self.p_cost_per_sugar = p_cost_per_sugar
-        self.trade_flow_constant = trade_flow_constant
+        # self.trade_flow_constant = trade_flow_constant # Unused for now, can be used to scale the effect of trades on agent states in future iterations.
 
         obs_size = 4 + (self.num_agents - 1) * 2 # Add space for incoming trade flows in observations.
         action_size = 5 # [p_trade, s_trade, growth, maintenance, reproduction]
@@ -100,7 +100,7 @@ class BaseMycorMarl(MultiAgentEnv):
             s_trades = state.s_trades[:, i].flatten() # Sugars received from other agents
             s_trades = jnp.delete(s_trades, i) # Remove self-trade
             p_trades = state.p_trades[:, i].flatten() # Phosphorus received from other agents
-            p_trades = jnp.delete(p_trades, i) # Remove self-trade
+            p_trades = jnp.delete(p_trades, i) # Remove self-trade (always 0)
             obs_vector = jnp.concatenate((obs_vector, p_trades, s_trades))
 
             assert obs_vector.shape[0] == self.observation_spaces[agent].shape[0], \
