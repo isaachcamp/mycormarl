@@ -1,24 +1,39 @@
 
 import os
+import json
 
 import hydra
 from omegaconf import DictConfig
 import jax
+from flax.training import checkpoints
 
 from mycormarl.environments.base_mycor import BaseMycorMarl
 from mycormarl.algos.ppo import make_train
 from mycormarl.eval.plot_trajs import base_eval, plot_mean_return_all_seeds
+from mycormarl.eval.utils import get_creation_attributes
+
+
+RUN_NAME = "basic_twoagent_ppo"
+AGENT_TYPES = {"plant": 1, "fungus": 1}
+DESCRIPTION = """
+    Basic two-agent PPO training with default control parameters.
+    Exclusive access to one resource each (P for fungus, S for plant).
+    Episode ends when both agents die.
+    Reward (+1.5) for accumulated reproduction, punishment (-100) for death.
+    No limit on trade flow.
+    No constraints on growth or reproduction.
+    This run serves as a baseline for future experiments.
+"""
+SAVE_WEIGHTS = False
 
 
 @hydra.main(config_path="mycormarl/mycormarl/conf", config_name="env_params")
 def main(cfg: DictConfig):
 
     opath_plots = os.path.join(os.getcwd(), "plots")
-    os.makedirs(opath_plots, exist_ok=True) # Create directory if it doesn't exist.
-    
+
     env = BaseMycorMarl(
-        num_agents=2,
-        agent_types={"plant": 1, "fungus": 1},
+        agent_types=AGENT_TYPES,
         growth_cost=cfg.control_params.GROWTH_COST,
         reproduction_cost=cfg.control_params.REPRODUCTION_COST,
         maintenance_cost_ratio=cfg.control_params.MAINTENANCE_COST_RATIO,
@@ -49,6 +64,7 @@ def main(cfg: DictConfig):
         train_state_i = jax.tree.map(lambda x: x[i], train_state) # get train state for seed i
         train_trajs_i = jax.tree.map(lambda x: x[i], train_trajs) # get train trajs for seed i
 
+        # Run evaluation for seed i and save plots.
         base_eval(
             key=key_seeds[i],
             env=env,
@@ -58,6 +74,16 @@ def main(cfg: DictConfig):
         )
 
     plot_mean_return_all_seeds(train_trajs, opath_plots)
+
+    # Collate run details and save to JSON for record-keeping and reproducibility.
+    attrs_dict = {}
+    attrs_dict['run_name'] = RUN_NAME
+    attrs_dict['agent_types'] = AGENT_TYPES
+    attrs_dict['description'] = DESCRIPTION
+    attrs_dict.update(get_creation_attributes())
+
+    with open(os.path.join(os.getcwd(), "run_details.json"), "w") as f:
+        json.dump(attrs_dict, f, indent=4)
 
 
 if __name__ == "__main__":
