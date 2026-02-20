@@ -240,7 +240,7 @@ class BaseMycorMarl(MultiAgentEnv):
         new_health = jnp.clip(state.agents[agt_id].health + health_deficit, 0, 100.0)
 
         # Update biomass based on growth / cost.
-        biomass_increase = growth / self.growth_cost
+        new_biomass = jnp.clip(state.agents[agt_id].biomass + growth / self.growth_cost, 0, 100.0)
 
         # Execute agent-specific function for extra biology, returns modified agent state.
         agent_mod = jax.lax.switch(agt_id, step_fns, key, state, action, state.agents[agt_id])
@@ -248,7 +248,7 @@ class BaseMycorMarl(MultiAgentEnv):
         # Update state with agent and trade values
         with jdc.copy_and_mutate(state) as state:
             state.agents[agt_id].health = new_health
-            state.agents[agt_id].biomass += biomass_increase
+            state.agents[agt_id].biomass = new_biomass
             state.agents[agt_id].phosphorus = agent_mod.phosphorus + p_acquired
             state.agents[agt_id].sugars = agent_mod.sugars - s_used
 
