@@ -19,10 +19,10 @@ DESCRIPTION = """
     Basic two-agent PPO training with default control parameters.
     Exclusive access to one resource each (P for fungus, S for plant).
     Episode ends when both agents die.
-    Reward (+1.5) for accumulated reproduction, punishment (-100) for death.
+    Reward (+1.5) for accumulated reproduction, no punishment for death.
     No limit on trade flow.
     No constraints on growth or reproduction.
-    This run serves as a baseline for future experiments.
+    Remove punishment for death and clip biomass to 100.
 """
 SAVE_WEIGHTS = False
 
@@ -31,6 +31,13 @@ SAVE_WEIGHTS = False
 def main(cfg: DictConfig):
 
     opath_plots = os.path.join(os.getcwd(), "plots")
+
+    # Collate run details and save to JSON for record-keeping and reproducibility.
+    attrs_dict = {}
+    attrs_dict['run_name'] = RUN_NAME
+    attrs_dict['agent_types'] = AGENT_TYPES
+    attrs_dict['description'] = DESCRIPTION
+    attrs_dict.update(get_creation_attributes())
 
     env = BaseMycorMarl(
         agent_types=AGENT_TYPES,
@@ -91,13 +98,6 @@ def main(cfg: DictConfig):
         )
 
     plot_mean_return_all_seeds(train_trajs, opath_plots)
-
-    # Collate run details and save to JSON for record-keeping and reproducibility.
-    attrs_dict = {}
-    attrs_dict['run_name'] = RUN_NAME
-    attrs_dict['agent_types'] = AGENT_TYPES
-    attrs_dict['description'] = DESCRIPTION
-    attrs_dict.update(get_creation_attributes())
 
     with open(os.path.join(os.getcwd(), "run_details.json"), "w") as f:
         json.dump(attrs_dict, f, indent=4)
