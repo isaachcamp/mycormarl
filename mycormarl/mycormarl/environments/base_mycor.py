@@ -240,7 +240,7 @@ class BaseMycorMarl(MultiAgentEnv):
         new_health = jnp.clip(state.agents[agt_id].health + health_deficit, 0, 100.0)
 
         # Update biomass based on growth / cost.
-        new_biomass = jnp.clip(state.agents[agt_id].biomass + growth / self.growth_cost, 0, 100.0)
+        new_biomass = jnp.clip(state.agents[agt_id].biomass + growth / self.growth_cost, 0, jnp.inf) # Clip biomass to prevent exponential growth.
 
         # Execute agent-specific function for extra biology, returns modified agent state.
         agent_mod = jax.lax.switch(agt_id, step_fns, key, state, action, state.agents[agt_id])
