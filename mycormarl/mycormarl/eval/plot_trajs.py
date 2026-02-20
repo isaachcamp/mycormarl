@@ -207,6 +207,36 @@ def plot_s_allocations_eval(info: Dict[str, jax.Array], opath: str) -> None:
     )
     plt.close()
 
+def plot_constrained_actions_eval(info: Dict[str, jax.Array], opath: str) -> None:
+    """Plot constrained action for agents over eval episode."""
+
+    num_agents = len(info)
+    _, axs = plt.subplots(num_agents, 1, figsize=(12, 4 * max(1, num_agents)))
+    axs = np.atleast_1d(axs) # Ensure axs is always an array, even if there's only one agent.
+    linewidth = 0.8
+
+    for ax, (agent_name, traj) in zip(axs, info.items()):
+        ax.plot(traj["constrained_actions"][:, 2], label='Growth', linewidth=linewidth)
+        ax.plot(traj["constrained_actions"][:, 3], label='Maintenance', linewidth=linewidth)
+        ax.plot(traj["constrained_actions"][:, 4], label='Reproduction', linewidth=linewidth)
+        ax.plot(traj["constrained_actions"][:, 1], label='S trade', linewidth=linewidth)
+        ax.plot(traj["constrained_actions"][:, 0], label='P trade', linewidth=linewidth)
+
+        ax.set_ylabel('Actions taken (proportion of resource supply)')
+        ax.set_title(f'{agent_name}')
+
+    axs[-1].set_xlabel('Env Step')
+
+    for ax in axs.flat:
+        ax.legend()
+
+    plt.savefig(
+        os.path.join(opath, "eval_episode_constrained_actions.png"),
+        bbox_inches='tight',
+        dpi=300
+    )
+    plt.close()
+
 def plot_s_plant_v_p_fungus_allocations_eval(info: Dict[str, jax.Array], opath: str) -> None:
     """Plot trades of exclusive resources for agents over eval episode."""
 
@@ -327,6 +357,7 @@ def plot_eval_episode(
     plot_s_allocations_eval(eval_info, opath)
     plot_s_plant_v_p_fungus_allocations_eval(eval_info, opath)
     plot_s_gen_levels_eval(eval_info, opath)
+    plot_constrained_actions_eval(eval_info, opath)
 
 def base_eval(
         key: jax.random.PRNGKey,
