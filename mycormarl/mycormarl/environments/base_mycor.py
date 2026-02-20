@@ -275,7 +275,7 @@ class BaseMycorMarl(MultiAgentEnv):
         reward = 0.0
         shaped_rewards = {}
         reward += props_generated * 1.5 # Reward for each seed produced
-        reward += -100 * dead_this_step # Large penalty for death
+        # reward += -100 * dead_this_step # Large penalty for death
 
         return state, reward, shaped_rewards, info
 
