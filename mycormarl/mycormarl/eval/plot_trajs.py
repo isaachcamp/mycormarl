@@ -389,6 +389,9 @@ def plot_mean_return_all_seeds(train_trajs: Tuple[Trajectory], opath: str) -> No
     cmap = plt.get_cmap('tab10')
     colors = [cmap(i) for i in range(num_seeds)]
 
+    plant_mean_return_per_episodes = []
+    fungus_mean_return_per_episodes = []
+
     plt.figure(figsize=(10, 6))
 
     for i in range(num_seeds):
@@ -397,6 +400,11 @@ def plot_mean_return_all_seeds(train_trajs: Tuple[Trajectory], opath: str) -> No
 
         plant_mean_return_per_episode = np.nanmean(np.nansum(plant_rewards, axis=-1), axis=0)
         fungus_mean_return_per_episode = np.nanmean(np.nansum(fungus_rewards, axis=-1), axis=0)
+
+        # Store mean return per episode for this seed to compute mean/std across seeds later.
+        plant_mean_return_per_episodes.append(plant_mean_return_per_episode)
+        fungus_mean_return_per_episodes.append(fungus_mean_return_per_episode)
+
         plt.plot(plant_mean_return_per_episode, c=colors[i], label=f'Seed {i}', linewidth=0.8)
         plt.plot(fungus_mean_return_per_episode, c=colors[i], linestyle="--", linewidth=0.8)
 
@@ -410,6 +418,50 @@ def plot_mean_return_all_seeds(train_trajs: Tuple[Trajectory], opath: str) -> No
 
     plt.savefig(
         os.path.join(opath, "mean_return_per_episode_all_seeds.png"),
+        bbox_inches='tight',
+        dpi=300
+    )
+    plt.close()
+
+    # Both plant and fungus mean return per episode lists will have shape (num_seeds, num_episodes),
+    # but num_episodes may differ across seeds, so we pad with NaNs to get a consistent shape for
+    # mean/std calculation.
+    max_episodes = max(r.shape[0] for r in plant_mean_return_per_episodes)
+    plant_mean_return_per_episodes = [np.pad(r, (0, max_episodes - r.shape[0]), constant_values=np.nan) for r in plant_mean_return_per_episodes]
+    fungus_mean_return_per_episodes = [np.pad(r, (0, max_episodes - r.shape[0]), constant_values=np.nan) for r in fungus_mean_return_per_episodes]
+
+    plant_seeds_mean = np.nanmean(np.stack(plant_mean_return_per_episodes), axis=0)
+    fungus_seeds_mean = np.nanmean(np.stack(fungus_mean_return_per_episodes), axis=0)
+
+    plants_seeds_std = np.nanstd(np.stack(plant_mean_return_per_episodes), axis=0)
+    fungus_seeds_std = np.nanstd(np.stack(fungus_mean_return_per_episodes), axis=0)
+
+    # Plot mean and variance across seeds for plant and fungus.
+    plt.plot(plant_seeds_mean, c='b', label='Plant', linewidth=2.0)
+    plt.fill_between(
+        range(len(plant_seeds_mean)),
+        plant_seeds_mean - plants_seeds_std,
+        plant_seeds_mean + plants_seeds_std,
+        alpha=0.2,
+        color='b'
+    )
+
+    plt.plot(fungus_seeds_mean, c='orange', label='Fungus', linewidth=2.0)
+    plt.fill_between(
+        range(len(fungus_seeds_mean)),
+        fungus_seeds_mean - fungus_seeds_std,
+        fungus_seeds_mean + fungus_seeds_std,
+        alpha=0.2,
+        color='orange'
+    )
+
+    plt.xlabel('Episode Number')
+    plt.ylabel('Episode Return')
+
+    plt.legend()
+
+    plt.savefig(
+        os.path.join(opath, "mean_return_per_episode_seeds_meanvar.png"),
         bbox_inches='tight',
         dpi=300
     )
