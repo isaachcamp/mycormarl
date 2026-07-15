@@ -23,6 +23,30 @@ class AgentType(IntEnum):
     FUNGUS = 1
 
 
+@jdc.pytree_dataclass
+class EnvConfig:
+    """Environment-wide controls.
+
+    The defaults intentionally keep the environment lightweight. More detailed
+    mechanisms can be swapped in later without changing the JaxMARL-facing API.
+    """
+
+    max_steps: int = 256
+    dt: float = 0.05
+    dr: float = 0.05
+    dtheta: float = 0.05
+    n_layers: int = 10
+    layer_thickness: float = 0.05
+    topsoil_depth: float = 0.25
+    initial_soil_p: float = 1.0
+    soil_diffusion: float = 0.0
+    soil_buffer_power: float = 1.0
+    soil_impedence: float = 1.0
+    volum_water_content: float = 0.3
+    reward_scaling: float = 1.0
+    normalize_observations: bool = True
+
+
 class State(NamedTuple):
     """Full environment state.
 
