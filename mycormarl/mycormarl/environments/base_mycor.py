@@ -1,7 +1,7 @@
 
 
 from enum import IntEnum
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, NamedTuple
 from functools import partial
 
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
@@ -23,21 +23,30 @@ class AgentType(IntEnum):
     FUNGUS = 1
 
 
-@jdc.pytree_dataclass
-class State:
-    """
-    Represents the full environment state with two AgentState instances for
-    the Plant and Fungus.
-    """
-    agents: List[AgentState]
-    adj: jax.Array # (n_agents, n_agents) adjacency matrix representing mycorrhizal network.
-    s_trades: jax.Array # (n_agents, n_agents) Sugars traded by each agent in the current step
-    p_trades: jax.Array # (n_agents, n_agents) Phosphorus traded by each agent in the current step
-    step: jax.Array # To track episode length
-    terminal: bool  # Flag to indicate if the episode is done
+class State(NamedTuple):
+    """Full environment state.
 
-    # Solar irradiance for sugar production, can be modified for different scenarios
-    # solar_irradiance: jax.Array = jdc.field(default_factory=lambda: jnp.array(400.0))
+    Arrays are stored explicitly so the model stays JAX-friendly and easy to
+    extend.
+    """
+
+    done: jax.Array
+    step: jax.Array
+    plant_biomass: jax.Array # shape (n_plant_agents,)
+    fungus_biomass: jax.Array # shape (n_fungus_agents,)
+    plant_history_max_biomass: jax.Array # shape (n_plant_agents,)
+    fungus_history_max_biomass: jax.Array # shape (n_fungus_agents,)
+    plant_c_pool: jax.Array # shape (n_plant_agents,)
+    plant_p_pool: jax.Array # shape (n_plant_agents,)
+    fungus_c_pool: jax.Array # shape (n_fungus_agents,)
+    fungus_p_pool: jax.Array # shape (n_fungus_agents,)
+    plant_trade_in: jax.Array # shape (n_plant_agents,)
+    fungus_trade_in: jax.Array # shape (n_fungus_agents,)
+    soil_p: jax.Array  # shape: (r_size, theta_size, z_size)
+    root_length_density: jax.Array # shape: (r_size, theta_size, z_size)
+    hyphae_length_density: jax.Array # shape: (r_size, theta_size, z_size)
+    plant_dead: jax.Array # shape (n_plant_agents,)
+    fungus_dead: jax.Array # shape (n_fungus_agents,)
 
 
 class BaseMycorMarl(MultiAgentEnv):
