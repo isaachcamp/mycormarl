@@ -5,6 +5,9 @@ import jax_dataclasses as jdc
 class FungusTraits:
     """Static functional traits for the fungus partner."""
 
+    initial_biomass: float = 1.0
+    initial_c_pool: float = 0.5
+    initial_p_pool: float = 0.05
     carbon_per_growth: float = 0.45
     phosphorus_per_growth: float = 0.05
     maintenance_kappa_c: float = 0.03
