@@ -1,7 +1,7 @@
 
-import jax_dataclasses as jdc
+from flax import struct
 
-@jdc.pytree_dataclass
+@struct.dataclass
 class PlantTraits:
     """Static functional traits for the plant partner."""
 
@@ -19,7 +19,7 @@ class PlantTraits:
     beta_root_distribution: float = 0.96
     carbon_per_growth: float = 0.45
     phosphorus_per_growth: float = 0.05
-    maintenance_kappa_c: float = 0.02
-    maintenance_kappa_p: float = 0.002
+    kappa_c: float = 0.02
+    kappa_p: float = 0.002
     death_fraction: float = 0.20
     biomass_cap: float = 100.0

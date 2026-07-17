@@ -1,7 +1,7 @@
 
-import jax_dataclasses as jdc
+from flax import struct
 
-@jdc.pytree_dataclass
+@struct.dataclass
 class FungusTraits:
     """Static functional traits for the fungus partner."""
 
@@ -10,8 +10,8 @@ class FungusTraits:
     initial_p_pool: float = 0.05
     carbon_per_growth: float = 0.45
     phosphorus_per_growth: float = 0.05
-    maintenance_kappa_c: float = 0.03
-    maintenance_kappa_p: float = 0.003
+    kappa_c: float = 0.03
+    kappa_p: float = 0.003
     death_fraction: float = 0.05
     hyphal_radius: float = 0.002
     saturation_density: float = 1.0
