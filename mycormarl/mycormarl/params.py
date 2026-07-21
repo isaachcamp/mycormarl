@@ -1,11 +1,9 @@
 
 from flax import struct
-import math
 
 from mycormarl.plant.traits import PlantTraits
 from mycormarl.fungus.traits import FungusTraits
 
-# To implement: implement function to read params from YAML file.
 
 @struct.dataclass
 class SpeciesParams:
@@ -18,22 +16,29 @@ class SpeciesParams:
 class EnvConfig:
     """Environment-wide controls.
 
-    The defaults intentionally keep the environment lightweight. More detailed
-    mechanisms can be swapped in later without changing the JaxMARL-facing API.
+    The defaults describe the selected production phosphate grid. Smaller
+    explicit domains should be used for tests and development runs.
+    Spatial values use cm, ``dt`` uses days, the phosphate diffusion
+    coefficient uses cm² s⁻¹, and its dimensionless impedance factor and CFL
+    safety are applied by the soil scheduler. The P5 reference time uses days;
+    its positive transition exponent is dimensionless.
     """
 
-    max_steps: int = 256
-    dt: float = 0.05
-    soil_radius_cm: float = math.sqrt(10_000.0 / math.pi)
+    max_steps: int = 14600
+    dt: float = 0.025
+    consumer_mode: str = "mixed"
+    soil_radius_cm: float = 50.0
     soil_depth_cm: float = 100.0
-    n_radial_cells: int = 564
-    n_depth_cells: int = 1000
+    radial_interval_cm: float = 0.1
+    depth_interval_cm: float = 0.1
     topsoil_depth_cm: float = 25.0
     initial_solution_p_um: float = 1.0
-    soil_diffusion: float = 0.0
+    phosphate_diffusion_coefficient_cm2_s: float = 1e-5
     buffer_power: float = 239.0
-    soil_impedence: float = 1.0
+    phosphate_impedance_factor: float = 0.308
+    diffusion_cfl_safety: float = 0.8
+    uptake_reference_time_days: float = 1.0
+    uptake_transition_exponent: float = 2.0
     theta_water: float = 0.3
     alpha: float = 0.5
-    reward_scaling: float = 1.0
     norm_obs: bool = True
