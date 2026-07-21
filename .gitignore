@@ -10,6 +10,7 @@ wheels/
 .venv
 
 outputs/
+plots/
 
 .vscode/
 
