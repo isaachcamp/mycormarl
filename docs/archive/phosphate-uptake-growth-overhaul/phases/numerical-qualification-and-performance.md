@@ -176,7 +176,7 @@ and project a one-year run without executing all annual steps.
   not process RSS. At 14,600 steps, the latest measured deterministic annual
   projection is roughly 70 seconds plus compilation, excluding training,
   learned-policy inference, output, and transfers. Exact platform-specific values remain in
-  [`../../qualification/phosphate-numerical-qualification.json`](../../qualification/phosphate-numerical-qualification.json).
+  [`../../../qualification/phosphate-numerical-qualification.json`](../../../qualification/phosphate-numerical-qualification.json).
 - Phase review found and fixed two blocking qualification gaps: coupled
   timestep convergence is now required before choosing `dt`, and extended
   coupled P balance is now measured. It also found that `EnvConfig.max_steps`

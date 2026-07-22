@@ -28,7 +28,7 @@ model without relying on conversation history.
 ## Verification record
 
 - Phase status: **verified** on 2026-07-21.
-- [`../../phosphate-model.md`](../../phosphate-model.md) is the authoritative model
+- [`../../../phosphate-model.md`](../../../phosphate-model.md) is the authoritative model
   and provenance guide; `README.md` links the guide, qualification evidence,
   examples, and test command.
 - The three examples use the shared production transaction and expose

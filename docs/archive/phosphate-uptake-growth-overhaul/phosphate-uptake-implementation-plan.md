@@ -3,7 +3,7 @@
 **Status:** Implementation, numerical qualification, documentation, and the
 post-implementation audit are complete. This plan is retained as a historical
 record; current behaviour is described in
-[`../phosphate-model.md`](../phosphate-model.md).
+[`../../phosphate-model.md`](../../phosphate-model.md).
 
 ## Summary
 
@@ -20,8 +20,8 @@ and the agreed growth-before-uptake credit-assignment order. It will support
 plant-only, fungus-only, and mixed simulations.
 
 Current unresolved decisions are maintained in
-[`../open-questions.md`](../open-questions.md), and implemented module
-boundaries are summarised in [`../module-map.md`](../module-map.md).
+[`../../open-questions.md`](../../open-questions.md), and implemented module
+boundaries are summarised in [`../../module-map.md`](../../module-map.md).
 
 ## Execution Route
 
