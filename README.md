@@ -6,8 +6,12 @@ grid and couples buffered diffusion with root/fungal uptake and competition.
 
 ## Start here
 
+- [Model overview](docs/model-overview.md):
+  shared state, axisymmetric geometry, and growth–phosphate coupling.
+- [Growth model](docs/growth-model.md):
+  resource allocation, biomass change, and root/fungal geometry.
 - [Phosphate model](docs/phosphate-model.md):
-  equations, units, configuration, provenance, diagnostics, and limitations.
+  buffering, diffusion, uptake regimes, competition, and verification.
 - [Module map](docs/module-map.md):
   code ownership, pipeline boundaries, executables, and test locations.
 - [Numerical qualification](docs/qualification/phosphate-numerical-qualification.md):

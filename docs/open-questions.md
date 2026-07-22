@@ -46,6 +46,7 @@ verification records are retained under [`archive/`](archive/).
 
 ## Uptake regimes and time
 
+- Determine a biologically motivated value for $T_{ref}$.
 - Add local time since colonisation if growth-front age or structure turnover
   materially changes the sparse-to-continuous transition.
 - Assess sub-cell interference between sparse root and fungal depletion zones;

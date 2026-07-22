@@ -1,9 +1,9 @@
-# Phosphate model module map
+# Coupled model module map
 
-This is a compact guide to where the implemented model lives. For the
-scientific assumptions, equations, units, and parameter provenance, read the
-[phosphate model](phosphate-model.md). Source docstrings and tests remain the
-authoritative API-level detail.
+This is a compact guide to where the implemented model lives. Start with the
+[model overview](model-overview.md), then use the component guides for the
+[growth model](growth-model.md) and [phosphate model](phosphate-model.md).
+Source docstrings and tests remain the authoritative API-level detail.
 
 ## End-to-end flow
 
