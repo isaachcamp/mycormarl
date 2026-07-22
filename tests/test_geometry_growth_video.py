@@ -48,7 +48,7 @@ def test_growth_radii_reject_more_than_one_thousand_frames():
 
 
 def test_fungal_biomass_inverts_the_p2_colony_radius_pipeline():
-    """Targets each frame radius through the implemented P2 biomass conversion."""
+    """Targets each frame radius through the implemented biomass conversion."""
     traits = FungusTraits()
     target_radius = 1.2
 

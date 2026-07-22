@@ -1,4 +1,4 @@
-# P3 — Conservative continuous uptake and root–fungus competition
+# Conservative continuous uptake and root–fungus competition
 
 ## Phase goal
 

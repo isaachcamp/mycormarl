@@ -1,4 +1,4 @@
-# P2 — Realised growth to conservative root and fungal geometry
+# Realised growth to conservative root and fungal geometry
 
 ## Phase goal
 

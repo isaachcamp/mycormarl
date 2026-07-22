@@ -124,7 +124,7 @@ def test_axisymmetric_uniform_p_conc_with_partial_topsoil_layer():
 
 
 def test_hemisphere_cell_fractions_use_annular_volume_fraction():
-    """Locks partial-cell volume geometry needed by P2 fungal occupancy."""
+    """Locks partial-cell volume geometry needed by fungal occupancy."""
     r_edges = jnp.array([0.0, 1.0, 2.0])
     z_edges = jnp.array([0.0, 1.0, 2.0])
 
@@ -140,7 +140,7 @@ def test_hemisphere_cell_fractions_use_annular_volume_fraction():
 
 
 def test_hemisphere_density_scales_fraction_by_saturation_density():
-    """Checks P2 fungal occupancy converts to volume-averaged length density."""
+    """Checks fungal occupancy converts to volume-averaged length density."""
     r_edges = jnp.array([0.0, 1.0])
     z_edges = jnp.array([0.0, 1.0])
 
@@ -153,7 +153,7 @@ def test_hemisphere_density_scales_fraction_by_saturation_density():
 
 
 def test_colony_radius_from_length_axisymmetric_inverts_hemisphere_volume():
-    """Checks the P2 length-to-colony-radius analytical inverse."""
+    """Checks the length-to-colony-radius analytical inverse."""
     radius = colony_radius_from_length_axisymmetric(
         total_length=(2.0 / 3.0) * jnp.pi * 8.0,
         saturation_density=1.0,
@@ -163,7 +163,7 @@ def test_colony_radius_from_length_axisymmetric_inverts_hemisphere_volume():
 
 
 def test_axisymmetric_stacked_disc_root_density_conserves_total_length():
-    """Checks the provisional P2 root field integrates to represented length."""
+    """Checks the provisional root field integrates to represented length."""
     traits = PlantTraits(
         kroot=0.25,
         specific_root_length=100.0,

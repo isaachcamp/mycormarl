@@ -210,7 +210,7 @@ def test_environment_rejects_invalid_soil_configuration(config, species):
 def test_soil_step_updates_canonical_amount_without_storing_concentration(
     species, small_config
 ):
-    """Allows redistribution and uptake while retaining the P1 state contract."""
+    """Allows redistribution and uptake while retaining the labile-state contract."""
     env = BaseMycorMarl(config=small_config, species=species)
     _, state = env.reset(jax.random.PRNGKey(0))
 

@@ -32,7 +32,7 @@ from mycormarl.soil.soil import (
 
 
 def _p5_coefficients(env, state):
-    """Reproduce coefficients cached once by the integrated P5 soil step."""
+    """Reproduce coefficients cached once by the integrated soil step."""
     return uptake_geometry_coefficients(
         state,
         env.species,

@@ -1,4 +1,4 @@
-# P4 — Conservative axisymmetric diffusion and subcycling
+# Conservative axisymmetric diffusion and subcycling
 
 ## Phase goal
 

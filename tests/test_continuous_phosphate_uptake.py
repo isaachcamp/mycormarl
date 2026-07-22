@@ -1,4 +1,4 @@
-"""Scientific contracts for P3 continuous phosphate uptake and competition."""
+"""Scientific contracts for continuous phosphate uptake and competition."""
 
 import jax
 import jax.numpy as jnp
@@ -79,7 +79,7 @@ def test_continuous_request_has_physical_zero_and_monotonic_limits():
 
 
 def test_continuous_request_is_jittable():
-    """Keeps the P3 request calculation usable inside the compiled environment."""
+    """Keeps the continuous request calculation usable in the compiled environment."""
     request_fn = jax.jit(continuous_uptake_request)
 
     request = request_fn(

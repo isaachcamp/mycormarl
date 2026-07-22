@@ -6,12 +6,14 @@ grid and couples buffered diffusion with root/fungal uptake and competition.
 
 ## Start here
 
-- [Phosphate model guide](implementation-docs/phosphate-model-guide.md):
+- [Phosphate model](docs/phosphate-model.md):
   equations, units, configuration, provenance, diagnostics, and limitations.
-- [Function and test reference](implementation-docs/phosphate-foundations-reference.md):
-  module-level pipeline and protected contracts.
-- [P6 qualification](implementation-docs/qualification/p6-results.md):
+- [Module map](docs/module-map.md):
+  code ownership, pipeline boundaries, executables, and test locations.
+- [Numerical qualification](docs/qualification/phosphate-numerical-qualification.md):
   convergence, balance, sensitivity, and performance evidence.
+- [Open questions](docs/open-questions.md):
+  unresolved scientific, calibration, and modelling decisions.
 
 Install and run the deterministic examples:
 

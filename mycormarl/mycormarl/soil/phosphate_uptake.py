@@ -3,7 +3,7 @@
 The module owns both analytical uptake requests and their amount-conservative
 competition transaction. All spatial inputs use centimetres, concentration
 uses µmol P cm^-3, time enters in model days, and returned cell amounts use
-µmol P. Geometry-only P5 coefficients can be calculated once per biological
+µmol P. Geometry-only uptake coefficients can be calculated once per biological
 step while concentration-dependent requests are refreshed after diffusion.
 """
 
@@ -37,7 +37,7 @@ def continuous_uptake_request(
     lateral area of cylindrical absorbers, and multiplied by the
     Michaelis–Menten surface flux and physical timestep. The calculation uses
     the cell's derived bulk solution concentration as its surface
-    concentration; the P5 pipeline blends this request with the sparse closure.
+    concentration; the integrated pipeline blends it with the sparse closure.
     """
     concentration = jnp.maximum(
         jnp.asarray(solution_concentration_micromol_cm3), 0.0
@@ -270,7 +270,7 @@ def blended_uptake_transaction(
     """Calculate, blend, cap, and diagnose one simultaneous uptake event.
 
     This is the single scientific implementation shared by production soil
-    evolution and P6 qualification. It returns remaining soil amount, accepted
+    evolution and offline qualification. It returns remaining soil amount, accepted
     root amount, accepted fungal amount, and cellwise diagnostics. Bulk-zero
     cells report a surface ratio of one (no defined depletion from zero), while
     their uptake requests remain exactly zero.

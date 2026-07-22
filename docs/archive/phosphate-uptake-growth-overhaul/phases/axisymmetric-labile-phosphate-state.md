@@ -1,4 +1,4 @@
-# P1 — Axisymmetric domain and canonical labile-P state
+# Axisymmetric domain and canonical labile-phosphate state
 
 ## Phase goal
 
@@ -120,7 +120,7 @@ code and tests rather than retained as ambiguous dual configuration fields.
 ## Phase notes
 
 Function-level and test-level documentation:
-`implementation-docs/phosphate-foundations-reference.md`.
+the current [`../../module-map.md`](../../module-map.md).
 
 - Phase status: **verified** on 2026-07-21.
 - Pre-P1 baseline on 2026-07-21: `47 passed, 1 warning` in 33.43 seconds.

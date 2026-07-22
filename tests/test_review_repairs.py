@@ -1,4 +1,4 @@
-"""Regression tests for integration defects found in the P0–P7 audit."""
+"""Regression tests for defects found in the post-implementation audit."""
 
 from pathlib import Path
 from types import SimpleNamespace

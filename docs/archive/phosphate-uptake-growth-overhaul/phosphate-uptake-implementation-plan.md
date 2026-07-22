@@ -1,8 +1,9 @@
 # Buffered Phosphate Transport and Root–Fungus Uptake Implementation Plan
 
-**Status:** P0–P7 complete; delegated post-P7 audit findings repaired and
-reverified on 2026-07-21. See
-`implementation-docs/phases/post-p7-audit-repairs.md`.
+**Status:** Implementation, numerical qualification, documentation, and the
+post-implementation audit are complete. This plan is retained as a historical
+record; current behaviour is described in
+[`../phosphate-model.md`](../phosphate-model.md).
 
 ## Summary
 
@@ -18,11 +19,9 @@ The implementation will retain the current JAX/JaxMARL environment interface
 and the agreed growth-before-uptake credit-assignment order. It will support
 plant-only, fungus-only, and mixed simulations.
 
-The detailed scientific specification remains in
-`implementation-docs/phosphate-uptake-todos.md`.
-
-The implemented P0–P7 functions, tests, and pipeline composition are documented
-in `implementation-docs/phosphate-foundations-reference.md`.
+Current unresolved decisions are maintained in
+[`../open-questions.md`](../open-questions.md), and implemented module
+boundaries are summarised in [`../module-map.md`](../module-map.md).
 
 ## Execution Route
 
@@ -232,10 +231,10 @@ phase-by-phase workflow.
 
 ## Implementation Phases
 
-### P0 — Baseline, terminology, and unit contracts
+### Baseline, terminology, and unit contracts
 
 Detailed phase checklist:
-`implementation-docs/phases/p0-baseline-unit-contracts.md`.
+[`phases/baseline-and-unit-contracts.md`](phases/baseline-and-unit-contracts.md).
 
 - Restore or document the project test environment and run the existing suite.
 - Record baseline failures separately from new work.
@@ -250,10 +249,10 @@ Detailed phase checklist:
 **Gate:** existing tests are runnable; unit-contract tests pass; no physics
 state has yet been migrated.
 
-### P1 — Axisymmetric domain and canonical labile-P state
+### Axisymmetric domain and canonical labile-phosphate state
 
 Detailed phase checklist:
-`implementation-docs/phases/p1-axisymmetric-labile-state.md`.
+[`phases/axisymmetric-labile-phosphate-state.md`](phases/axisymmetric-labile-phosphate-state.md).
 
 - Generate exact radial and depth edges, annular cell volumes, radial and
   vertical face geometry, and partial topsoil occupancy.
@@ -269,10 +268,10 @@ Detailed phase checklist:
 and the inventory implied by its configured extents without changing
 biological pools.
 
-### P2 — Realised growth to conservative root and fungal geometry
+### Realised growth to conservative root and fungal geometry
 
 Detailed phase checklist:
-`implementation-docs/phases/p2-growth-to-geometry.md`.
+[`phases/biomass-to-absorbing-geometry.md`](phases/biomass-to-absorbing-geometry.md).
 
 - Replace placeholder density updates with total-length calculations driven
   by realised growth.
@@ -292,10 +291,10 @@ volume integrals equal analytically expected root and in-domain hyphal length;
 fungal structure outside the hemisphere–soil intersection is explicitly
 clipped, with saturation density never exceeded.
 
-### P3 — Conservative continuous uptake and root–fungus competition
+### Conservative continuous uptake and root–fungus competition
 
 Detailed phase checklist:
-`implementation-docs/phases/p3-continuous-uptake-competition.md`.
+[`phases/continuous-uptake-and-competition.md`](phases/continuous-uptake-and-competition.md).
 
 - Implement Michaelis–Menten surface flux using derived solution
   concentration and absorbing surface area.
@@ -313,10 +312,10 @@ Detailed phase checklist:
 **Gate:** end-to-end steps are non-negative and close soil-plus-organism-plus-
 loss P balance in a common unit.
 
-### P4 — Conservative axisymmetric diffusion and subcycling
+### Conservative axisymmetric diffusion and subcycling
 
 Detailed phase checklist:
-`implementation-docs/phases/p4-conservative-diffusion-subcycling.md`.
+[`phases/conservative-diffusion-and-subcycling.md`](phases/conservative-diffusion-and-subcycling.md).
 
 - Implement radial and vertical finite-volume fluxes with closed boundaries.
 - Calculate the exact cellwise explicit stability ceiling and enforce the
@@ -332,10 +331,10 @@ Detailed phase checklist:
 **Gate:** diffusion conserves total P and converges against a refined
 timestep on representative small grids.
 
-### P5 — Analytical sparse closure and smooth regime transition
+### Analytical sparse closure and smooth uptake-regime transition
 
 Detailed phase record:
-`implementation-docs/phases/p5-sparse-continuous-transition.md`.
+[`phases/sparse-continuous-uptake-transition.md`](phases/sparse-continuous-uptake-transition.md).
 
 - Implement root and fungal territory radii, `R_eff`, logarithmic resistance,
   stable `C_s`, sparse requests, and diagnostics.
@@ -352,10 +351,10 @@ Detailed phase record:
 **Gate:** all three simulation modes run through the blended closure, and
 limiting cases reproduce their analytical expectations.
 
-### P6 — Scientific convergence and performance qualification
+### Numerical convergence and performance qualification
 
 Detailed phase record:
-`implementation-docs/phases/p6-scientific-convergence-performance.md`.
+[`phases/numerical-qualification-and-performance.md`](phases/numerical-qualification-and-performance.md).
 
 - Run concentration scenarios `0.1, 0.3, 1, 3, 10 µM`.
 - Run root-only, fungus-only, and mixed timestep studies over candidate
@@ -373,10 +372,10 @@ Detailed phase record:
 **Gate:** the selected production configuration has documented accuracy,
 stability, conservation, memory, and runtime evidence.
 
-### P7 — Documentation, provenance, and handoff
+### Documentation, provenance, and handoff
 
 Detailed phase record:
-`implementation-docs/phases/p7-documentation-provenance-handoff.md`.
+[`phases/documentation-provenance-and-handoff.md`](phases/documentation-provenance-and-handoff.md).
 
 - Document equations, units, step order, state meanings, configuration, and
   expected diagnostics.

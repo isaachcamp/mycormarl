@@ -1,4 +1,4 @@
-"""Executable contracts for P6 diagnostics and qualification arithmetic.
+"""Executable contracts for phosphate diagnostics and qualification arithmetic.
 
 The tests ensure that qualification reports observe the production uptake
 transaction rather than reimplementing a subtly different scientific model.

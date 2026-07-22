@@ -41,7 +41,7 @@ def test_provisional_growth_geometry_trait_defaults():
 
 
 def test_one_gram_biomass_has_expected_root_and_hyphal_length():
-    """Checks the independently calculated per-gram P2 reference lengths."""
+    """Checks independently calculated per-gram geometry reference lengths."""
     root_length = root_length_from_plant_biomass(
         biomass_g=1.0,
         root_mass_fraction=0.62,
@@ -330,7 +330,7 @@ def _geometry_species(**trait_overrides):
 
 
 def _geometry_config():
-    """Build a cheap axisymmetric domain for P2 environment tests."""
+    """Build a cheap axisymmetric domain for growth-geometry environment tests."""
     return EnvConfig(
         dt=1.0,
         soil_radius_cm=2.0,

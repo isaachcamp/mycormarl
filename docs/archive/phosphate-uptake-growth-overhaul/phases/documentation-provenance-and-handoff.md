@@ -1,4 +1,4 @@
-# P7 — Documentation, provenance, and handoff
+# Documentation, provenance, and handoff
 
 ## Objective
 
@@ -28,7 +28,7 @@ model without relying on conversation history.
 ## Verification record
 
 - Phase status: **verified** on 2026-07-21.
-- `implementation-docs/phosphate-model-guide.md` is the authoritative model
+- [`../../phosphate-model.md`](../../phosphate-model.md) is the authoritative model
   and provenance guide; `README.md` links the guide, qualification evidence,
   examples, and test command.
 - The three examples use the shared production transaction and expose
@@ -41,7 +41,7 @@ model without relying on conversation history.
   plant-only` command completed successfully.
 - The initial P7 review found no actionable defect, but a subsequent delegated
   whole-plan audit identified integration gaps. These are tracked and verified
-  in `post-p7-audit-repairs.md`; this historical record no longer claims that
+  in `post-implementation-audit-repairs.md`; this historical record no longer claims that
   the untouched PPO/evaluation modules were compatible.
 - Remaining scientific risks are maintained explicitly in the guide and main
   plan rather than treated as completed calibration.

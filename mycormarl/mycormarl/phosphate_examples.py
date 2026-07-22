@@ -19,7 +19,7 @@ MODES = ("plant-only", "fungus-only", "mixed")
 
 
 def example_config() -> EnvConfig:
-    """Return a cheap four-cell domain using the selected P6 timestep."""
+    """Return a cheap four-cell domain using the qualified timestep."""
     return EnvConfig(
         max_steps=1,
         dt=0.025,

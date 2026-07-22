@@ -1,4 +1,4 @@
-# P0 — Baseline, terminology, and unit contracts
+# Baseline, terminology, and unit contracts
 
 ## Phase goal
 
@@ -131,7 +131,7 @@ the input boundary while rejecting files that provide both old and new names.
 ## Phase notes
 
 Function-level and test-level documentation:
-`implementation-docs/phosphate-foundations-reference.md`.
+the current [`../../module-map.md`](../../module-map.md).
 
 - Phase status: **verified** on 2026-07-20.
 - P0 baseline: `29 passed, 1 warning` in 33.32 seconds.

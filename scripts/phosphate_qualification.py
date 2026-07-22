@@ -1,8 +1,8 @@
-"""Run the reproducible P6 phosphate convergence and performance studies.
+"""Run the reproducible phosphate convergence and performance studies.
 
 The script uses production environment construction, diffusion, uptake, and
 biological stepping. It writes machine-readable JSON and a concise Markdown
-summary under ``implementation-docs/qualification``. Scientific convergence
+summary under ``docs/qualification``. Scientific convergence
 uses a reduced physical domain; the full default grid is used only for timed
 performance and memory-footprint qualification.
 """
@@ -69,7 +69,7 @@ def qualification_config(
     reference_time_days: float = 1.0,
     exponent: float = 2.0,
 ) -> EnvConfig:
-    """Return the reduced-domain P6 configuration with an internal P front."""
+    """Return the reduced-domain qualification configuration with an internal P front."""
     return EnvConfig(
         dt=dt_days,
         max_steps=math.ceil(HORIZON_DAYS / dt_days) + 1,
@@ -439,7 +439,7 @@ def benchmark_environment(config: EnvConfig, repeats: int = 20) -> dict:
 
 
 def run_studies(include_target_benchmark: bool) -> dict:
-    """Execute the complete deterministic P6 matrix and selection arithmetic."""
+    """Execute the complete deterministic qualification matrix and selection arithmetic."""
     concentration = [
         run_fixed_soil_scenario(mode, value, 0.05, 0.1)
         for mode in MODES
@@ -580,7 +580,7 @@ def render_markdown(results: dict) -> str:
     selection = results["selection"]
     target = results["benchmarks"]["target"]
     lines = [
-        "# P6 phosphate qualification results",
+        "# Phosphate numerical qualification results",
         "",
         "## Outcome",
         "",
@@ -671,28 +671,30 @@ def render_markdown(results: dict) -> str:
         "- Reduced-domain convergence retains a topsoil diffusion front but cannot reproduce every full-domain spatial scale.",
         "- Coupled actions are fixed at `[trade=0.25, growth=0.75, maintenance=0, reproduction=0]`; maintenance costs are disabled only in this qualification fixture so the unresolved maintenance-P fate cannot contaminate balance interpretation.",
         "- Annual runtime is projected from both warmed soil-only and deterministic full-environment steps. MARL training, learned-policy inference, output, and accelerator transfer costs are excluded.",
-        "- The complete machine-readable tables and exact platform metadata are in `p6-results.json`.",
+        "- The complete machine-readable tables and exact platform metadata are in `phosphate-numerical-qualification.json`.",
         "",
     ])
     return "\n".join(lines)
 
 
 def main() -> None:
-    """Parse options, execute studies, and write canonical P6 artifacts."""
+    """Parse options, execute studies, and write canonical qualification artifacts."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-target-benchmark", action="store_true")
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("implementation-docs/qualification"),
+        default=Path("docs/qualification"),
     )
     args = parser.parse_args()
     results = run_studies(not args.skip_target_benchmark)
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    (args.output_dir / "p6-results.json").write_text(
+    (args.output_dir / "phosphate-numerical-qualification.json").write_text(
         json.dumps(results, indent=2, sort_keys=True) + "\n"
     )
-    (args.output_dir / "p6-results.md").write_text(render_markdown(results) + "\n")
+    (args.output_dir / "phosphate-numerical-qualification.md").write_text(
+        render_markdown(results) + "\n"
+    )
     print(json.dumps(results["selection"], sort_keys=True))
 
 

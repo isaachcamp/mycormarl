@@ -6,8 +6,9 @@ The implemented model represents labile inorganic phosphorus (Pi) in an
 axisymmetric `r-z` soil domain. It couples closed-boundary diffusion, linear
 instantaneous buffering, root and fungal uptake, sparse/continuous uptake
 blending, competition for finite cell inventory, and organism growth geometry.
-Phases P0–P6 are implemented and numerically qualified. P7 supplies this
-handoff, provenance audit, and executable examples.
+The complete transport, uptake, competition, and geometry pipeline is
+implemented and numerically qualified. Historical planning and verification
+records are retained under [`archive/`](archive/).
 
 This is a mechanistic provisional parameterisation, not an empirically
 calibrated soil. In particular, an initial `1 µM` solution concentration does
@@ -201,7 +202,7 @@ conductances, the CFL schedule, and static array shapes.
 | `lambda_sat` | `168.75 cm⁻²` | Converted from `1500 µm mm⁻²` in Oyarte-Galvez et al. (2025), [doi:10.1038/s41586-025-08614-x](https://doi.org/10.1038/s41586-025-08614-x), using the stipulated `rho_3D=3 rho_2D²/4`; not a direct 3-D soil measurement. |
 | `lambda_root`, `beta` | `1 cm cm⁻³`, `0.96` | Inherited/provisional geometry choices; no empirical calibration is claimed. |
 | `T_ref`, `p` | `1 day`, `2` | Explicit modelling choices. `T_ref` approximates exposure time while all structure remains indefinitely active. |
-| Grid, timestep | `0.1 cm`, `0.025 day` | P6 selected the grid under the 5% rule, but no coarser timestep passed after coupled P uptake and free-pool outputs were added. The timestep is therefore the finest tested fallback, not demonstrated convergence. |
+| Grid, timestep | `0.1 cm`, `0.025 day` | Numerical qualification selected the grid under the 5% rule, but no coarser timestep passed after coupled P uptake and free-pool outputs were added. The timestep is therefore the finest tested fallback, not demonstrated convergence. |
 
 ## Running and interpreting examples
 
@@ -240,14 +241,15 @@ should construct and persist their own explicit environment, species, and PPO
 configuration rather than relying on launcher defaults.
 
 For the full numerical study, run `scripts/phosphate_qualification.py`; its
-canonical reports are `implementation-docs/qualification/p6-results.md` and
-`.json`. The selected spatial comparison remained below the provisional 5%
+canonical reports are
+`docs/qualification/phosphate-numerical-qualification.md` and `.json`. The
+selected spatial comparison remained below the provisional 5%
 rule and the reported closed-system errors were below `1e-5`. No timestep
 above `0.025 day` passed once coupled uptake and endpoint free-P pools were
 included; the selected timestep is consequently a conservative fallback
 pending a finer study or a justified change to the endpoint metric.
 
-## Known limitations and next decisions
+## Known limitations
 
 - Maintenance P is removed from free pools but has no explicit destination.
   Do not claim whole-system P conservation for maintenance-active runs until
@@ -263,3 +265,7 @@ pending a finer study or a justified change to the endpoint metric.
 - Initial organism pools and every empirical proxy above require calibration
   against the eventual experiment; extractable-P observations need an
   observation model rather than direct comparison with solution `C`.
+
+The maintained list of decisions still to be made is in
+[open questions](open-questions.md). For code ownership and pipeline
+boundaries, see the [module map](module-map.md).

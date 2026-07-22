@@ -36,7 +36,7 @@ def _p3_config(initial_solution_p_um=1.0):
 
 
 def _p3_species(**overrides):
-    """Return small consumers with controllable P3 kinetic and loss traits."""
+    """Return small consumers with controllable uptake and loss traits."""
     plant_overrides = overrides.get("plant", {})
     fungus_overrides = overrides.get("fungus", {})
     return SpeciesParams(
@@ -158,7 +158,7 @@ def test_mixed_soil_step_caps_shared_inventory_and_closes_transaction_balance():
 
 
 def test_mixed_cell_matches_independent_shared_weight_and_post_blend_cap():
-    """Reconstructs P5 requests to verify one fungal-derived regime decision."""
+    """Reconstructs blended requests to verify one fungal-derived regime decision."""
     species = _p3_species()
     env = BaseMycorMarl(_p3_config(), species)
     _, state = env.reset(jax.random.PRNGKey(0))

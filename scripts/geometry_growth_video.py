@@ -1,6 +1,6 @@
 """Render side-by-side root and mycelial geometry growth as an animated GIF.
 
-The animation deliberately uses the production P2 geometry functions. Each
+The animation deliberately uses the production growth-geometry functions. Each
 frame target is a successive radial grid edge, so a 0.1 cm radial interval
 advances the fungal radius and the largest root-disc radius by exactly 1 mm
 per frame (apart from a potentially shortened final boundary cell). Deeper
@@ -63,7 +63,7 @@ def fungal_biomass_for_colony_radius(
         colony_radius_cm: float,
         traits: FungusTraits,
     ) -> chex.Array:
-    """Invert the P2 conversion to obtain biomass for a target colony radius."""
+    """Invert the fungal geometry conversion for a target colony radius."""
     total_length_cm = (
         traits.saturation_density
         * (2.0 / 3.0)
@@ -80,7 +80,7 @@ def root_biomass_for_max_disc_radius(
         traits: PlantTraits,
         z_edges: chex.Array,
     ) -> chex.Array:
-    """Invert P2 root geometry so its largest layer reaches a target radius.
+    """Invert root geometry so its largest layer reaches a target radius.
 
     Disc radii scale with the square root of biomass at fixed beta weights and
     ``lambda_root``. Evaluating the production function at one gram therefore
@@ -104,7 +104,7 @@ def render_growth_video(
         fps: int = 12,
         dpi: int = 120,
     ) -> Path:
-    """Render the P2 root and fungal geometries side-by-side to a GIF."""
+    """Render the production root and fungal geometries side-by-side to a GIF."""
     if isinstance(fps, bool) or not isinstance(fps, int) or fps <= 0:
         raise ValueError("fps must be a positive integer")
     if isinstance(dpi, bool) or not isinstance(dpi, int) or dpi <= 0:

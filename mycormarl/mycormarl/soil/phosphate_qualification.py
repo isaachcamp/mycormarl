@@ -12,7 +12,7 @@ def reference_relative_change(
 ) -> float:
     """Return candidate error relative to reference with a near-zero guard.
 
-    The P6 selection rule compares a coarser/larger-step candidate with its
+    The qualification rule compares a coarser/larger-step candidate with its
     finer/smaller-step reference. If both magnitudes are below the declared
     scientific reporting floor, their relative difference is defined as zero
     rather than amplified into a meaningless convergence failure.

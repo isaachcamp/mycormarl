@@ -1,4 +1,4 @@
-"""Scientific contracts for the P5 sparse-to-continuous uptake closure.
+"""Scientific contracts for the sparse-to-continuous uptake closure.
 
 These tests isolate the analytical model from the environment. They verify
 the geometry and units behind depletion-zone overlap, the stable physical
@@ -175,7 +175,7 @@ def test_zero_diffusive_supply_gives_infinite_resistance_and_zero_sparse_request
 
 
 def test_blending_uses_one_weight_and_recovers_both_limits():
-    """P5 interpolates alternative requests rather than summing two sinks."""
+    """The model interpolates alternative requests rather than summing two sinks."""
     sparse = jnp.array([2.0, 4.0, 6.0])
     continuous = jnp.array([10.0, 12.0, 14.0])
     weight = jnp.array([0.0, 0.25, 1.0])
@@ -186,7 +186,7 @@ def test_blending_uses_one_weight_and_recovers_both_limits():
 
 
 def test_sparse_primitives_are_jittable():
-    """All concentration-dependent P5 calculations remain JAX-transformable."""
+    """All concentration-dependent uptake calculations remain JAX-transformable."""
     kernel = jax.jit(
         lambda concentration, resistance: sparse_uptake_request(
             concentration,

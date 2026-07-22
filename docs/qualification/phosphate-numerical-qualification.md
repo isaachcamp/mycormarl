@@ -1,4 +1,4 @@
-# P6 phosphate qualification results
+# Phosphate numerical qualification results
 
 ## Outcome
 
@@ -71,5 +71,4 @@ The selection uses a 5% next-finer/next-smaller comparison on fixed-geometry upt
 - Reduced-domain convergence retains a topsoil diffusion front but cannot reproduce every full-domain spatial scale.
 - Coupled actions are fixed at `[trade=0.25, growth=0.75, maintenance=0, reproduction=0]`; maintenance costs are disabled only in this qualification fixture so the unresolved maintenance-P fate cannot contaminate balance interpretation.
 - Annual runtime is projected from both warmed soil-only and deterministic full-environment steps. MARL training, learned-policy inference, output, and accelerator transfer costs are excluded.
-- The complete machine-readable tables and exact platform metadata are in `p6-results.json`.
-
+- The complete machine-readable tables and exact platform metadata are in `phosphate-numerical-qualification.json`.

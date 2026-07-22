@@ -89,7 +89,7 @@ def _apply_blended_uptake(
     fungus_sparse_resistance: chex.Array,
     continuous_weight: chex.Array,
 ) -> State:
-    """Apply the complete concentration-dependent P5 uptake transaction.
+    """Apply the complete concentration-dependent uptake transaction.
 
     Current canonical amount is converted to bulk solution concentration.
     Root and fungal sparse requests use their cached resistances; continuous
@@ -123,7 +123,7 @@ def _apply_blended_uptake_with_diagnostics(
     fungus_sparse_resistance: chex.Array,
     continuous_weight: chex.Array,
 ) -> tuple[State, PhosphateUptakeDiagnostics]:
-    """Apply blended uptake and return the exact cellwise P6 observables."""
+    """Apply blended uptake and return exact cellwise qualification observables."""
     concentration = labile_amount_to_solution_concentration(
         state.soil_labile_p,
         cell_volumes_cm3,

@@ -20,8 +20,8 @@ class EnvConfig:
     explicit domains should be used for tests and development runs.
     Spatial values use cm, ``dt`` uses days, the phosphate diffusion
     coefficient uses cm² s⁻¹, and its dimensionless impedance factor and CFL
-    safety are applied by the soil scheduler. The P5 reference time uses days;
-    its positive transition exponent is dimensionless.
+    safety are applied by the soil scheduler. The uptake-regime reference time
+    uses days; its positive transition exponent is dimensionless.
     """
 
     max_steps: int = 14600

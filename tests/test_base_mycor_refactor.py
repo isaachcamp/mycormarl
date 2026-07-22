@@ -63,7 +63,7 @@ def simple_dynamics(monkeypatch):
         return jnp.zeros((r_edges.shape[0] - 1, z_edges.shape[0] - 1))
 
     def no_soil_uptake(state, *soil_args):
-        """Keep behavioural unit tests isolated from the P3 soil transaction."""
+        """Keep behavioural unit tests isolated from the soil transaction."""
         return state
 
     def pool_specific_growth(allocated_c, allocated_p, grow_c_cost, grow_p_cost, grow_type):

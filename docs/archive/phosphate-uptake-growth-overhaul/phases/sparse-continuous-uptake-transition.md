@@ -1,4 +1,4 @@
-# P5 — Analytical sparse closure and smooth regime transition
+# Analytical sparse closure and smooth uptake-regime transition
 
 ## Phase goal
 
