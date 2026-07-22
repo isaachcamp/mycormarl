@@ -21,9 +21,9 @@ def apparent_diffusivity_cm2_s(
     diffusion_coefficient_cm2_s: float,
     theta_water: float,
     impedance_factor: float,
-    buffer_power: float,
+    b_p: float,
 ) -> chex.Array:
-    """Return buffered apparent diffusivity ``D_l theta f_l/(theta+B)``.
+    """Return buffered apparent diffusivity ``D_l theta f_l/(theta+b_p)``.
 
     This diagnostic describes propagation of a disturbance in the complete
     labile inventory. The conservative amount-flux kernel must instead use
@@ -34,7 +34,7 @@ def apparent_diffusivity_cm2_s(
         jnp.asarray(diffusion_coefficient_cm2_s)
         * jnp.asarray(theta_water)
         * jnp.asarray(impedance_factor)
-        / labile_capacity_factor(theta_water, buffer_power)
+        / labile_capacity_factor(theta_water, b_p)
     )
 
 
@@ -52,7 +52,8 @@ def axisymmetric_diffusion_conductances(
     Each conductance is ``D_l theta f_l A/d`` using the distance between the
     actual neighbouring cell centres. External faces are omitted, enforcing
     closed boundaries; the zero-area central radial face is omitted as well.
-    This handles a shortened final grid cell without assuming uniform spacing.
+    Using actual centre distances also keeps the helper correct for explicitly
+    supplied nonuniform grids, although production grid construction is uniform.
     """
     r_edges = jnp.asarray(r_edges)
     z_edges = jnp.asarray(z_edges)
@@ -96,7 +97,7 @@ def diffuse_labile_amount(
     labile_amount_micromol: chex.Array,
     cell_volumes_cm3: chex.Array,
     theta_water: float,
-    buffer_power: float,
+    b_p: float,
     radial_conductance: chex.Array,
     vertical_conductance: chex.Array,
     dt_seconds: float,
@@ -111,7 +112,7 @@ def diffuse_labile_amount(
     """
     amount = jnp.asarray(labile_amount_micromol)
     concentration = labile_amount_to_solution_concentration(
-        amount, cell_volumes_cm3, theta_water, buffer_power
+        amount, cell_volumes_cm3, theta_water, b_p
     )
     radial_transfer = (
         jnp.asarray(radial_conductance)
@@ -134,21 +135,21 @@ def diffuse_labile_amount(
 def explicit_diffusion_cfl_seconds(
     cell_volumes_cm3: chex.Array,
     theta_water: float,
-    buffer_power: float,
+    b_p: float,
     radial_conductance: chex.Array,
     vertical_conductance: chex.Array,
 ) -> chex.Array:
     """Return the minimum exact cellwise positivity ceiling in seconds.
 
     For cell ``i`` the explicit finite-volume limit is
-    ``V_i(theta+B)/sum_j(G_ij)``. Cells with no diffusive neighbours have an
+    ``V_i(theta+b_p)/sum_j(G_ij)``. Cells with no diffusive neighbours have an
     infinite ceiling and therefore cannot restrict the global timestep.
     """
     volumes = jnp.asarray(cell_volumes_cm3)
     outgoing = cell_outgoing_diffusion_conductance(
         volumes, radial_conductance, vertical_conductance
     )
-    capacity = volumes * labile_capacity_factor(theta_water, buffer_power)
+    capacity = volumes * labile_capacity_factor(theta_water, b_p)
     safe_outgoing = jnp.where(outgoing > 0.0, outgoing, 1.0)
     cell_limits = jnp.where(outgoing > 0.0, capacity / safe_outgoing, jnp.inf)
     return jnp.min(cell_limits)

@@ -50,31 +50,31 @@ def days_to_seconds(days):
     return jnp.asarray(days) * SECONDS_PER_DAY
 
 
-def labile_capacity_factor(theta_water, buffer_power):
-    """Return the linear-buffer storage factor ``theta_water + buffer_power``.
+def labile_capacity_factor(theta_water, b_p):
+    """Return the linear-buffer storage factor ``theta_water + b_p``.
 
     Multiplying this factor by bulk cell volume and solution concentration
     gives the total reversibly labile amount stored in that cell.
     """
-    return jnp.asarray(theta_water) + jnp.asarray(buffer_power)
+    return jnp.asarray(theta_water) + jnp.asarray(b_p)
 
 
-def retardation_factor(theta_water, buffer_power):
-    """Return ``(theta + B) / theta``, the buffering retardation factor.
+def retardation_factor(theta_water, b_p):
+    """Return ``(theta + b_p) / theta``, the buffering retardation factor.
 
     Diagnostic used to relate solute-only diffusion to the slower
     apparent propagation of the complete labile inventory.
     """
-    return labile_capacity_factor(theta_water, buffer_power) / jnp.asarray(theta_water)
+    return labile_capacity_factor(theta_water, b_p) / jnp.asarray(theta_water)
 
 
-def dissolved_labile_fraction(theta_water, buffer_power):
-    """Return ``theta / (theta + B)``, the dissolved labile-P fraction.
+def dissolved_labile_fraction(theta_water, b_p):
+    """Return ``theta / (theta + b_p)``, the dissolved labile-P fraction.
 
     This diagnostic explains why solution concentration can be low while the
     reversibly available cell inventory is much larger.
     """
-    return jnp.asarray(theta_water) / labile_capacity_factor(theta_water, buffer_power)
+    return jnp.asarray(theta_water) / labile_capacity_factor(theta_water, b_p)
 
 
 def michaelis_menten_surface_flux(concentration, j_max, k_m):
@@ -102,7 +102,7 @@ def cylindrical_lateral_area(length_cm, radius_cm):
     return 2.0 * jnp.pi * jnp.asarray(radius_cm) * jnp.asarray(length_cm)
 
 
-def validate_linear_buffer_parameters(theta_water: float, buffer_power: float) -> None:
+def validate_linear_buffer_parameters(theta_water: float, b_p: float) -> None:
     """Reject invalid buffer configuration before JAX arrays are constructed.
 
     Keeping scalar validation outside model kernels avoids traced Python
@@ -110,8 +110,8 @@ def validate_linear_buffer_parameters(theta_water: float, buffer_power: float) -
     """
     if not math.isfinite(theta_water) or theta_water <= 0.0:
         raise ValueError("theta_water must be finite and greater than zero")
-    if not math.isfinite(buffer_power) or buffer_power < 0.0:
-        raise ValueError("buffer_power must be finite and non-negative")
+    if not math.isfinite(b_p) or b_p < 0.0:
+        raise ValueError("b_p must be finite and non-negative")
 
 
 def validate_michaelis_menten_parameters(j_max: float, k_m: float) -> None:

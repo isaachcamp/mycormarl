@@ -39,7 +39,7 @@ def _p5_coefficients(env, state):
         env.config.phosphate_diffusion_coefficient_cm2_s,
         env.config.theta_water,
         env.config.phosphate_impedance_factor,
-        env.config.buffer_power,
+        env.config.b_p,
         env.config.uptake_reference_time_days,
         env.config.uptake_transition_exponent,
     )
@@ -59,12 +59,12 @@ def test_diffusion_defaults_match_schnepf_roose_parameters():
 
 
 def test_apparent_diffusivity_matches_buffered_reference():
-    """Reproduces D_app = D_l theta f_l / (theta + B)."""
+    """Reproduces D_app = D_l theta f_l / (theta + b_p)."""
     apparent = apparent_diffusivity_cm2_s(
         diffusion_coefficient_cm2_s=1e-5,
         theta_water=0.3,
         impedance_factor=0.308,
-        buffer_power=239.0,
+        b_p=239.0,
     )
 
     expected = 1e-5 * 0.3 * 0.308 / 239.3
@@ -72,8 +72,8 @@ def test_apparent_diffusivity_matches_buffered_reference():
     assert apparent == pytest.approx(3.861263e-9, rel=1e-6)
 
 
-def test_conductances_use_actual_shortened_cell_centre_distances():
-    """Checks G = D_l theta f_l A/d on nonuniform final grid cells."""
+def test_conductances_use_actual_nonuniform_cell_centre_distances():
+    """Checks G = D_l theta f_l A/d for explicitly nonuniform input edges."""
     r_edges = jnp.array([0.0, 1.0, 2.5])
     z_edges = jnp.array([0.0, 2.0, 3.0])
     radial_areas = axisymmetric_radial_face_areas(r_edges, z_edges)
@@ -98,7 +98,7 @@ def test_conductances_use_actual_shortened_cell_centre_distances():
 
 
 def test_exact_cfl_matches_two_cell_radial_reference():
-    """Independently verifies min[V(theta+B)/sum(G)] for two annuli."""
+    """Independently verifies min[V(theta+b_p)/sum(G)] for two annuli."""
     r_edges = jnp.array([0.0, 1.0, 2.0])
     z_edges = jnp.array([0.0, 1.0])
     volumes = axisymmetric_cylindrical_cell_volumes(r_edges, z_edges)
@@ -115,7 +115,7 @@ def test_exact_cfl_matches_two_cell_radial_reference():
     cfl = explicit_diffusion_cfl_seconds(
         volumes,
         theta_water=1.0,
-        buffer_power=0.0,
+        b_p=0.0,
         radial_conductance=radial,
         vertical_conductance=vertical,
     )
@@ -197,14 +197,14 @@ def test_uniform_solution_concentration_is_invariant_on_nonuniform_grid():
     volumes, radial, vertical = _diffusion_geometry(r_edges, z_edges)
     concentration = jnp.full(volumes.shape, 2.0)
     amount = solution_concentration_to_labile_amount(
-        concentration, volumes, theta_water=1.0, buffer_power=2.0
+        concentration, volumes, theta_water=1.0, b_p=2.0
     )
 
     updated = diffuse_labile_amount(
         amount,
         volumes,
         theta_water=1.0,
-        buffer_power=2.0,
+        b_p=2.0,
         radial_conductance=radial,
         vertical_conductance=vertical,
         dt_seconds=0.01,
@@ -326,7 +326,7 @@ def _subcycling_config(dt_seconds=1.0):
         topsoil_depth_cm=1.0,
         initial_solution_p_um=0.0,
         theta_water=1.0,
-        buffer_power=0.0,
+        b_p=0.0,
         phosphate_diffusion_coefficient_cm2_s=1.0,
         phosphate_impedance_factor=1.0,
         diffusion_cfl_safety=0.8,
@@ -361,7 +361,7 @@ def test_one_substep_evolution_matches_direct_diffusion_uptake_substep():
         env.species,
         env.cell_volumes,
         env.config.theta_water,
-        env.config.buffer_power,
+        env.config.b_p,
         env.radial_diffusion_conductance,
         env.vertical_diffusion_conductance,
         root_resistance,
@@ -393,7 +393,7 @@ def test_multi_substep_evolution_matches_three_explicit_repetitions():
             env.species,
             env.cell_volumes,
             env.config.theta_water,
-            env.config.buffer_power,
+            env.config.b_p,
             env.radial_diffusion_conductance,
             env.vertical_diffusion_conductance,
             root_resistance,
@@ -451,7 +451,7 @@ def test_subcycled_soil_evolution_is_jittable():
         env.species,
         env.cell_volumes,
         env.config.theta_water,
-        env.config.buffer_power,
+        env.config.b_p,
         env.radial_diffusion_conductance,
         env.vertical_diffusion_conductance,
         env.soil_substeps,

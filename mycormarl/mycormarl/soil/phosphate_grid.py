@@ -17,10 +17,12 @@ def validate_axisymmetric_grid_parameters(
         radial_interval_cm: float,
         depth_interval_cm: float,
     ) -> None:
-    """Reject invalid physical extents or intervals before grid allocation.
+    """Reject invalid physical extents or non-uniform interval requests.
 
     This protects every downstream geometry, amount conversion, and numerical
-    kernel from empty grids and non-finite or non-positive dimensions.
+    kernel from empty grids and non-finite or non-positive dimensions. An
+    interval must divide its corresponding extent into a whole number of cells;
+    otherwise the error suggests the closest interval of the form ``extent/n``.
     """
     for name, value in (
         ("radius_cm", radius_cm),
@@ -31,16 +33,47 @@ def validate_axisymmetric_grid_parameters(
         if not math.isfinite(value) or value <= 0.0:
             raise ValueError(f"{name} must be finite and greater than zero")
 
+    # Check whether each interval divides its extent into a whole number of cells.
+    invalid_intervals = []
+    for extent_name, extent, interval_name, interval in (
+        ("radius_cm", radius_cm, "radial_interval_cm", radial_interval_cm),
+        ("depth_cm", depth_cm, "depth_interval_cm", depth_interval_cm),
+    ):
+        ratio = extent / interval
+        nearest_integer = round(ratio)
+
+        # Only allow exact integer ratios; otherwise suggest the nearest valid
+        # uniform interval.
+        if nearest_integer >= 1 and math.isclose(
+            ratio, nearest_integer, rel_tol=1e-12, abs_tol=1e-12
+        ):
+            continue
+
+        # Suggest the nearest valid uniform interval of the form ``extent/n``.
+        lower_cells = max(1, math.floor(ratio))
+        upper_cells = max(1, math.ceil(ratio))
+        candidate_cells = {lower_cells, upper_cells}
+        suggested_cells = min(
+            candidate_cells,
+            key=lambda n: (
+                abs(extent / n - interval),
+                extent / n > interval,
+            ),
+        )
+        suggested_interval = extent / suggested_cells
+        invalid_intervals.append(
+            f"{interval_name}={interval:.12g} cm does not divide "
+            f"{extent_name}={extent:.12g} cm; nearest valid uniform interval "
+            f"is {suggested_interval:.12g} cm ({suggested_cells} cells)"
+        )
+
+    if invalid_intervals:
+        raise ValueError(". ".join(invalid_intervals))
+
 
 def _edges_from_interval(maximum_cm: float, interval_cm: float) -> chex.Array:
-    """Return zero-based edges at the interval, ending exactly at the maximum."""
-    ratio = maximum_cm / interval_cm
-    nearest_integer = round(ratio)
-    if math.isclose(ratio, nearest_integer, rel_tol=1e-12, abs_tol=1e-12):
-        n_cells = int(nearest_integer)
-    else:
-        n_cells = math.ceil(ratio)
-
+    """Return exact requested uniform edges after public validation."""
+    n_cells = int(round(maximum_cm / interval_cm))
     edges = jnp.arange(n_cells + 1, dtype=jnp.float32) * interval_cm
     return edges.at[-1].set(maximum_cm)
 
@@ -51,11 +84,12 @@ def axisymmetric_edges_from_intervals(
         radial_interval_cm: float,
         depth_interval_cm: float,
     ) -> tuple[chex.Array, chex.Array]:
-    """Generate radial and depth boundaries from requested centimetre spacing.
+    """Generate radial and depth boundaries from explicit uniform spacing.
 
     These edges define the shared geometry for phosphate amount, length
-    density, diffusion faces, and spatial uptake. Each final cell is
-    shortened when necessary so its outer edge equals the configured maximum.
+    density, diffusion faces, and spatial uptake. Each requested interval must
+    divide its extent exactly; invalid requests fail with the nearest valid
+    uniform interval rather than silently creating a shortened boundary cell.
     """
     validate_axisymmetric_grid_parameters(
         radius_cm, depth_cm, radial_interval_cm, depth_interval_cm
@@ -167,17 +201,17 @@ def solution_concentration_to_labile_amount(
         concentration_micromol_cm3: chex.Array,
         cell_volumes_cm3: chex.Array,
         theta_water: float,
-        buffer_power: float,
+        b_p: float,
     ) -> chex.Array:
     """Convert solution concentration to canonical labile P in µmol/cell.
 
-    Implements ``M = C * V * (theta + B)``. Diffusion and uptake will mutate
+    Implements ``M = C * V * (theta + b_p)``. Diffusion and uptake will mutate
     this conserved amount rather than subtracting amounts from concentration.
     """
     return (
         jnp.asarray(concentration_micromol_cm3)
         * jnp.asarray(cell_volumes_cm3)
-        * labile_capacity_factor(theta_water, buffer_power)
+        * labile_capacity_factor(theta_water, b_p)
     )
 
 
@@ -185,16 +219,16 @@ def labile_amount_to_solution_concentration(
         labile_amount_micromol: chex.Array,
         cell_volumes_cm3: chex.Array,
         theta_water: float,
-        buffer_power: float,
+        b_p: float,
     ) -> chex.Array:
     """Derive solution concentration from canonical labile amount.
 
-    Implements ``C = M / (V * (theta + B))``. Diffusion gradients and
+    Implements ``C = M / (V * (theta + b_p))``. Diffusion gradients and
     Michaelis–Menten uptake use this derived field on every soil update.
     """
     return jnp.asarray(labile_amount_micromol) / (
         jnp.asarray(cell_volumes_cm3)
-        * labile_capacity_factor(theta_water, buffer_power)
+        * labile_capacity_factor(theta_water, b_p)
     )
 
 
@@ -204,7 +238,7 @@ def initial_labile_p_from_micromolar(
         concentration_um: float,
         topsoil_depth_cm: Optional[float],
         theta_water: float,
-        buffer_power: float,
+        b_p: float,
     ) -> chex.Array:
     """Build the reset-time canonical labile-P field from configured µM.
 
@@ -226,5 +260,5 @@ def initial_labile_p_from_micromolar(
         concentration,
         volumes,
         theta_water,
-        buffer_power,
+        b_p,
     )

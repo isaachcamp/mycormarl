@@ -109,7 +109,7 @@ def _soil_step_arguments(env: BaseMycorMarl):
         env.species,
         env.cell_volumes,
         env.config.theta_water,
-        env.config.buffer_power,
+        env.config.b_p,
         env.radial_diffusion_conductance,
         env.vertical_diffusion_conductance,
         env.soil_substeps,

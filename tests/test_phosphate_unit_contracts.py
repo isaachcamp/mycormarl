@@ -39,11 +39,11 @@ def test_configuration_units_convert_to_physical_kernel_units():
 def test_schnepf_roose_linear_buffer_identities():
     """Guards the strong-buffer reference capacity, retardation, and fraction."""
     theta_water = 0.3
-    buffer_power = 239.0
+    b_p = 239.0
 
-    capacity = labile_capacity_factor(theta_water, buffer_power)
-    retardation = retardation_factor(theta_water, buffer_power)
-    dissolved_fraction = dissolved_labile_fraction(theta_water, buffer_power)
+    capacity = labile_capacity_factor(theta_water, b_p)
+    retardation = retardation_factor(theta_water, b_p)
+    dissolved_fraction = dissolved_labile_fraction(theta_water, b_p)
 
     assert capacity == pytest.approx(239.3, rel=REL_TOL)
     assert retardation == pytest.approx(797.6666667, rel=REL_TOL)
@@ -106,7 +106,7 @@ def test_array_helpers_are_jittable():
 
 
 @pytest.mark.parametrize(
-    ("theta_water", "buffer_power"),
+    ("theta_water", "b_p"),
     [
         (0.0, 239.0),
         (-0.1, 239.0),
@@ -115,10 +115,10 @@ def test_array_helpers_are_jittable():
         (0.3, float("inf")),
     ],
 )
-def test_invalid_linear_buffer_parameters_fail_fast(theta_water, buffer_power):
+def test_invalid_linear_buffer_parameters_fail_fast(theta_water, b_p):
     """Prevents invalid buffering from reaching amount/concentration kernels."""
     with pytest.raises(ValueError):
-        validate_linear_buffer_parameters(theta_water, buffer_power)
+        validate_linear_buffer_parameters(theta_water, b_p)
 
 
 @pytest.mark.parametrize(

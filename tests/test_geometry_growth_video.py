@@ -29,13 +29,13 @@ root_biomass_for_max_disc_radius = (
 
 
 def test_growth_radii_advance_by_radial_grid_interval():
-    """Uses successive radial edges as frames, including a shortened final cell."""
+    """Uses successive radial edges from an explicitly uniform grid."""
     radii = growth_radii_from_grid(
-        max_radius_cm=0.35,
+        max_radius_cm=0.4,
         radial_interval_cm=0.1,
     )
 
-    assert jnp.allclose(radii, jnp.array([0.1, 0.2, 0.3, 0.35]))
+    assert jnp.allclose(radii, jnp.array([0.1, 0.2, 0.3, 0.4]))
 
 
 def test_growth_radii_reject_more_than_one_thousand_frames():

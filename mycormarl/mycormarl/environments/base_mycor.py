@@ -12,7 +12,6 @@ import jax
 import jax.numpy as jnp
 
 from mycormarl import fungus, plant
-from mycormarl import state
 from mycormarl.fungus.physiology import fungal_maintenance_demand
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.growth import grow
@@ -105,7 +104,7 @@ class BaseMycorMarl(MultiAgentEnv):
             explicit_diffusion_cfl_seconds(
                 self.cell_volumes,
                 self.config.theta_water,
-                self.config.buffer_power,
+                self.config.b_p,
                 self.radial_diffusion_conductance,
                 self.vertical_diffusion_conductance,
             )
@@ -195,7 +194,7 @@ class BaseMycorMarl(MultiAgentEnv):
             self.config.initial_solution_p_um,
             self.config.topsoil_depth_cm,
             self.config.theta_water,
-            self.config.buffer_power,
+            self.config.b_p,
         )
 
         plant_biomass = jnp.array([
@@ -460,7 +459,7 @@ class BaseMycorMarl(MultiAgentEnv):
             self.species,
             self.cell_volumes,
             self.config.theta_water,
-            self.config.buffer_power,
+            self.config.b_p,
             self.radial_diffusion_conductance,
             self.vertical_diffusion_conductance,
             self.soil_substeps,
@@ -686,7 +685,7 @@ class BaseMycorMarl(MultiAgentEnv):
             config.radial_interval_cm,
             config.depth_interval_cm,
         )
-        validate_linear_buffer_parameters(config.theta_water, config.buffer_power)
+        validate_linear_buffer_parameters(config.theta_water, config.b_p)
         validate_diffusion_parameters(
             config.phosphate_diffusion_coefficient_cm2_s,
             config.theta_water,

@@ -41,7 +41,7 @@ def small_config():
         topsoil_depth_cm=1.5,
         initial_solution_p_um=2.0,
         theta_water=0.3,
-        buffer_power=239.0,
+        b_p=239.0,
         norm_obs=False,
     )
 
@@ -55,13 +55,13 @@ def test_buffered_amount_concentration_round_trip():
         concentration,
         volumes,
         theta_water=0.3,
-        buffer_power=239.0,
+        b_p=239.0,
     )
     recovered = labile_amount_to_solution_concentration(
         amount,
         volumes,
         theta_water=0.3,
-        buffer_power=239.0,
+        b_p=239.0,
     )
 
     assert jnp.allclose(recovered, concentration, rtol=1e-6, atol=1e-10)
@@ -79,7 +79,7 @@ def test_default_domain_initial_inventory_matches_configured_extents():
         concentration_um=1.0,
         topsoil_depth_cm=25.0,
         theta_water=0.3,
-        buffer_power=239.0,
+        b_p=239.0,
     )
 
     expected = jnp.pi * 50.0**2 * 25.0 * 0.001 * (0.3 + 239.0)
@@ -96,7 +96,7 @@ def test_partial_topsoil_amount_uses_fractional_cell_volume():
         concentration_um=2.0,
         topsoil_depth_cm=1.5,
         theta_water=0.3,
-        buffer_power=0.0,
+        b_p=0.0,
     )
 
     assert amount[0, 0] == pytest.approx(jnp.pi * 0.3 * 0.002)
@@ -129,7 +129,8 @@ def test_default_config_describes_reference_domain_and_initial_condition():
     assert config.topsoil_depth_cm == pytest.approx(25.0)
     assert config.initial_solution_p_um == pytest.approx(1.0)
     assert config.theta_water == pytest.approx(0.3)
-    assert config.buffer_power == pytest.approx(239.0)
+    assert config.b_p == pytest.approx(239.0)
+    assert not hasattr(config, "buffer_power")
     assert config.phosphate_diffusion_coefficient_cm2_s == pytest.approx(1e-5)
     assert config.phosphate_impedance_factor == pytest.approx(0.308)
     assert config.diffusion_cfl_safety == pytest.approx(0.8)
@@ -169,7 +170,7 @@ def test_reset_recovers_configured_solution_field_and_preserves_biological_pools
         state.soil_labile_p,
         env.cell_volumes,
         small_config.theta_water,
-        small_config.buffer_power,
+        small_config.b_p,
     )
 
     assert jnp.allclose(concentration[:, 0], 2e-3)
@@ -187,7 +188,7 @@ def test_reset_recovers_configured_solution_field_and_preserves_biological_pools
         EnvConfig(radial_interval_cm=0.0),
         EnvConfig(topsoil_depth_cm=101.0),
         EnvConfig(theta_water=0.0),
-        EnvConfig(buffer_power=-1.0),
+        EnvConfig(b_p=-1.0),
         EnvConfig(initial_solution_p_um=-1.0),
         EnvConfig(dt=0.0),
         EnvConfig(dt=float("inf")),

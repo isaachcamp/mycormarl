@@ -34,17 +34,61 @@ def test_axisymmetric_cylindrical_cell_volumes():
     assert jnp.allclose(volumes, expected)
 
 
-def test_axisymmetric_edges_follow_intervals_and_end_at_maxima():
-    """Uses requested spacing and truncates only the final cells at maxima."""
+def test_axisymmetric_edges_preserve_explicit_uniform_intervals_and_maxima():
+    """Uses an accepted interval exactly and ends at the requested extents."""
     r_edges, z_edges = axisymmetric_edges_from_intervals(
-        radius_cm=2.5,
+        radius_cm=2.0,
         depth_cm=3.0,
         radial_interval_cm=1.0,
-        depth_interval_cm=2.0,
+        depth_interval_cm=1.0,
     )
 
-    assert jnp.allclose(r_edges, jnp.array([0.0, 1.0, 2.0, 2.5]))
-    assert jnp.allclose(z_edges, jnp.array([0.0, 2.0, 3.0]))
+    assert jnp.allclose(r_edges, jnp.array([0.0, 1.0, 2.0]))
+    assert jnp.allclose(z_edges, jnp.array([0.0, 1.0, 2.0, 3.0]))
+
+
+def test_axisymmetric_edges_reject_nonuniform_remainders_with_nearest_suggestions():
+    """Makes every implicit interval adjustment explicit to the user."""
+    with pytest.raises(ValueError) as error:
+        axisymmetric_edges_from_intervals(
+            radius_cm=2.5,
+            depth_cm=3.0,
+            radial_interval_cm=1.0,
+            depth_interval_cm=2.0,
+        )
+
+    message = str(error.value)
+    assert "radial_interval_cm=1" in message
+    assert "0.833333" in message
+    assert "3 cells" in message
+    assert "depth_interval_cm=2" in message
+    assert "1.5" in message
+    assert "2 cells" in message
+
+
+@pytest.mark.parametrize(
+    ("extent_cm", "requested_cm", "suggested_cm", "n_cells"),
+    [
+        (2.5, 1.0, 2.5 / 3.0, 3),  # nearest valid interval is smaller
+        (1.0, 0.45, 0.5, 2),       # nearest valid interval is larger
+        (1.0, 1e13, 1.0, 1),       # never accepts a zero-cell grid by tolerance
+    ],
+)
+def test_nearest_uniform_interval_suggestion_is_nearest_by_spacing(
+    extent_cm, requested_cm, suggested_cm, n_cells
+):
+    """Chooses the closest L/n spacing, rather than always refining the grid."""
+    with pytest.raises(ValueError) as error:
+        axisymmetric_edges_from_intervals(
+            radius_cm=extent_cm,
+            depth_cm=1.0,
+            radial_interval_cm=requested_cm,
+            depth_interval_cm=1.0,
+        )
+
+    message = str(error.value)
+    assert f"{suggested_cm:.12g}" in message
+    assert f"{n_cells} cells" in message
 
 
 def test_axisymmetric_face_areas_have_expected_geometry_and_axis_face_is_zero():

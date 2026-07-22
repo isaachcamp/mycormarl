@@ -88,8 +88,8 @@ def test_length_conversions_are_jittable():
     assert jnp.all(jnp.isfinite(hypha))
 
 
-def test_root_density_conserves_length_on_shortened_boundary_cells():
-    """Integrates the stacked-disc field back to its biomass-implied length."""
+def test_root_density_conserves_length_on_nonuniform_input_cells():
+    """Integrates the stacked-disc field on explicitly nonuniform input edges."""
     traits = PlantTraits(
         kroot=0.25,
         specific_root_length=100.0,

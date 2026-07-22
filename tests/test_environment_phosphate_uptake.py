@@ -30,7 +30,7 @@ def _p3_config(initial_solution_p_um=1.0):
         topsoil_depth_cm=1.0,
         initial_solution_p_um=initial_solution_p_um,
         theta_water=0.3,
-        buffer_power=0.0,
+        b_p=0.0,
         norm_obs=False,
     )
 
@@ -75,7 +75,7 @@ def test_soil_step_credits_plant_only_uptake_in_milligrams():
         * env.config.theta_water
         * env.config.phosphate_impedance_factor
     )
-    d_app = d_flux / (env.config.theta_water + env.config.buffer_power)
+    d_app = d_flux / (env.config.theta_water + env.config.b_p)
     resistance = sparse_uptake_resistance(
         state.root_length_density,
         species.plant.root_radius,
@@ -172,13 +172,13 @@ def test_mixed_cell_matches_independent_shared_weight_and_post_blend_cap():
         env.config.phosphate_diffusion_coefficient_cm2_s,
         env.config.theta_water,
         env.config.phosphate_impedance_factor,
-        env.config.buffer_power,
+        env.config.b_p,
         env.config.uptake_reference_time_days,
         env.config.uptake_transition_exponent,
     )
     concentration = state.soil_labile_p / (
         env.cell_volumes
-        * (env.config.theta_water + env.config.buffer_power)
+        * (env.config.theta_water + env.config.b_p)
     )
     root_sparse = sparse_uptake_request(
         concentration,
@@ -295,7 +295,7 @@ def test_soil_uptake_kernel_is_jittable():
         species,
         env.cell_volumes,
         env.config.theta_water,
-        env.config.buffer_power,
+        env.config.b_p,
         env.radial_diffusion_conductance,
         env.vertical_diffusion_conductance,
         env.soil_substeps,

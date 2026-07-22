@@ -3,8 +3,8 @@
 The animation deliberately uses the production growth-geometry functions. Each
 frame target is a successive radial grid edge, so a 0.1 cm radial interval
 advances the fungal radius and the largest root-disc radius by exactly 1 mm
-per frame (apart from a potentially shortened final boundary cell). Deeper
-root discs retain their beta-derived smaller radii.
+per frame. Grid construction requires that the interval divide the maximum
+radius exactly. Deeper root discs retain their beta-derived smaller radii.
 """
 
 from __future__ import annotations

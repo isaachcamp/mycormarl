@@ -72,7 +72,7 @@ def test_diagnostic_transaction_exactly_matches_production_soil_step():
         env.config.phosphate_diffusion_coefficient_cm2_s,
         env.config.theta_water,
         env.config.phosphate_impedance_factor,
-        env.config.buffer_power,
+        env.config.b_p,
         env.config.uptake_reference_time_days,
         env.config.uptake_transition_exponent,
     )
@@ -80,7 +80,7 @@ def test_diagnostic_transaction_exactly_matches_production_soil_step():
         state.soil_labile_p,
         env.cell_volumes,
         env.config.theta_water,
-        env.config.buffer_power,
+        env.config.b_p,
     )
 
     remaining, accepted_root, accepted_fungus, diagnostics = (
@@ -132,7 +132,7 @@ def test_diagnostic_transaction_reports_inventory_capping():
         env.config.phosphate_diffusion_coefficient_cm2_s,
         env.config.theta_water,
         env.config.phosphate_impedance_factor,
-        env.config.buffer_power,
+        env.config.b_p,
         env.config.uptake_reference_time_days,
         env.config.uptake_transition_exponent,
     )
@@ -140,7 +140,7 @@ def test_diagnostic_transaction_reports_inventory_capping():
         state.soil_labile_p,
         env.cell_volumes,
         env.config.theta_water,
-        env.config.buffer_power,
+        env.config.b_p,
     )
 
     remaining, accepted_root, accepted_fungus, diagnostics = (
@@ -178,7 +178,7 @@ def test_diagnostic_evolution_matches_production_and_reports_each_substep():
         env.species,
         env.cell_volumes,
         env.config.theta_water,
-        env.config.buffer_power,
+        env.config.b_p,
         env.radial_diffusion_conductance,
         env.vertical_diffusion_conductance,
         env.soil_substeps,
