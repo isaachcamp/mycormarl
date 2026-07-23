@@ -32,6 +32,7 @@ def test_provisional_growth_geometry_trait_defaults():
     assert plant.specific_root_length == pytest.approx(25_434.3)
     assert plant.root_radius == pytest.approx(0.01)
     assert plant.root_length_density == pytest.approx(1.0)
+    assert plant.max_rooting_depth_cm == pytest.approx(150.0)
 
     assert fungus.gamma_c == pytest.approx(0.5)
     assert fungus.gamma_p == pytest.approx(40.0)
@@ -95,6 +96,7 @@ def test_root_density_conserves_length_on_nonuniform_input_cells():
         specific_root_length=100.0,
         root_length_density=100.0,
         beta_root_distribution=0.5,
+        max_rooting_depth_cm=2.5,
     )
     r_edges = jnp.array([0.0, 1.0, 2.0, 2.5])
     z_edges = jnp.array([0.0, 1.0, 2.0, 2.5])
@@ -118,6 +120,7 @@ def test_root_disc_radii_decrease_with_beta_weighted_depth():
         specific_root_length=10.0,
         root_length_density=2.0,
         beta_root_distribution=0.5,
+        max_rooting_depth_cm=3.0,
     )
     z_edges = jnp.array([0.0, 1.0, 2.0, 3.0])
 
@@ -140,6 +143,7 @@ def test_root_density_is_uniform_inside_depth_specific_discs():
         specific_root_length=1.0,
         root_length_density=1.0,
         beta_root_distribution=0.5,
+        max_rooting_depth_cm=2.0,
     )
     r_edges = jnp.array([0.0, 0.25, 0.5, 0.75, 1.0])
     z_edges = jnp.array([0.0, 1.0, 2.0])
@@ -164,6 +168,7 @@ def test_root_geometry_clips_each_layer_at_radial_domain_boundary():
         specific_root_length=100.0,
         root_length_density=1.0,
         beta_root_distribution=0.5,
+        max_rooting_depth_cm=2.0,
     )
     r_edges = jnp.array([0.0, 1.0, 2.0])
     z_edges = jnp.array([0.0, 1.0, 2.0])
@@ -190,6 +195,61 @@ def test_root_geometry_clips_each_layer_at_radial_domain_boundary():
     assert jnp.sum(density * volumes) == pytest.approx(
         expected_represented, rel=1e-6
     )
+
+
+def test_truncated_soil_retains_only_analytical_root_fraction():
+    """Keeps below-domain roots implicit while retaining their biomass cost."""
+    traits = PlantTraits(
+        kroot=1.0,
+        specific_root_length=100.0,
+        root_length_density=1.0,
+        beta_root_distribution=0.96,
+        max_rooting_depth_cm=150.0,
+    )
+    r_edges = jnp.array([0.0, 2.0])
+    z_edges = jnp.array([0.0, 25.0])
+    volumes = axisymmetric_cylindrical_cell_volumes(r_edges, z_edges)
+    total_root_length = root_length_from_plant_biomass(
+        biomass_g=jnp.array([1.0]),
+        root_mass_fraction=traits.kroot,
+        specific_root_length_cm_g=traits.specific_root_length,
+    )
+
+    density = axisymmetric_stacked_disc_root_density(
+        biomass=jnp.array([1.0]),
+        traits=traits,
+        r_edges=r_edges,
+        z_edges=z_edges,
+    )
+
+    expected_fraction = (1.0 - 0.96**25.0) / (1.0 - 0.96**150.0)
+    represented_length = jnp.sum(density * volumes)
+    assert total_root_length[0] == pytest.approx(100.0)
+    assert represented_length == pytest.approx(
+        total_root_length[0] * expected_fraction, rel=1e-6
+    )
+
+
+def test_root_distribution_is_zero_below_maximum_rooting_depth():
+    """Prevents a soil domain deeper than the rooting horizon creating roots."""
+    traits = PlantTraits(
+        kroot=1.0,
+        specific_root_length=10.0,
+        root_length_density=10.0,
+        beta_root_distribution=0.5,
+        max_rooting_depth_cm=2.0,
+    )
+    r_edges = jnp.array([0.0, 2.0])
+    z_edges = jnp.array([0.0, 1.0, 2.0, 3.0])
+
+    density = axisymmetric_stacked_disc_root_density(
+        biomass=jnp.array([1.0]),
+        traits=traits,
+        r_edges=r_edges,
+        z_edges=z_edges,
+    )
+
+    assert density[0, 2] == pytest.approx(0.0)
 
 
 def test_sphere_cylinder_intersection_helper_returns_physical_volume():
@@ -316,6 +376,7 @@ def _geometry_species(**trait_overrides):
             "kappa_p": 0.0,
             "biomass_cap": 10.0,
             "root_length_density": 100.0,
+            "max_rooting_depth_cm": 3.0,
             **plant_overrides,
         }),
         fungus=FungusTraits(**{
@@ -447,6 +508,7 @@ def test_maintenance_biomass_loss_contracts_geometry(monkeypatch):
         ("plant", "kroot", 1.1),
         ("plant", "specific_root_length", -1.0),
         ("plant", "root_length_density", 0.0),
+        ("plant", "max_rooting_depth_cm", 0.0),
         ("plant", "jmax", -1.0),
         ("plant", "km", 0.0),
         ("plant", "beta_root_distribution", 1.0),

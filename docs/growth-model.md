@@ -103,10 +103,23 @@ where $k_{root}$ is the root dry-mass fraction (dimensionless), $SRL$ is
 specific root length (cm g⁻¹ root dry mass), and $L_{root}$ is cm. Implemented
 by [`root_length_from_plant_biomass`](../mycormarl/mycormarl/plant/roots.py#L9-L21).
 
-The cumulative depth distribution is $F(d)=1-\beta^d$. For layer $k$ bounded
-by $z_k,z_{k+1}$, normalized length weight $w_k$ is the difference in $F$ at
-the two edges. Given a prescribed uniform root length density $\lambda_{root}$
-(cm cm⁻³), each layer receives its own disc radius:
+The cumulative depth distribution is $F(d)=1-\beta^d$. It is normalized over
+the intended maximum rooting depth $D_{root}$, which defaults to 150 cm, rather
+than over the simulated soil depth. For layer $k$ bounded by
+$z_k,z_{k+1}$,
+
+$$
+w_k=\frac{F(\min(z_{k+1},D_{root}))
+              -F(\min(z_k,D_{root}))}
+             {F(D_{root})}.
+$$
+
+Consequently, a truncated soil domain represents only its analytical fraction
+of the complete root system. Roots below the simulated boundary remain implicit:
+their biomass construction and maintenance costs remain in the whole-plant
+accounts, but they provide no in-domain absorbing surface. Given a prescribed
+uniform root length density $\lambda_{root}$ (cm cm⁻³), each represented layer
+receives its own disc radius:
 
 $$
 R_k=\sqrt{\frac{L_{root}w_k}
@@ -114,8 +127,9 @@ R_k=\sqrt{\frac{L_{root}w_k}
 $$
 
 Thus density is uniform inside each disc but deeper discs expand more slowly
-because their assigned length is smaller. Partially crossed annular cells are
-volume averaged; radii beyond the soil boundary are clipped, not redistributed.
+because their assigned length is smaller. Layers below $D_{root}$ are empty.
+Partially crossed annular cells are volume averaged; radii beyond the radial soil
+boundary are clipped, not redistributed.
 Implemented by
 [`root_disc_radii_from_biomass`](../mycormarl/mycormarl/plant/roots.py#L60-L88)
 and [`axisymmetric_stacked_disc_root_density`](../mycormarl/mycormarl/plant/roots.py#L90-L107).
@@ -161,6 +175,7 @@ justification.
 | Plant $\gamma_C$ | `0.402 g C g⁻¹` | Carrot-root elemental analysis from [Kaur et al. (2022)](https://doi.org/10.1038/s41598-022-20971-5); a root-dominated proxy, not whole-plant calibration. |
 | Plant $\gamma_P$ | `1.92 mg P g⁻¹` | Derived dry-mass-weighted carrot value from [Kováčik et al. (2022)](https://doi.org/10.3390/agronomy12112770), an MDPI *Agronomy* paper; independent validation remains required. |
 | $k_{root}$, $SRL$ | `0.62`, `25,434.3 cm g⁻¹` | Separate *Daucus carota* medians from the [GRooT database](https://doi.org/10.1111/geb.13179); not matched observations from one specimen. |
+| $\beta$, $D_{root}$ | `0.96`, `150 cm` | Provisional depth profile and near-infinite rooting horizon. A shallower simulated domain retains only $F(D_{soil})/F(D_{root})$ of total roots. |
 | Fungal $\gamma_C$, $M_C$ | `0.5`, `0.1155 g C cm⁻³` | Provisional values from [Bisot et al. (2026)](https://doi.org/10.1073/pnas.2512182123). |
 | Fungal $\gamma_P$ | `40 mg P g⁻¹` | Upper-bound 4% mass fraction reported by the Bisot et al. literature search; underlying evidence still needs validation. |
 | $\lambda_{sat}$ | `168.75 cm cm⁻³` | Converted from the 2-D density reported by [Oyarte Galvez et al. (2025)](https://doi.org/10.1038/s41586-025-08614-x) using the stipulated $\rho_{3D}=3\rho_{2D}^2/4$; not a direct 3-D soil measurement. |

@@ -33,7 +33,7 @@ class EnvConfig:
     soil_depth_cm: float = 100.0
     radial_interval_cm: float = 0.1
     depth_interval_cm: float = 0.1
-    topsoil_depth_cm: float = 25.0
+    topsoil_depth_cm: float | None = None
     initial_solution_p_um: float = 1.0
     phosphate_diffusion_coefficient_cm2_s: float = 1e-5
     b_p: float = 239.0  # linear volumetric P buffer power

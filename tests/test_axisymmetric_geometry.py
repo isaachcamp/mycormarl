@@ -213,6 +213,7 @@ def test_axisymmetric_stacked_disc_root_density_conserves_total_length():
         specific_root_length=100.0,
         root_length_density=100.0,
         beta_root_distribution=0.5,
+        max_rooting_depth_cm=2.0,
     )
     r_edges = jnp.array([0.0, 1.0, 2.0])
     z_edges = jnp.array([0.0, 1.0, 2.0])
