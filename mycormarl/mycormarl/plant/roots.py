@@ -24,12 +24,23 @@ def _root_depth_cdf(depth: chex.Array, beta: float) -> chex.Array:
     """Evaluate the provisional cumulative root-depth distribution."""
     return 1 - beta ** depth
 
-def _depth_weights_from_edges(beta: float, z_edges: chex.Array) -> chex.Array:
-    """Root depth weights for layers bounded by ``z_edges``."""
+def _depth_weights_from_edges(
+        beta: float,
+        z_edges: chex.Array,
+        max_rooting_depth_cm: float,
+    ) -> chex.Array:
+    """Return full-profile root fractions represented by bounded soil layers.
+
+    The beta depth distribution is normalised over the intended maximum rooting
+    depth, not the simulated soil depth. Edges beyond that rooting horizon are
+    clipped before differencing, so deeper soil layers contain no roots.
+    """
     z_edges = jnp.asarray(z_edges, dtype=jnp.float32)
-    cdf = _root_depth_cdf(z_edges, beta)
+    bounded_edges = jnp.minimum(z_edges, max_rooting_depth_cm)
+    cdf = _root_depth_cdf(bounded_edges, beta)
     weights = jnp.diff(cdf)
-    return weights / jnp.maximum(jnp.sum(weights), 1e-12)
+    full_profile_fraction = _root_depth_cdf(max_rooting_depth_cm, beta)
+    return weights / jnp.maximum(full_profile_fraction, 1e-12)
 
 def axisymmetric_disc_overlap_fractions(
         r_edges: chex.Array,
@@ -79,6 +90,7 @@ def root_disc_radii_from_biomass(
     depth_weights = _depth_weights_from_edges(
         traits.beta_root_distribution,
         z_edges,
+        traits.max_rooting_depth_cm,
     )
     layer_lengths = total_root_length * depth_weights
     dz = z_edges[1:] - z_edges[:-1]
