@@ -26,6 +26,7 @@ class PlantTraits:
     specific_root_length: float = 25_434.3
     root_length_density: float = 1.0
     beta_root_distribution: float = 0.96
+    max_rooting_depth_cm: float = 150.0
     gamma_c: float = 0.402
     gamma_p: float = 1.92
     kappa_c: float = 0.02
@@ -42,6 +43,7 @@ def validate_plant_growth_geometry_traits(traits: PlantTraits) -> None:
         "root_radius",
         "specific_root_length",
         "root_length_density",
+        "max_rooting_depth_cm",
     ):
         value = getattr(traits, name)
         if not math.isfinite(value) or value <= 0.0:
