@@ -20,6 +20,8 @@ class State:
     plant_p_pool: chex.Array # shape (n_plant_agents,)
     fungus_c_pool: chex.Array # shape (n_fungus_agents,)
     fungus_p_pool: chex.Array # shape (n_fungus_agents,)
+    plant_last_p_received: chex.Array  # shape (n_plant_agents,)
+    fungus_last_c_received: chex.Array  # shape (n_fungus_agents,)
     soil_labile_p: chex.Array  # µmol P per cell; shape (n_r, n_z)
     root_length_density: chex.Array  # cm cm^-3; shape (n_r, n_z)
     hyphae_length_density: chex.Array  # cm cm^-3; shape (n_r, n_z)
