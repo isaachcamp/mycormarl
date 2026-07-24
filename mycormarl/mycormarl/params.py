@@ -43,4 +43,3 @@ class EnvConfig:
     uptake_transition_exponent: float = 2.0
     theta_water: float = 0.3
     alpha: float = 0.5
-    norm_obs: bool = True
