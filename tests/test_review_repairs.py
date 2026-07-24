@@ -29,7 +29,6 @@ def _small_config(mode="mixed"):
         depth_interval_cm=0.1,
         topsoil_depth_cm=0.2,
         consumer_mode=mode,
-        norm_obs=False,
     )
 
 

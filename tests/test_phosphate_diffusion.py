@@ -330,7 +330,6 @@ def _subcycling_config(dt_seconds=1.0):
         phosphate_diffusion_coefficient_cm2_s=1.0,
         phosphate_impedance_factor=1.0,
         diffusion_cfl_safety=0.8,
-        norm_obs=False,
     )
 
 

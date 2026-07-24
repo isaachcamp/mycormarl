@@ -42,7 +42,6 @@ def small_config():
         initial_solution_p_um=2.0,
         theta_water=0.3,
         b_p=239.0,
-        norm_obs=False,
     )
 
 

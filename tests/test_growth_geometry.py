@@ -8,6 +8,7 @@ from mycormarl.fungus.mycelium import (
     _volume_under_sphere_within_radius,
     axisymmetric_density_from_biomass,
     axisymmetric_hemisphere_cell_fractions,
+    fungal_biomass_for_colony_radius,
     hyphal_length_from_fungal_biomass,
 )
 from mycormarl.fungus.traits import FungusTraits
@@ -57,6 +58,20 @@ def test_one_gram_biomass_has_expected_root_and_hyphal_length():
 
     assert root_length == pytest.approx(15_769.266, rel=1e-6)
     assert hyphal_length == pytest.approx(5_511_859.501, rel=1e-6)
+
+
+def test_fungal_biomass_for_colony_radius_inverts_geometry_pipeline():
+    """A 2 cm radial fill maps through length and biomass in physical units."""
+    traits = FungusTraits(
+        gamma_c=0.5,
+        hyphal_tissue_carbon_density=4.0,
+        hyphal_radius=0.5,
+        saturation_density=3.0,
+    )
+
+    biomass_g = fungal_biomass_for_colony_radius(2.0, traits)
+
+    assert biomass_g == pytest.approx(315.8273408, rel=1e-6)
 
 
 def test_length_conversions_have_physical_zero_and_nonnegative_limits():
@@ -400,7 +415,6 @@ def _geometry_config():
         depth_interval_cm=1.0,
         topsoil_depth_cm=1.5,
         initial_solution_p_um=0.0,
-        norm_obs=False,
     )
 
 

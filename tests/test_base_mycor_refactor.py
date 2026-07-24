@@ -48,7 +48,6 @@ def config():
         depth_interval_cm=0.5,
         topsoil_depth_cm=0.5,
         initial_solution_p_um=0.0,
-        norm_obs=False,
     )
 
 
@@ -82,10 +81,10 @@ def test_reset_uses_zero_trade_observations(env):
     obs, state = env.reset(jax.random.PRNGKey(0))
 
     assert state.step == 0
-    assert obs[PLANT].shape == env.observation_spaces[PLANT].shape == (4,)
-    assert obs[FUNGUS].shape == env.observation_spaces[FUNGUS].shape == (4,)
-    assert obs[PLANT][-1] == 0.0
-    assert obs[FUNGUS][-1] == 0.0
+    assert obs[PLANT].shape == env.observation_spaces[PLANT].shape == (5,)
+    assert obs[FUNGUS].shape == env.observation_spaces[FUNGUS].shape == (5,)
+    assert obs[PLANT][3] == 0.0
+    assert obs[FUNGUS][3] == 0.0
 
 
 def test_step_trades_from_starting_pools_and_exposes_trade_in_obs(env):
@@ -102,8 +101,10 @@ def test_step_trades_from_starting_pools_and_exposes_trade_in_obs(env):
     assert next_state.plant_p_pool[0] == pytest.approx(26.0)
     assert next_state.fungus_c_pool[0] == pytest.approx(32.0)
     assert next_state.fungus_p_pool[0] == pytest.approx(0.0)
-    assert obs[PLANT][-1] == pytest.approx(16.0)
-    assert obs[FUNGUS][-1] == pytest.approx(20.0)
+    assert obs[PLANT][3] == pytest.approx(1.0)
+    assert obs[FUNGUS][3] == pytest.approx(1.0)
+    assert obs[PLANT][4] == pytest.approx(1.0)
+    assert obs[FUNGUS][4] == pytest.approx(1.0)
     assert rewards[PLANT] == pytest.approx(0.0)
     assert rewards[FUNGUS] == pytest.approx(0.0)
     assert dones["__all__"] == jnp.array(False)

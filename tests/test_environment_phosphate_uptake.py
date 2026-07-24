@@ -31,7 +31,6 @@ def _p3_config(initial_solution_p_um=1.0):
         initial_solution_p_um=initial_solution_p_um,
         theta_water=0.3,
         b_p=0.0,
-        norm_obs=False,
     )
 
 
