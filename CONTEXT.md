@@ -52,3 +52,15 @@ A small pure function in the PPO layer that converts a `Transition` into the
 trajectory fields needed by independent PPO. It derives PPO validity masks and
 bootstrap/trace controls without making `BaseMycorMarl` depend on PPO. It is
 not a class, framework, or extensibility layer.
+
+### Biomass-derived uptake geometry
+
+The root and external-hyphal length-density fields reconstructed from an
+organism's current biomass before soil uptake. These fields represent current
+living uptake infrastructure, not a persistent record of previously occupied
+soil.
+
+Maintenance-induced biomass loss therefore changes uptake geometry through the
+same biomass-to-geometry conversion as any other biomass change. The model does
+not retain thinning, damage, abandoned territory, or a historical growth front
+once biomass is restored.
