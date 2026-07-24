@@ -28,7 +28,10 @@ os.environ.setdefault(
 import chex
 import jax.numpy as jnp
 
-from mycormarl.fungus.mycelium import axisymmetric_density_from_biomass
+from mycormarl.fungus.mycelium import (
+    axisymmetric_density_from_biomass,
+    fungal_biomass_for_colony_radius,
+)
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.plant.roots import axisymmetric_stacked_disc_root_density
 from mycormarl.plant.roots import root_disc_radii_from_biomass
@@ -57,22 +60,6 @@ def growth_radii_from_grid(
             f"to {MAX_VIDEO_FRAMES:,} frames."
         )
     return r_edges[1:]
-
-
-def fungal_biomass_for_colony_radius(
-        colony_radius_cm: float,
-        traits: FungusTraits,
-    ) -> chex.Array:
-    """Invert the fungal geometry conversion for a target colony radius."""
-    total_length_cm = (
-        traits.saturation_density
-        * (2.0 / 3.0)
-        * jnp.pi
-        * colony_radius_cm**3
-    )
-    tissue_volume_cm3 = total_length_cm * jnp.pi * traits.hyphal_radius**2
-    structural_carbon_g = tissue_volume_cm3 * traits.hyphal_tissue_carbon_density
-    return structural_carbon_g / traits.gamma_c
 
 
 def root_biomass_for_max_disc_radius(
