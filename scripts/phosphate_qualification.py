@@ -81,7 +81,6 @@ def qualification_config(
         initial_solution_p_um=concentration_um,
         uptake_reference_time_days=reference_time_days,
         uptake_transition_exponent=exponent,
-        norm_obs=False,
     )
 
 
@@ -533,7 +532,7 @@ def run_studies(include_target_benchmark: bool) -> dict:
     if include_target_benchmark:
         annual_steps = annual_runtime_projection(selected_dt, 0.0)["steps_per_year"]
         target_benchmark = benchmark_environment(
-            EnvConfig(dt=selected_dt, max_steps=annual_steps, norm_obs=False),
+            EnvConfig(dt=selected_dt, max_steps=annual_steps),
             repeats=20,
         )
     return {
