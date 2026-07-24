@@ -31,6 +31,7 @@ from mycormarl.soil import (
 from mycormarl.plant import photosynthesise
 from mycormarl.observations import actor_observation
 from mycormarl.state import State
+from mycormarl.transition import Transition
 
 
 # TODO: consider more complex allocation strategies based on past allocations.
@@ -500,6 +501,40 @@ class BaseMycorMarl(MultiAgentEnv):
             FUNGUS: fungus_dead.squeeze(),
             "__all__": done,
         }
+
+        def completed_transition(
+            requested_action,
+            operational_at_start,
+            operational_at_end,
+            final_observation,
+        ):
+            realised_action = jnp.concatenate(
+                [
+                    jnp.atleast_1d(
+                        jnp.where(
+                            trading_enabled,
+                            requested_action[Actions.trade],
+                            0.0,
+                        )
+                    ),
+                    jnp.where(
+                        operational_at_end,
+                        requested_action[Actions.growth :],
+                        0.0,
+                    ),
+                ]
+            )
+            return Transition(
+                requested_action=requested_action,
+                realised_action=realised_action,
+                operational_at_start=operational_at_start.squeeze(),
+                operational_at_end=operational_at_end.squeeze(),
+                allocation_executed=operational_at_end.squeeze(),
+                trade_executed=trading_enabled.squeeze(),
+                truncated=state.step >= self.max_episode_steps,
+                final_observation=final_observation,
+            )
+
         infos = {
             PLANT: {
                 **plant_step["info"],
@@ -522,6 +557,20 @@ class BaseMycorMarl(MultiAgentEnv):
                 "trade_out": fungus_p_trade_out,
                 "trade_in": plant_c_trade_out,
                 "trade_cancelled": trade_cancelled,
+            },
+            "transitions": {
+                PLANT: completed_transition(
+                    actions[PLANT],
+                    plant_operational_at_start,
+                    plant_operational_at_end,
+                    obs[PLANT],
+                ),
+                FUNGUS: completed_transition(
+                    actions[FUNGUS],
+                    fungus_operational_at_start,
+                    fungus_operational_at_end,
+                    obs[FUNGUS],
+                ),
             },
         }
 
