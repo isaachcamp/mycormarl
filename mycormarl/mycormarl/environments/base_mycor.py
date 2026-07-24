@@ -32,7 +32,7 @@ from mycormarl.soil import (
 )
 from mycormarl.plant import photosynthesise
 from mycormarl.actions import constrain_allocation
-from mycormarl.observations import _normalize_if
+from mycormarl.observations import actor_observation
 from mycormarl.state import State
 
 
@@ -120,15 +120,15 @@ class BaseMycorMarl(MultiAgentEnv):
             self.z_edges.shape[0] - 1,
         )
 
-        obs_dim = 4 # [biomass, carbon_pool, phosphorus_pool, received_trades] normalised
+        obs_dim = 5
 
         self.action_set = jnp.array(
             [Actions.trade, Actions.growth, Actions.maintenance, Actions.reproduction]
         )
 
         self.observation_spaces = {
-            PLANT: Box(low=-jnp.inf, high=jnp.inf, shape=(obs_dim,), dtype=jnp.float32),
-            FUNGUS: Box(low=-jnp.inf, high=jnp.inf, shape=(obs_dim,), dtype=jnp.float32),
+            PLANT: Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=jnp.float32),
+            FUNGUS: Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=jnp.float32),
         }
         # Four continuous allocations: trade, growth, maintenance, reproduction.
         self.action_spaces = {
@@ -147,36 +147,61 @@ class BaseMycorMarl(MultiAgentEnv):
     def agent_classes(self) -> dict:
         return {PLANT: [PLANT], FUNGUS: [FUNGUS]}
 
-    def _get_obs(
-        self,
-        state: State,
-        last_trade: Optional[Dict[str, chex.Array]] = None,
-    ) -> Dict[str, chex.Array]:
+    def get_obs(self, state: State) -> Dict[str, chex.Array]:
+        """Reconstruct bounded actor observations entirely from environment state."""
+        # Calculate reference biomasses for normalization.
+        # Use 0.5 * maximum so that normed obs is also half-maximum.
+        plant_biomass_reference = 0.5 * self.species.plant.biomass_cap
 
-        if last_trade is None:
-            plant_trade_obs = jnp.zeros_like(state.plant_p_pool)
-            fungus_trade_obs = jnp.zeros_like(state.fungus_c_pool)
-        else:
-            plant_trade_obs = last_trade[PLANT]
-            fungus_trade_obs = last_trade[FUNGUS]
+        # Calculate ref biomass based on maximum radius possible constrained by
+        # grid boundaries.
+        fungus_biomass_reference = (
+            0.5
+            * fungus.fungal_biomass_for_colony_radius(
+                self.config.soil_radius_cm,
+                self.species.fungus,
+            )
+        )
 
-        plant_obs = jnp.concatenate([
-            _normalize_if(self.config.norm_obs, state.plant_biomass, self.species.plant.biomass_cap),
-            _normalize_if(self.config.norm_obs, state.plant_c_pool, state.plant_biomass),
-            _normalize_if(self.config.norm_obs, state.plant_p_pool, state.plant_biomass),
-            _normalize_if(self.config.norm_obs, plant_trade_obs, state.plant_p_pool),
-        ])
-
-        fungus_obs = jnp.concatenate([
-            _normalize_if(self.config.norm_obs, state.fungus_biomass, self.species.plant.biomass_cap),
-            _normalize_if(self.config.norm_obs, state.fungus_c_pool, state.fungus_biomass),
-            _normalize_if(self.config.norm_obs, state.fungus_p_pool, state.fungus_biomass),
-            _normalize_if(self.config.norm_obs, fungus_trade_obs, state.fungus_c_pool),
-        ])
+        association = (
+            jnp.asarray(self.plant_active and self.fungus_active)
+            & ~state.plant_dead
+            & ~state.fungus_dead
+        )
 
         return {
-            PLANT: plant_obs.astype(jnp.float32),
-            FUNGUS: fungus_obs.astype(jnp.float32),
+            PLANT: actor_observation(
+                biomass=state.plant_biomass,
+                biomass_reference=plant_biomass_reference,
+                c_pool=state.plant_c_pool,
+                gamma_c=self.species.plant.gamma_c,
+                p_pool=state.plant_p_pool,
+                gamma_p=self.species.plant.gamma_p,
+                last_received=state.plant_last_p_received,
+                maintenance_need=(
+                    self.species.plant.kappa_p
+                    * state.plant_biomass
+                    * self.config.dt
+                ),
+                association=association,
+                operational=~state.plant_dead,
+            ),
+            FUNGUS: actor_observation(
+                biomass=state.fungus_biomass,
+                biomass_reference=fungus_biomass_reference,
+                c_pool=state.fungus_c_pool,
+                gamma_c=self.species.fungus.gamma_c,
+                p_pool=state.fungus_p_pool,
+                gamma_p=self.species.fungus.gamma_p,
+                last_received=state.fungus_last_c_received,
+                maintenance_need=(
+                    self.species.fungus.kappa_c
+                    * state.fungus_biomass
+                    * self.config.dt
+                ),
+                association=association,
+                operational=~state.fungus_dead,
+            ),
         }
 
     def _initial_state(self) -> State:
@@ -235,6 +260,8 @@ class BaseMycorMarl(MultiAgentEnv):
             fungus_p_pool=jnp.array([
                 self.species.fungus.initial_p_pool if self.fungus_active else 0.0
             ]),
+            plant_last_p_received=jnp.array([0.0]),
+            fungus_last_c_received=jnp.array([0.0]),
             soil_labile_p=soil_labile_p,
             root_length_density=root_length_density,
             hyphae_length_density=hyphae_length_density,
@@ -250,7 +277,7 @@ class BaseMycorMarl(MultiAgentEnv):
     def reset(self, key: chex.PRNGKey) -> Tuple[Dict[str, chex.Array], State]:
         state = self._initial_state()
 
-        obs = self._get_obs(state)
+        obs = self.get_obs(state)
         return obs, state
 
     def step_env(
@@ -355,6 +382,16 @@ class BaseMycorMarl(MultiAgentEnv):
             plant_p_pool=plant_step["p_pool"] + fungus_p_trade_out,
             fungus_c_pool=fungus_step["c_pool"] + plant_c_trade_out,
             fungus_p_pool=jnp.clip(fungus_step["p_pool"] - fungus_p_trade_out, 0.0, jnp.inf),
+            plant_last_p_received=jnp.where(
+                jnp.logical_and(self.plant_active, jnp.logical_not(plant_dead)),
+                fungus_p_trade_out,
+                0.0,
+            ),
+            fungus_last_c_received=jnp.where(
+                jnp.logical_and(self.fungus_active, jnp.logical_not(fungus_dead)),
+                plant_c_trade_out,
+                0.0,
+            ),
             cumulative_plant_p_mortality_loss_mg=(
                 state.cumulative_plant_p_mortality_loss_mg
                 + plant_mortality_biomass * self.species.plant.gamma_p
@@ -407,13 +444,7 @@ class BaseMycorMarl(MultiAgentEnv):
         done = self.is_terminal(state)
         state = state.replace(terminal=done)
 
-        obs = self._get_obs(
-            state,
-            last_trade={
-                PLANT: fungus_p_trade_out,
-                FUNGUS: plant_c_trade_out,
-            },
-        )
+        obs = self.get_obs(state)
 
         rewards = {
             PLANT: plant_step["reward"],
@@ -698,8 +729,6 @@ class BaseMycorMarl(MultiAgentEnv):
             raise ValueError(
                 "consumer_mode must be 'mixed', 'plant-only', or 'fungus-only'"
             )
-        if not isinstance(config.norm_obs, bool):
-            raise ValueError("norm_obs must be a boolean")
         if not math.isfinite(config.alpha) or not 0.0 <= config.alpha <= 1.0:
             raise ValueError("alpha must be finite and within [0, 1]")
         if (
