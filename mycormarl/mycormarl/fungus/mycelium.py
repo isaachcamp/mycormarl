@@ -25,6 +25,55 @@ def hyphal_length_from_fungal_biomass(
         / (tissue_carbon_density_g_c_cm3 * cross_section_cm2)
     )
 
+
+def fungal_biomass_from_hyphal_length(
+        total_length_cm: chex.Array,
+        gamma_c_g_c_per_g: float,
+        tissue_carbon_density_g_c_cm3: float,
+        hyphal_radius_cm: float,
+    ) -> chex.Array:
+    """Convert cylindrical external-hyphal length to fungal dry biomass."""
+    total_length_cm = jnp.maximum(jnp.asarray(total_length_cm), 0.0)
+    cross_section_cm2 = jnp.pi * hyphal_radius_cm ** 2
+    structural_carbon_g = (
+        total_length_cm
+        * cross_section_cm2
+        * tissue_carbon_density_g_c_cm3
+    )
+    return structural_carbon_g / gamma_c_g_c_per_g
+
+
+def hyphal_length_for_colony_radius_axisymmetric(
+        colony_radius_cm: chex.Array,
+        saturation_density: float,
+    ) -> chex.Array:
+    """Return the length in a saturated hemisphere of the requested radius."""
+    colony_radius_cm = jnp.maximum(jnp.asarray(colony_radius_cm), 0.0)
+    return (
+        (2.0 / 3.0)
+        * jnp.pi
+        * colony_radius_cm ** 3
+        * saturation_density
+    )
+
+
+def fungal_biomass_for_colony_radius(
+        colony_radius_cm: chex.Array,
+        traits,
+    ) -> chex.Array:
+    """Invert the fungal biomass-to-saturated-hemisphere radius pipeline."""
+    total_length_cm = hyphal_length_for_colony_radius_axisymmetric(
+        colony_radius_cm,
+        traits.saturation_density,
+    )
+    return fungal_biomass_from_hyphal_length(
+        total_length_cm,
+        traits.gamma_c,
+        traits.hyphal_tissue_carbon_density,
+        traits.hyphal_radius,
+    )
+
+
 def colony_radius_from_length_axisymmetric(total_length, saturation_density):
     """Return the radius of a saturated hemisphere containing total length."""
     return jnp.cbrt((3 * total_length) / (2 * jnp.pi * saturation_density))
