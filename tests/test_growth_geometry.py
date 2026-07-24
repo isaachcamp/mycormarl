@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
+from mycormarl.actions import physical_action
 from mycormarl.environments import base_mycor as env_mod
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.mycelium import (
@@ -458,8 +459,8 @@ def test_realised_growth_updates_geometry_before_soil_stage(monkeypatch):
 
     monkeypatch.setattr(env_mod, "evolve_soil_p", observe_geometry)
     actions = {
-        PLANT: jnp.array([0.0, 1.0, 0.0, 0.0]),
-        FUNGUS: jnp.array([0.0, 1.0, 0.0, 0.0]),
+        PLANT: physical_action(0.0, 1.0, 0.0, 0.0),
+        FUNGUS: physical_action(0.0, 1.0, 0.0, 0.0),
     }
 
     _, next_state, _, _, _ = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -502,8 +503,8 @@ def test_maintenance_biomass_loss_contracts_geometry(monkeypatch):
 
     monkeypatch.setattr(env_mod, "evolve_soil_p", no_soil_uptake)
     actions = {
-        PLANT: jnp.array([0.0, 0.0, 1.0, 0.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
 
     _, next_state, _, _, _ = env.step_env(jax.random.PRNGKey(1), state, actions)

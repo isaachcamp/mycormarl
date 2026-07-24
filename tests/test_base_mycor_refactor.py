@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
+from mycormarl.actions import physical_action
 from mycormarl.environments import base_mycor as env_mod
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
@@ -90,8 +91,8 @@ def test_reset_uses_zero_trade_observations(env):
 def test_step_trades_from_starting_pools_and_exposes_trade_in_obs(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: jnp.array([1.0, 0.0, 0.0, 0.0]),
-        FUNGUS: jnp.array([1.0, 0.0, 0.0, 0.0]),
+        PLANT: physical_action(1.0, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(1.0, 0.0, 0.0, 1.0),
     }
 
     obs, next_state, rewards, dones, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -112,11 +113,30 @@ def test_step_trades_from_starting_pools_and_exposes_trade_in_obs(env):
     assert "growth" in infos[FUNGUS]
 
 
+def test_trade_is_independent_and_environment_executes_physical_action_unchanged(env):
+    _, state = env.reset(jax.random.PRNGKey(0))
+    actions = {
+        PLANT: physical_action(0.5, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(0.5, 0.0, 0.0, 1.0),
+    }
+
+    _, next_state, _, _, infos = env.step_env(
+        jax.random.PRNGKey(1), state, actions
+    )
+
+    assert next_state.plant_c_pool[0] == pytest.approx(110.0)
+    assert next_state.plant_p_pool[0] == pytest.approx(18.0)
+    assert next_state.fungus_c_pool[0] == pytest.approx(22.0)
+    assert next_state.fungus_p_pool[0] == pytest.approx(8.0)
+    assert infos[PLANT]["proposed_trade_out"][0] == pytest.approx(10.0)
+    assert infos[FUNGUS]["proposed_trade_out"][0] == pytest.approx(8.0)
+
+
 def test_newly_fixed_carbon_is_not_available_for_same_step_growth(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: jnp.array([0.0, 1.0, 0.0, 0.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(0.0, 1.0, 0.0, 0.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
 
     _, next_state, _, _, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -137,8 +157,8 @@ def test_plant_growth_at_biomass_cap_charges_only_realised_structure(env):
         plant_p_pool=jnp.array([10.0]),
     )
     actions = {
-        PLANT: jnp.array([0.0, 1.0, 0.0, 0.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(0.0, 1.0, 0.0, 0.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
 
     _, next_state, _, _, infos = env.step_env(
@@ -152,6 +172,26 @@ def test_plant_growth_at_biomass_cap_charges_only_realised_structure(env):
         (next_state.plant_biomass[0] - state.plant_biomass[0])
         * env.species.plant.gamma_p
     )
+
+
+def test_essential_growth_returns_unused_non_limiting_allocation(env):
+    _, state = env.reset(jax.random.PRNGKey(0))
+    state = state.replace(plant_c_pool=jnp.array([20.0]), plant_p_pool=jnp.array([4.0]))
+    actions = {
+        PLANT: physical_action(0.0, 0.5, 0.0, 0.5),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
+    }
+
+    _, next_state, _, _, infos = env.step_env(
+        jax.random.PRNGKey(1), state, actions
+    )
+
+    assert infos[PLANT]["growth_c_allocated"][0] == pytest.approx(10.0)
+    assert infos[PLANT]["growth_p_allocated"][0] == pytest.approx(2.0)
+    assert infos[PLANT]["growth_c_used"][0] == pytest.approx(4.0)
+    assert infos[PLANT]["growth_p_used"][0] == pytest.approx(2.0)
+    assert next_state.plant_c_pool[0] == pytest.approx(136.0)
+    assert next_state.plant_p_pool[0] == pytest.approx(2.0)
 
 
 def test_dead_plant_cannot_resume_biology_while_fungus_remains_alive(env):
@@ -171,8 +211,8 @@ def test_dead_plant_cannot_resume_biology_while_fungus_remains_alive(env):
         )
     )
     maintenance_failure = {
-        PLANT: jnp.array([0.0, 0.0, 0.0, 0.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
     _, dead_state, _, dones, _ = env.step_env(
         jax.random.PRNGKey(1), state, maintenance_failure
@@ -188,8 +228,8 @@ def test_dead_plant_cannot_resume_biology_while_fungus_remains_alive(env):
         plant=env.species.plant.replace(kappa_c=0.0)
     )
     attempted_recovery = {
-        PLANT: jnp.array([1.0, 1.0, 0.0, 0.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(1.0, 1.0, 0.0, 0.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
     biomass_before = dead_state.plant_biomass.copy()
     c_before = dead_state.plant_c_pool.copy()
@@ -210,8 +250,8 @@ def test_dead_plant_cannot_resume_biology_while_fungus_remains_alive(env):
 def test_incoming_trade_is_not_available_for_same_step_growth(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: jnp.array([0.0, 1.0, 0.0, 0.0]),
-        FUNGUS: jnp.array([0.5, 0.0, 0.5, 0.0]),
+        PLANT: physical_action(0.0, 1.0, 0.0, 0.0),
+        FUNGUS: physical_action(0.5, 0.0, 0.0, 1.0),
     }
 
     _, next_state, _, _, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -220,12 +260,106 @@ def test_incoming_trade_is_not_available_for_same_step_growth(env):
     assert next_state.plant_p_pool[0] == pytest.approx(8.0)
 
 
+def test_plant_pays_automatic_maintenance_before_reserving_resources(env):
+    _, state = env.reset(jax.random.PRNGKey(0))
+    env.species = env.species.replace(
+        plant=env.species.plant.replace(kappa_c=0.1, kappa_p=0.05)
+    )
+    actions = {
+        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
+    }
+
+    _, next_state, _, _, infos = env.step_env(
+        jax.random.PRNGKey(1), state, actions
+    )
+
+    assert infos[PLANT]["maint_c_used"][0] == pytest.approx(1.0)
+    assert infos[PLANT]["maint_p_used"][0] == pytest.approx(0.5)
+    assert next_state.plant_c_pool[0] == pytest.approx(119.0)
+    assert next_state.plant_p_pool[0] == pytest.approx(9.5)
+    assert next_state.cumulative_plant_p_maintenance_loss_mg[0] == pytest.approx(
+        0.5
+    )
+
+
+def test_maintenance_p_loss_records_only_the_amount_actually_paid(env):
+    _, state = env.reset(jax.random.PRNGKey(0))
+    state = state.replace(plant_p_pool=jnp.array([0.25]))
+    env.species = env.species.replace(
+        plant=env.species.plant.replace(kappa_c=0.0, kappa_p=0.05)
+    )
+    actions = {
+        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
+    }
+
+    _, next_state, _, _, infos = env.step_env(
+        jax.random.PRNGKey(1), state, actions
+    )
+
+    assert infos[PLANT]["maint_p"][0] == pytest.approx(0.5)
+    assert infos[PLANT]["maint_p_used"][0] == pytest.approx(0.25)
+    assert infos[PLANT]["p_deficit"][0] == pytest.approx(0.25)
+    assert next_state.cumulative_plant_p_maintenance_loss_mg[0] == pytest.approx(
+        0.25
+    )
+
+
+def test_fungus_pays_automatic_maintenance_before_reserving_resources(env):
+    _, state = env.reset(jax.random.PRNGKey(0))
+    env.species = env.species.replace(
+        fungus=env.species.fungus.replace(kappa_c=0.25, kappa_p=0.125)
+    )
+    actions = {
+        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
+    }
+
+    _, next_state, _, _, infos = env.step_env(
+        jax.random.PRNGKey(1), state, actions
+    )
+
+    assert infos[FUNGUS]["maint_c_used"][0] == pytest.approx(2.0)
+    assert infos[FUNGUS]["maint_p_used"][0] == pytest.approx(1.0)
+    assert next_state.fungus_c_pool[0] == pytest.approx(10.0)
+    assert next_state.fungus_p_pool[0] == pytest.approx(15.0)
+    assert next_state.cumulative_fungus_p_maintenance_loss_mg[0] == pytest.approx(
+        1.0
+    )
+
+
+def test_maintenance_death_cancels_bilateral_trade_and_preserves_survivor_pool(env):
+    _, state = env.reset(jax.random.PRNGKey(0))
+    state = state.replace(plant_c_pool=jnp.array([0.0]))
+    env.species = env.species.replace(
+        plant=env.species.plant.replace(kappa_c=2.0, kappa_p=0.0)
+    )
+    actions = {
+        PLANT: physical_action(1.0, 0.0, 1.0, 0.0),
+        FUNGUS: physical_action(0.5, 0.0, 0.0, 1.0),
+    }
+
+    _, next_state, _, dones, infos = env.step_env(
+        jax.random.PRNGKey(1), state, actions
+    )
+
+    assert dones[PLANT]
+    assert not dones[FUNGUS]
+    assert infos[FUNGUS]["proposed_trade_out"][0] == pytest.approx(8.0)
+    assert infos[FUNGUS]["trade_out"][0] == pytest.approx(0.0)
+    assert infos[FUNGUS]["trade_cancelled"]
+    assert infos[PLANT]["reproduction_p"][0] == pytest.approx(0.0)
+    assert next_state.fungus_p_pool[0] == pytest.approx(16.0)
+    assert next_state.plant_p_pool[0] == pytest.approx(10.0)
+
+
 def test_reproduction_spends_pools_and_returns_reward(env):
     """Exports reproduced P and records it in the cumulative plant diagnostic."""
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: jnp.array([0.0, 0.0, 0.0, 1.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(0.0, 0.0, 1.0, 0.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
 
     _, next_state, rewards, _, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -247,8 +381,8 @@ def test_fungal_reproduction_export_is_accumulated(env):
         cumulative_fungus_p_reproduction_export_mg=jnp.array([2.0])
     )
     actions = {
-        PLANT: jnp.array([0.0, 0.0, 1.0, 0.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 0.0, 1.0]),
+        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(0.0, 0.0, 1.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(
@@ -275,8 +409,8 @@ def test_reproduction_reward_uses_scaled_cobb_douglas(env):
     )
 
     actions = {
-        PLANT: jnp.array([0.0, 0.0, 0.0, 1.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(0.0, 0.0, 1.0, 0.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
 
     _, _, rewards, _, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -286,7 +420,7 @@ def test_reproduction_reward_uses_scaled_cobb_douglas(env):
     assert rewards[PLANT] == pytest.approx(6.0)
 
 
-def test_excess_maintenance_allocation_is_not_wasted(env):
+def test_automatic_maintenance_does_not_spend_reserved_resources(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     state = state.replace(
         plant_biomass=jnp.array([10.0]),
@@ -298,8 +432,8 @@ def test_excess_maintenance_allocation_is_not_wasted(env):
     )
 
     actions = {
-        PLANT: jnp.array([0.0, 0.0, 1.0, 0.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
 
     _, next_state, _, _, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -317,8 +451,8 @@ def test_excess_maintenance_allocation_is_not_wasted(env):
 def test_terminal_after_max_episode_steps(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: jnp.array([0.0, 0.0, 1.0, 0.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
 
     for step in range(3):
@@ -326,3 +460,34 @@ def test_terminal_after_max_episode_steps(env):
 
     assert state.step == 3
     assert dones["__all__"] == jnp.array(True)
+
+
+def test_physical_resource_transaction_is_jittable_and_vectorised(env):
+    keys = jax.random.split(jax.random.PRNGKey(0), 2)
+    _, states = jax.vmap(env.reset)(keys)
+    actions = {
+        PLANT: jnp.stack(
+            [
+                physical_action(0.25, 0.5, 0.25, 0.25),
+                physical_action(0.75, 0.25, 0.5, 0.25),
+            ]
+        ),
+        FUNGUS: jnp.stack(
+            [
+                physical_action(0.5, 0.25, 0.25, 0.5),
+                physical_action(0.0, 0.5, 0.0, 0.5),
+            ]
+        ),
+    }
+    step = jax.jit(jax.vmap(env.step_env, in_axes=(0, 0, 0)))
+
+    _, next_states, _, _, _ = step(keys, states, actions)
+
+    for pool in (
+        next_states.plant_c_pool,
+        next_states.plant_p_pool,
+        next_states.fungus_c_pool,
+        next_states.fungus_p_pool,
+    ):
+        assert jnp.all(jnp.isfinite(pool))
+        assert jnp.all(pool >= 0.0)

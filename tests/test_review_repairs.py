@@ -9,6 +9,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
+from mycormarl.actions import physical_action
 from mycormarl.algos.ppo import make_train
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
@@ -74,8 +75,8 @@ def test_independent_consumer_mode_keeps_absent_partner_dormant(mode, inactive, 
     env = BaseMycorMarl(_small_config(mode), _species())
     _, state = env.reset(jax.random.PRNGKey(0))
     aggressive = {
-        PLANT: jnp.array([1.0, 1.0, 1.0, 1.0]),
-        FUNGUS: jnp.array([1.0, 1.0, 1.0, 1.0]),
+        PLANT: physical_action(1.0, 1.0, 1.0, 1.0),
+        FUNGUS: physical_action(1.0, 1.0, 1.0, 1.0),
     }
 
     for step in range(2):
@@ -101,8 +102,8 @@ def test_absorbing_death_removes_real_root_geometry_and_uptake():
     c_before = state.plant_c_pool.copy()
     p_before = state.plant_p_pool.copy()
     actions = {
-        PLANT: jnp.array([1.0, 1.0, 1.0, 1.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(1.0, 1.0, 1.0, 1.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
 
     _, next_state, rewards, dones, infos = env.step_env(

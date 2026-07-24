@@ -10,6 +10,8 @@ class State:
 
     Arrays are stored explicitly so the model stays JAX-friendly and easy to
     extend.
+
+    Cumulative P loss fields are stored to ensure P conservation.
     """
 
     plant_biomass: chex.Array # shape (n_plant_agents,)
@@ -27,6 +29,8 @@ class State:
     hyphae_length_density: chex.Array  # cm cm^-3; shape (n_r, n_z)
     cumulative_plant_p_mortality_loss_mg: chex.Array  # shape (n_plant_agents,)
     cumulative_fungus_p_mortality_loss_mg: chex.Array  # shape (n_fungus_agents,)
+    cumulative_plant_p_maintenance_loss_mg: chex.Array  # shape (n_plant_agents,)
+    cumulative_fungus_p_maintenance_loss_mg: chex.Array  # shape (n_fungus_agents,)
     cumulative_plant_p_reproduction_export_mg: chex.Array  # shape (n_plant_agents,)
     cumulative_fungus_p_reproduction_export_mg: chex.Array  # shape (n_fungus_agents,)
     plant_dead: chex.Array # shape (n_plant_agents,)
