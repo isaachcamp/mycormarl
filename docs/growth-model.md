@@ -157,6 +157,12 @@ $$
 R_f=\left(\frac{3L_h}{2\pi\lambda_{sat}}\right)^{1/3}.
 $$
 
+The inverse transformations from colony radius to saturated length and from
+length to dry biomass are owned by the same mycelium module. Their composition,
+[`fungal_biomass_for_colony_radius`](../mycormarl/mycormarl/fungus/mycelium.py),
+provides the radial-fill biomass. Half of that value is used as the fungal
+actor-observation reference.
+
 Each annular cell receives $\lambda_{sat}$ times its exact occupied-volume
 fraction. Implemented by
 [`colony_radius_from_length_axisymmetric`](../mycormarl/mycormarl/fungus/mycelium.py#L28-L30),
