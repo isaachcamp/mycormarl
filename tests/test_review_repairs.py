@@ -142,6 +142,25 @@ def test_ppo_stack_accepts_current_agent_identifiers():
 
     assert set(output["runner_state"][0]) == {PLANT, FUNGUS}
     assert output["trajectories"][0].reward.shape[:2] == (1, 2)
+    final_state = output["runner_state"][1]
+    for pool in (
+        final_state.plant_c_pool,
+        final_state.plant_p_pool,
+        final_state.fungus_c_pool,
+        final_state.fungus_p_pool,
+    ):
+        assert jnp.all(jnp.isfinite(pool))
+        assert jnp.all(pool >= 0.0)
+    for trajectory in output["trajectories"]:
+        for field in (
+            "proposed_trade_out",
+            "growth_c_allocated",
+            "growth_p_allocated",
+            "reproduction_c",
+            "reproduction_p",
+        ):
+            assert jnp.all(jnp.isfinite(trajectory.info[field]))
+            assert jnp.all(trajectory.info[field] >= 0.0)
 
 
 @pytest.mark.parametrize(
