@@ -1,4 +1,5 @@
 
+from dataclasses import dataclass
 from typing import NamedTuple, Tuple, Dict, List
 
 import jax
@@ -8,6 +9,27 @@ from flax.linen.initializers import constant
 from flax.training.train_state import TrainState
 import distrax
 import optax
+
+from mycormarl.environments.base_mycor import FUNGUS, PLANT
+
+
+@dataclass(frozen=True)
+class PPOConfig:
+    """Typed configuration for the two-policy PPO training loop."""
+
+    TOTAL_TIMESTEPS: int = 5_000_000
+    NUM_STEPS: int = 128
+    NUM_ENVS: int = 16
+    NUM_ACTORS: int = 2
+    UPDATE_EPOCHS: int = 4
+    NUM_MINIBATCHES: int = 4
+    GAMMA: float = 0.995
+    GAE_LAMBDA: float = 0.95
+    VF_COEF: float = 0.5
+    ENT_COEF: float = 0.01
+    CLIP_EPS: float = 0.2
+    ACTIVATION: str = "tanh"
+    LR: float = 2.5e-4
 
 
 class ActorCritic(nn.Module):
@@ -67,6 +89,13 @@ def unbatchify(
 def make_train(env, config):
     """Factory function to create training function for PPO."""
 
+    if config.NUM_ACTORS != len(env.agents):
+        raise ValueError("NUM_ACTORS must match the environment agent count")
+    if config.NUM_STEPS % config.NUM_MINIBATCHES != 0:
+        raise ValueError("NUM_STEPS must be divisible by NUM_MINIBATCHES")
+    if config.TOTAL_TIMESTEPS < config.NUM_STEPS * config.NUM_ENVS:
+        raise ValueError("TOTAL_TIMESTEPS must contain at least one PPO update")
+
     NUM_UPDATES = (
         config.TOTAL_TIMESTEPS // config.NUM_STEPS // config.NUM_ENVS
     )
@@ -93,12 +122,11 @@ def make_train(env, config):
         Note: This function assumes a single environment and does not handle multiple environments.
         """
         # Initialize independent tree and fungus networks
-        tree_policy = ActorCritic(env.action_spaces["agent_0"].shape[0], activation=config.ACTIVATION)
-        fungus_policy = ActorCritic(env.action_spaces["agent_1"].shape[0], activation=config.ACTIVATION)
+        tree_policy = ActorCritic(env.action_spaces[PLANT].shape[0], activation=config.ACTIVATION)
+        fungus_policy = ActorCritic(env.action_spaces[FUNGUS].shape[0], activation=config.ACTIVATION)
 
         rng, tree_rng, fungus_rng = jax.random.split(rng, 3)
-        # init_x = jnp.zeros(env.observation_space("agent_0").shape).flatten()
-        init_x = jnp.zeros((1, env.observation_spaces["agent_0"].shape[0])) # same for both agents
+        init_x = jnp.zeros((1, env.observation_spaces[PLANT].shape[0]))
 
         tree_tx = optax.adam(learning_rate=config.LR) # Adam optimizer with static learning rate
         fungus_tx = optax.adam(learning_rate=config.LR)
@@ -166,23 +194,23 @@ def make_train(env, config):
 
                 # Collect Trajectory object
                 tree_transition = Trajectory(
-                    done['agent_0'].squeeze(),
+                    done[PLANT].squeeze(),
                     tree_action,
                     jnp.array(tree_value),
-                    reward['agent_0'].squeeze(),
+                    reward[PLANT].squeeze(),
                     tree_log_prob,
                     tree_obs_batch,
-                    info=info['agent_0'],
+                    info=info[PLANT],
                     terminal=done["__all__"].squeeze()
                 )
                 fungus_transition = Trajectory(
-                    done['agent_1'].squeeze(),
+                    done[FUNGUS].squeeze(),
                     fungus_action,
                     jnp.array(fungus_value),
-                    reward['agent_1'].squeeze(),
+                    reward[FUNGUS].squeeze(),
                     fungus_log_prob,
                     fungus_obs_batch,
-                    info=info['agent_1'],
+                    info=info[FUNGUS],
                     terminal=done["__all__"].squeeze()
                 )
 
@@ -317,7 +345,7 @@ def make_train(env, config):
                             + config.VF_COEF * value_loss
                             - config.ENT_COEF * entropy
                         )
-                        return total_loss, (value_loss, loss_actor, _)
+                        return total_loss, (value_loss, loss_actor, entropy)
 
                     grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
                     total_loss, grads = grad_fn(agent_train_state.params, traj_batch, advantages, targets)

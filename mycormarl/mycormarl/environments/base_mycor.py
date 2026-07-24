@@ -1,419 +1,745 @@
 
-
-from enum import IntEnum
-from typing import Dict, List, Tuple
+from __future__ import annotations
+import math
+from typing import Dict, Tuple, Optional
 from functools import partial
+from enum import IntEnum
 
+import chex
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
-from jaxmarl.environments import spaces
+from jaxmarl.environments.spaces import Box
 import jax
 import jax.numpy as jnp
-import jax_dataclasses as jdc
 
-from mycormarl.agents.agent import AgentState
+from mycormarl import fungus, plant
+from mycormarl.fungus.physiology import fungal_maintenance_demand
+from mycormarl.params import EnvConfig, SpeciesParams
+from mycormarl.growth import grow
+from mycormarl.plant.physiology import plant_maintenance_demand
+from mycormarl.soil import (
+    axisymmetric_cylindrical_cell_volumes,
+    axisymmetric_diffusion_conductances,
+    axisymmetric_edges_from_intervals,
+    axisymmetric_radial_face_areas,
+    axisymmetric_vertical_face_areas,
+    evolve_soil_p,
+    explicit_diffusion_cfl_seconds,
+    initial_labile_p_from_micromolar,
+    required_diffusion_substeps,
+    validate_axisymmetric_grid_parameters,
+    validate_diffusion_parameters,
+    validate_linear_buffer_parameters,
+)
+from mycormarl.plant import photosynthesise
+from mycormarl.actions import constrain_allocation
+from mycormarl.observations import _normalize_if
+from mycormarl.state import State
 
 
-# TODO: add AgentState inits with configurable parameters (e.g. initial health, biomass, etc.)
 # TODO: consider more complex allocation strategies based on past allocations.
 # TODO: decouple constraints from the environment step function.
 
 
-class AgentType(IntEnum):
-    PLANT = 0
-    FUNGUS = 1
+PLANT = "plant"
+FUNGUS = "fungus"
+AGENTS = (PLANT, FUNGUS)
 
-
-@jdc.pytree_dataclass
-class State:
-    """
-    Represents the full environment state with two AgentState instances for
-    the Plant and Fungus.
-    """
-    agents: List[AgentState]
-    adj: jax.Array # (n_agents, n_agents) adjacency matrix representing mycorrhizal network.
-    s_trades: jax.Array # (n_agents, n_agents) Sugars traded by each agent in the current step
-    p_trades: jax.Array # (n_agents, n_agents) Phosphorus traded by each agent in the current step
-    step: jax.Array # To track episode length
-    terminal: bool  # Flag to indicate if the episode is done
-
-    # Solar irradiance for sugar production, can be modified for different scenarios
-    # solar_irradiance: jax.Array = jdc.field(default_factory=lambda: jnp.array(400.0))
+class Actions(IntEnum):
+    # Trade, growth, maintenance, reproduction fractions.
+    trade = 0
+    growth = 1
+    maintenance = 2
+    reproduction = 3
 
 
 class BaseMycorMarl(MultiAgentEnv):
     def __init__(
         self,
-        agent_types: Dict[str, int],
-        growth_cost: float = 100.0,
-        reproduction_cost: float = 50.0,
-        maintenance_cost_ratio: float = 0.5,
-        p_uptake_max_rate: float = 300.0,
-        # p_availability: jnp.float32 = 1.0,
-        fungus_p_uptake_efficiency: float = 1.0,
-        plant_p_uptake_efficiency: float = 0.0,
-        max_sugar_gen_rate: float = 100.0,
-        p_cost_per_sugar: float = 3.0,
-        trade_flow_constant: float = 100.0,
-        max_episode_steps: int = 1000,
-    ):
-        self.num_agents: int = sum(agent_types.values())
-        self.agents = [f"agent_{i}" for i in range(self.num_agents)]
-        self.agent_types: List[AgentType] = [AgentType.PLANT] * agent_types.get("plant", 0) + \
-                                            [AgentType.FUNGUS] * agent_types.get("fungus", 0)
+        config: Optional[EnvConfig] = None,
+        species: Optional[SpeciesParams] = None,
+        max_episode_steps: Optional[int] = None,
+    ) -> None:
+        super().__init__(num_agents=2)
+        self.config = config or EnvConfig()
+        self.agents = list(AGENTS)
+        self.plant_active = self.config.consumer_mode != "fungus-only"
+        self.fungus_active = self.config.consumer_mode != "plant-only"
 
-        assert len(self.agent_types) == self.num_agents,\
-            "Sum of agent types must equal num_agents"
+        if species is not None:
+            self.species = species
+        else:
+            raise ValueError("Species parameters must be provided.")
 
-        self.growth_cost = growth_cost
-        self.reproduction_cost = reproduction_cost
-        self.maintenance_cost_ratio = maintenance_cost_ratio
-        self.p_uptake_max_rate = p_uptake_max_rate
-        # self.p_availability = p_availability
-        self.fungus_p_uptake_efficiency = fungus_p_uptake_efficiency
-        self.plant_p_uptake_efficiency = plant_p_uptake_efficiency
-        self.max_sugar_gen_rate = max_sugar_gen_rate
-        self.p_cost_per_sugar = p_cost_per_sugar
-        # self.trade_flow_constant = trade_flow_constant # Unused for now, can be used to scale the effect of trades on agent states in future iterations.
+        plant.validate_plant_growth_geometry_traits(self.species.plant)
+        fungus.validate_fungus_growth_geometry_traits(self.species.fungus)
+        self._validate_soil_config(self.config)
+        self.r_edges, self.z_edges = axisymmetric_edges_from_intervals(
+            self.config.soil_radius_cm,
+            self.config.soil_depth_cm,
+            self.config.radial_interval_cm,
+            self.config.depth_interval_cm,
+        )
+        self.cell_volumes = axisymmetric_cylindrical_cell_volumes(
+            self.r_edges, self.z_edges
+        )
+        self.radial_face_areas = axisymmetric_radial_face_areas(
+            self.r_edges, self.z_edges
+        )
+        self.vertical_face_areas = axisymmetric_vertical_face_areas(
+            self.r_edges, self.z_edges
+        )
+        (
+            self.radial_diffusion_conductance,
+            self.vertical_diffusion_conductance,
+        ) = axisymmetric_diffusion_conductances(
+            self.r_edges,
+            self.z_edges,
+            self.radial_face_areas,
+            self.vertical_face_areas,
+            self.config.phosphate_diffusion_coefficient_cm2_s,
+            self.config.theta_water,
+            self.config.phosphate_impedance_factor,
+        )
+        self.diffusion_cfl_seconds = float(
+            explicit_diffusion_cfl_seconds(
+                self.cell_volumes,
+                self.config.theta_water,
+                self.config.b_p,
+                self.radial_diffusion_conductance,
+                self.vertical_diffusion_conductance,
+            )
+        )
+        self.soil_substeps = required_diffusion_substeps(
+            self.config.dt,
+            self.diffusion_cfl_seconds,
+            self.config.diffusion_cfl_safety,
+        )
+        self.soil_substep_days = self.config.dt / self.soil_substeps
+        self.grid_shape = (
+            self.r_edges.shape[0] - 1,
+            self.z_edges.shape[0] - 1,
+        )
 
-        obs_size = 4 + (self.num_agents - 1) * 2 # Add space for incoming trade flows in observations.
-        action_size = 5 # [p_trade, s_trade, growth, maintenance, reproduction]
+        obs_dim = 4 # [biomass, carbon_pool, phosphorus_pool, received_trades] normalised
 
-        self.observation_spaces = {agent: self.agent_obs_space(obs_size) for agent in self.agents}
-        self.action_spaces = {agent: self.agent_action_space(action_size) for agent in self.agents}
+        self.action_set = jnp.array(
+            [Actions.trade, Actions.growth, Actions.maintenance, Actions.reproduction]
+        )
+
+        self.observation_spaces = {
+            PLANT: Box(low=-jnp.inf, high=jnp.inf, shape=(obs_dim,), dtype=jnp.float32),
+            FUNGUS: Box(low=-jnp.inf, high=jnp.inf, shape=(obs_dim,), dtype=jnp.float32),
+        }
+        # Four continuous allocations: trade, growth, maintenance, reproduction.
+        self.action_spaces = {
+            PLANT: Box(low=0.0, high=1.0, shape=self.action_set.shape, dtype=jnp.float32),
+            FUNGUS: Box(low=0.0, high=1.0, shape=self.action_set.shape, dtype=jnp.float32),
+        }
 
         # Environment parameters
-        self.max_episode_steps = max_episode_steps
+        self.max_episode_steps = (
+            self.config.max_steps
+            if max_episode_steps is None
+            else max_episode_steps
+        )
 
-    def _get_obs(self, state: State) -> Dict[str, jax.Array]:
-        obs = {}
-        for i, agent in enumerate(self.agents):
-            agent_state = state.agents[i]
-            # Example observation: [health, biomass, phosphorus, sugars]
-            obs_vector = jnp.array([
-                agent_state.health,
-                agent_state.biomass,
-                agent_state.phosphorus,
-                agent_state.sugars
-            ])
+    @property
+    def agent_classes(self) -> dict:
+        return {PLANT: [PLANT], FUNGUS: [FUNGUS]}
 
-            # Add received resource trades to observations, select all but self.
-            s_trades = state.s_trades[:, i].flatten() # Sugars received from other agents
-            s_trades = jnp.delete(s_trades, i) # Remove self-trade
-            p_trades = state.p_trades[:, i].flatten() # Phosphorus received from other agents
-            p_trades = jnp.delete(p_trades, i) # Remove self-trade (always 0)
-            obs_vector = jnp.concatenate((obs_vector, p_trades, s_trades))
+    def _get_obs(
+        self,
+        state: State,
+        last_trade: Optional[Dict[str, chex.Array]] = None,
+    ) -> Dict[str, chex.Array]:
 
-            assert obs_vector.shape[0] == self.observation_spaces[agent].shape[0], \
-                "Observation size mismatch"
+        if last_trade is None:
+            plant_trade_obs = jnp.zeros_like(state.plant_p_pool)
+            fungus_trade_obs = jnp.zeros_like(state.fungus_c_pool)
+        else:
+            plant_trade_obs = last_trade[PLANT]
+            fungus_trade_obs = last_trade[FUNGUS]
 
-            obs[agent] = obs_vector
-        return obs
+        plant_obs = jnp.concatenate([
+            _normalize_if(self.config.norm_obs, state.plant_biomass, self.species.plant.biomass_cap),
+            _normalize_if(self.config.norm_obs, state.plant_c_pool, state.plant_biomass),
+            _normalize_if(self.config.norm_obs, state.plant_p_pool, state.plant_biomass),
+            _normalize_if(self.config.norm_obs, plant_trade_obs, state.plant_p_pool),
+        ])
+
+        fungus_obs = jnp.concatenate([
+            _normalize_if(self.config.norm_obs, state.fungus_biomass, self.species.plant.biomass_cap),
+            _normalize_if(self.config.norm_obs, state.fungus_c_pool, state.fungus_biomass),
+            _normalize_if(self.config.norm_obs, state.fungus_p_pool, state.fungus_biomass),
+            _normalize_if(self.config.norm_obs, fungus_trade_obs, state.fungus_c_pool),
+        ])
+
+        return {
+            PLANT: plant_obs.astype(jnp.float32),
+            FUNGUS: fungus_obs.astype(jnp.float32),
+        }
+
+    def _initial_state(self) -> State:
+        """Build biological pools, P state, and biomass-derived geometry.
+
+        Grid geometry created during environment construction is combined with
+        configured solution µM and buffering to store ``soil_labile_p``.
+        Concentration remains derived; initial biomass is converted into 2D
+        root/hyphal density; cumulative P-loss/export diagnostics start at
+        zero.
+        """
+        soil_labile_p = initial_labile_p_from_micromolar(
+            self.r_edges,
+            self.z_edges,
+            self.config.initial_solution_p_um,
+            self.config.topsoil_depth_cm,
+            self.config.theta_water,
+            self.config.b_p,
+        )
+
+        plant_biomass = jnp.array([
+            self.species.plant.initial_biomass if self.plant_active else 0.0
+        ])
+        fungus_biomass = jnp.array([
+            self.species.fungus.initial_biomass if self.fungus_active else 0.0
+        ])
+        root_length_density = plant.density_field_from_biomass(
+            plant_biomass,
+            self.species.plant,
+            self.r_edges,
+            self.z_edges,
+        )
+        hyphae_length_density = fungus.density_field_from_biomass(
+            fungus_biomass,
+            self.species.fungus,
+            self.r_edges,
+            self.z_edges,
+        )
+
+        return State(
+            terminal=False,
+            step=0,
+            plant_biomass=plant_biomass,
+            fungus_biomass=fungus_biomass,
+            plant_history_max_biomass=plant_biomass,
+            fungus_history_max_biomass=fungus_biomass,
+            plant_c_pool=jnp.array([
+                self.species.plant.initial_c_pool if self.plant_active else 0.0
+            ]),
+            plant_p_pool=jnp.array([
+                self.species.plant.initial_p_pool if self.plant_active else 0.0
+            ]),
+            fungus_c_pool=jnp.array([
+                self.species.fungus.initial_c_pool if self.fungus_active else 0.0
+            ]),
+            fungus_p_pool=jnp.array([
+                self.species.fungus.initial_p_pool if self.fungus_active else 0.0
+            ]),
+            soil_labile_p=soil_labile_p,
+            root_length_density=root_length_density,
+            hyphae_length_density=hyphae_length_density,
+            cumulative_plant_p_mortality_loss_mg=jnp.array([0.0]),
+            cumulative_fungus_p_mortality_loss_mg=jnp.array([0.0]),
+            cumulative_plant_p_reproduction_export_mg=jnp.array([0.0]),
+            cumulative_fungus_p_reproduction_export_mg=jnp.array([0.0]),
+            plant_dead=jnp.array([not self.plant_active]),
+            fungus_dead=jnp.array([not self.fungus_active])
+        )
 
     @partial(jax.jit, static_argnums=(0,))
-    def reset(self, key: jax.Array) -> Tuple[Dict[str, jax.Array], State]:
-
-        agents = [
-            AgentState(
-                species_id=jnp.array(species),
-                p_uptake_efficiency=jnp.array(
-                    self.fungus_p_uptake_efficiency
-                    if species == AgentType.FUNGUS
-                    else self.plant_p_uptake_efficiency
-                )
-            ) for species in self.agent_types
-        ]
-
-        # Begin with agents of one class connected to all agents of the other class.
-        adj = self.create_adj_matrix_fc_interclass(self.agent_types)
-
-        state = State(
-            agents=agents,
-            adj=adj,
-            s_trades=jnp.zeros((self.num_agents, self.num_agents)),
-            p_trades=jnp.zeros((self.num_agents, self.num_agents)),
-            step=jnp.array(0, dtype=jnp.int32),
-            terminal=False
-        )
+    def reset(self, key: chex.PRNGKey) -> Tuple[Dict[str, chex.Array], State]:
+        state = self._initial_state()
 
         obs = self._get_obs(state)
         return obs, state
 
     def step_env(
             self,
-            key: jax.Array,
+            key: chex.PRNGKey,
             state: State,
-            actions: Dict[str, jax.Array]
-        ) -> Tuple[Dict[str, jax.Array], State, Dict[str, float], Dict[str, bool], Dict]:
+            actions: Dict[str, chex.Array]
+        ) -> Tuple[Dict[str, chex.Array], State, Dict[str, float], Dict[str, bool], Dict]:
 
-        rewards = {}
-        shaped_rewards = {}
-        dones = {agent: jnp.array(False) for agent in self.agents}
-        infos = {}
+        plant_operational = jnp.logical_and(
+            self.plant_active, jnp.logical_not(state.plant_dead)
+        )
+        fungus_operational = jnp.logical_and(
+            self.fungus_active, jnp.logical_not(state.fungus_dead)
+        )
+        plant_actions = jnp.where(
+            plant_operational,
+            constrain_allocation(actions[PLANT]),
+            jnp.zeros_like(actions[PLANT]),
+        )
+        fungus_actions = jnp.where(
+            fungus_operational,
+            constrain_allocation(actions[FUNGUS]),
+            jnp.zeros_like(actions[FUNGUS]),
+        )
 
-        for i, agent in enumerate(self.agents):
-            # Process and constrain actions for each agent.
-            actions[agent] = self.constrain_allocation(actions[agent])
-            extra_info = {"constrained_actions": actions[agent]}
-            actions[agent] = self.allocate_resources(state.agents[i], actions[agent])
-            extra_info["allocated_actions"] = actions[agent]
+        # Agents spend only the pools that were observable at the start of the
+        # timestep. Newly acquired resources are credited after allocation.
+        plant_c_start = state.plant_c_pool
+        plant_p_start = state.plant_p_pool
+        fungus_c_start = state.fungus_c_pool
+        fungus_p_start = state.fungus_p_pool
 
-            # Step each agent and update state.
-            state, reward, shaped_rewards, info = self.step_agent(
-                key, i, state, actions[agent]
-            )
+        # Trade is an allocation choice on the same simplex as the other
+        # actions, but it only affects the traded currency for each partner.
+        trading_enabled = jnp.logical_and(plant_operational, fungus_operational)
+        plant_c_trade_out = jnp.where(
+            trading_enabled, plant_actions[Actions.trade] * plant_c_start, 0.0
+        )
+        fungus_p_trade_out = jnp.where(
+            trading_enabled, fungus_actions[Actions.trade] * fungus_p_start, 0.0
+        )
 
-            # Set done flag to True for agent if dead.
-            dones[agent] = self.check_agent_is_dead(state.agents[i])
+        plant_step = self.step_plant(key, state, plant_actions)
+        fungus_step = self.step_fungus(key, state, fungus_actions)
 
-            rewards[agent] = jnp.array(reward)
-            shaped_rewards[agent] = shaped_rewards
-            infos[agent] = {**info, **extra_info} # combine extra_info with info if needed
+        plant_biomass_before_mortality = jnp.clip(
+            state.plant_biomass + plant_step["growth"],
+            0.0,
+            self.species.plant.biomass_cap,
+        )
+        fungus_biomass_before_mortality = jnp.clip(
+            state.fungus_biomass + fungus_step["growth"],
+            0.0,
+            jnp.inf,
+        )
+        plant_biomass = jnp.clip(
+            state.plant_biomass + plant_step["growth"] - plant_step["maint_deficit_biomass"],
+            0.0,
+            self.species.plant.biomass_cap,
+        )
+        fungus_biomass = jnp.clip(
+            state.fungus_biomass + fungus_step["growth"] - fungus_step["maint_deficit_biomass"],
+            0.0,
+            jnp.inf,
+        )
+        plant_mortality_biomass = jnp.maximum(
+            plant_biomass_before_mortality - plant_biomass, 0.0
+        )
+        fungus_mortality_biomass = jnp.maximum(
+            fungus_biomass_before_mortality - fungus_biomass, 0.0
+        )
 
-        # After agents have stepped, process trade flows to update states based on trades.
-        for i, agent in enumerate(self.agents):
-            state = self.step_trade(state, i)
+        plant_history_max = jnp.maximum(state.plant_history_max_biomass, plant_biomass)
+        fungus_history_max = jnp.maximum(state.fungus_history_max_biomass, fungus_biomass)
 
-        # Update step and terminal state
-        state = jdc.replace(state, step=state.step + 1)
+        plant_dead = jnp.logical_or(
+            state.plant_dead,
+            jnp.logical_or(
+                not self.plant_active,
+                plant_biomass < (
+                self.species.plant.death_fraction * jnp.maximum(plant_history_max, 1e-8)
+                ),
+            ),
+        )
+        fungus_dead = jnp.logical_or(
+            state.fungus_dead,
+            jnp.logical_or(
+                not self.fungus_active,
+                fungus_biomass < (
+                self.species.fungus.death_fraction * jnp.maximum(fungus_history_max, 1e-8)
+                ),
+            ),
+        )
+
+        state = state.replace(
+            plant_biomass=plant_biomass,
+            fungus_biomass=fungus_biomass,
+            plant_history_max_biomass=plant_history_max,
+            fungus_history_max_biomass=fungus_history_max,
+            plant_c_pool=jnp.clip(plant_step["c_pool"] - plant_c_trade_out, 0.0, jnp.inf),
+            plant_p_pool=plant_step["p_pool"] + fungus_p_trade_out,
+            fungus_c_pool=fungus_step["c_pool"] + plant_c_trade_out,
+            fungus_p_pool=jnp.clip(fungus_step["p_pool"] - fungus_p_trade_out, 0.0, jnp.inf),
+            cumulative_plant_p_mortality_loss_mg=(
+                state.cumulative_plant_p_mortality_loss_mg
+                + plant_mortality_biomass * self.species.plant.gamma_p
+            ),
+            cumulative_fungus_p_mortality_loss_mg=(
+                state.cumulative_fungus_p_mortality_loss_mg
+                + fungus_mortality_biomass * self.species.fungus.gamma_p
+            ),
+            cumulative_plant_p_reproduction_export_mg=(
+                state.cumulative_plant_p_reproduction_export_mg
+                + plant_step["reproduction_p"]
+            ),
+            cumulative_fungus_p_reproduction_export_mg=(
+                state.cumulative_fungus_p_reproduction_export_mg
+                + fungus_step["reproduction_p"]
+            ),
+            plant_dead=plant_dead,
+            fungus_dead=fungus_dead,
+        )
+
+        # New resources acquired during the transition are added after
+        # allocation, so they are first visible to the policy at t + 1.
+        plant_carbon_fixed = jnp.where(
+            state.plant_dead,
+            0.0,
+            photosynthesise(state, self.species.plant, self.config),
+        )
+        state = state.replace(plant_c_pool=state.plant_c_pool + plant_carbon_fixed)
+
+        # Density fields should reflect the post-allocation biomass before soil
+        # uptake is calculated.
+        state = state.replace(
+            root_length_density=plant.density_field_from_biomass(
+                jnp.where(state.plant_dead, 0.0, state.plant_biomass),
+                self.species.plant,
+                self.r_edges,
+                self.z_edges,
+            ),
+            hyphae_length_density=fungus.density_field_from_biomass(
+                jnp.where(state.fungus_dead, 0.0, state.fungus_biomass),
+                self.species.fungus,
+                self.r_edges,
+                self.z_edges,
+            ),
+        )
+        state = self.step_phosphorus_field(state)
+
+        state = state.replace(step=state.step + 1)
 
         done = self.is_terminal(state)
-        # dones = {agent: done for agent in self.agents}
-        dones["__all__"] = done
+        state = state.replace(terminal=done)
 
-        # Get observations for next state
-        obs = self._get_obs(state)
+        obs = self._get_obs(
+            state,
+            last_trade={
+                PLANT: fungus_p_trade_out,
+                FUNGUS: plant_c_trade_out,
+            },
+        )
 
-        # Reset trade matrices for next step.
-        state = jdc.replace(state, p_trades=jnp.zeros_like(state.p_trades))
-        state = jdc.replace(state, s_trades=jnp.zeros_like(state.s_trades))
+        rewards = {
+            PLANT: plant_step["reward"],
+            FUNGUS: fungus_step["reward"],
+        }
+        dones = {
+            PLANT: plant_dead.squeeze(),
+            FUNGUS: fungus_dead.squeeze(),
+            "__all__": done,
+        }
+        infos = {
+            PLANT: {
+                **plant_step["info"],
+                "biomass": state.plant_biomass,
+                "c_pool": state.plant_c_pool,
+                "p_pool": state.plant_p_pool,
+                "trade_out": plant_c_trade_out,
+                "trade_in": fungus_p_trade_out,
+            },
+            FUNGUS: {
+                **fungus_step["info"],
+                "biomass": state.fungus_biomass,
+                "c_pool": state.fungus_c_pool,
+                "p_pool": state.fungus_p_pool,
+                "trade_out": fungus_p_trade_out,
+                "trade_in": plant_c_trade_out,
+            },
+        }
 
         return (
             jax.lax.stop_gradient(obs),
             jax.lax.stop_gradient(state),
             rewards,
             dones,
-            infos
+            infos,
         )
 
-    def step_agent(self, key: jax.Array, agt_id: int, state: State, action: jax.Array):
-        """
-        Step basic functions and additional agent-specific biology.
-        action: [p_trade, s_trade, growth, maintenance, reproduction]
-        """
-        # Check if agent is already dead before processing actions, zero out actions if so.
-        already_dead = self.check_agent_is_dead(state.agents[agt_id])
-        state, action = self.handle_agent_death(already_dead, state, agt_id, action)
-
-        # Unpack actions.
-        [p_trade, s_trade, growth, maintenance, reproduction] = action
-
-        # List of agent-specific step functions for lax.switch
-        step_fns = [self.step_plant, self.step_fungus]
-
-        # --- Calculate resource usage ---
-        # Calculate number of propagules produced based on reproduction energy.
-        props_generated = reproduction // self.reproduction_cost
-
-        # Recalculate sugars used with effective reproduction cost (discrete
-        # no. of propagules).
-        effective_reproduction_cost = props_generated * self.reproduction_cost
-
-        # Growth + maintenance + effective_reproduction_cost
-        s_used = growth + maintenance + effective_reproduction_cost
-
-        # --- Update trade flows ---
-        state = self.update_trade_flows(state, agt_id, p_trade, s_trade)
-
-        # ---  Resource absorption  ---
-        # Phosphorus absorption based on biomass and max uptake rate, scaled by efficiency.
-        p_acquired = jnp.floor(
-            self.p_uptake_max_rate \
-            * state.agents[agt_id].p_uptake_efficiency \
-            * state.agents[agt_id].biomass \
-            * (1 - already_dead) # If agent is dead, no P is acquired.
+    def step_phosphorus_field(self, state: State) -> State:
+        """Apply cached diffusion and blended P uptake to the soil state."""
+        return evolve_soil_p(
+            state,
+            self.config.dt,
+            self.species,
+            self.cell_volumes,
+            self.config.theta_water,
+            self.config.b_p,
+            self.radial_diffusion_conductance,
+            self.vertical_diffusion_conductance,
+            self.soil_substeps,
+            self.config.phosphate_diffusion_coefficient_cm2_s,
+            self.config.phosphate_impedance_factor,
+            self.config.uptake_reference_time_days,
+            self.config.uptake_transition_exponent,
         )
 
-        # --- Update agent state ---
-        # Update health proportional to maintenance deficit.
-        required_maintenance = self.maintenance_cost_ratio * state.agents[agt_id].biomass \
-                               * self.growth_cost
-        health_deficit = maintenance - required_maintenance
-        new_health = jnp.clip(state.agents[agt_id].health + health_deficit, 0, 100.0)
+    def step_plant(self, key: jax.Array, state: State, action: jax.Array) -> dict:
+        """Step the plant dynamics based on the action allocation.
 
-        # Update biomass based on growth / cost.
-        new_biomass = jnp.clip(state.agents[agt_id].biomass + growth / self.growth_cost, 0, 100) # Clip biomass to prevent exponential growth.
+        Currently, assumes action allocations are valid and sum to 1.0.
+        """
 
-        # Execute agent-specific function for extra biology, returns modified agent state.
-        agent_mod = jax.lax.switch(agt_id, step_fns, key, state, action, state.agents[agt_id])
+        operational = jnp.logical_and(
+            self.plant_active, jnp.logical_not(state.plant_dead)
+        )
+        action = jnp.where(operational, action, jnp.zeros_like(action))
+        active_biomass = jnp.where(operational, state.plant_biomass, 0.0)
+        growth_alloc = action[Actions.growth]
+        maintenance_alloc = action[Actions.maintenance]
+        reproduction_alloc = action[Actions.reproduction]
 
-        # Update state with agent and trade values
-        with jdc.copy_and_mutate(state) as state:
-            state.agents[agt_id].health = new_health
-            state.agents[agt_id].biomass = new_biomass
-            state.agents[agt_id].phosphorus = agent_mod.phosphorus + p_acquired
-            state.agents[agt_id].sugars = agent_mod.sugars - s_used
+        # Determine the growth based on essential resources.
+        growth_c_alloc = growth_alloc * state.plant_c_pool
+        growth_p_alloc = growth_alloc * state.plant_p_pool
+        growth = grow(
+            allocated_c=growth_c_alloc,
+            allocated_p=growth_p_alloc,
+            grow_c_cost=self.species.plant.gamma_c,
+            grow_p_cost=self.species.plant.gamma_p,
+            grow_type="essential",
+        )
+        growth = jnp.minimum(
+            growth,
+            jnp.maximum(self.species.plant.biomass_cap - state.plant_biomass, 0.0),
+        )
 
-        # Check if agent is dead after health update.
-        now_dead = self.check_agent_is_dead(state.agents[agt_id]).astype(jnp.float32)
-        dead_this_step = now_dead - already_dead.astype(jnp.float32)
+        # Determine real resources used for growth, e.g.,
+        # if using essential resources, the minimum of the two will determine actual growth.
+        growth_c_used = growth * self.species.plant.gamma_c
+        growth_p_used = growth * self.species.plant.gamma_p
+
+        # Determine required maintenance resources based on biomass and species traits.
+        required_maint_c, required_maint_p = plant_maintenance_demand(
+            active_biomass,
+            self.species.plant.kappa_c,
+            self.species.plant.kappa_p,
+            self.config.dt,
+        )
+
+        # Calculate allocated maintenance resources.
+        allocated_maint_c = maintenance_alloc * state.plant_c_pool
+        allocated_maint_p = maintenance_alloc * state.plant_p_pool
+
+        # Calculate actual maintenance resources used, which cannot exceed required amount.
+        # Over-allocated resources are returned to their pools.
+        maint_c_used = jnp.minimum(allocated_maint_c, required_maint_c)
+        maint_p_used = jnp.minimum(allocated_maint_p, required_maint_p)
+
+        # Calculate maintenance resource deficit, if any.
+        c_deficit = jnp.maximum(required_maint_c - allocated_maint_c, 0.0)
+        p_deficit = jnp.maximum(required_maint_p - allocated_maint_p, 0.0)
+
+        # Calculate the biomass deficit due to maintenance shortfall.
+        # Taking the maximum of carbon and phosphorus deficits converted to biomass.
+        maint_deficit_biomass = jnp.maximum(
+            c_deficit / self.species.plant.gamma_c,
+            p_deficit / self.species.plant.gamma_p,
+        )
+
+        # Calculate the resources allocated to reproduction.
+        reproduction_c = reproduction_alloc * state.plant_c_pool
+        reproduction_p = reproduction_alloc * state.plant_p_pool
+
+        # Calculate total resources used for maintenance, reproduction, and growth.
+        c_used = maint_c_used + reproduction_c + growth_c_used
+        p_used = maint_p_used + reproduction_p + growth_p_used
+
+        # Update the carbon and phosphorus pools after accounting for used resources.
+        c_pool = jnp.clip(state.plant_c_pool - c_used, 0.0, jnp.inf)
+        p_pool = jnp.clip(state.plant_p_pool - p_used, 0.0, jnp.inf)
+
+        # Get reward for reproduction based on Cobb-Douglas function of carbon and phosphorus.
+        # Scale reproduction C and P to be in terms of biomass for reward calculation.
+        reproduction_c_scaled = reproduction_c / self.species.plant.gamma_c
+        reproduction_p_scaled = reproduction_p / self.species.plant.gamma_p
+        reward = self._cobb_douglas(reproduction_c_scaled, reproduction_p_scaled, self.config.alpha)
 
         info = {
-            "props_generated": props_generated,
             "growth": growth,
-            "maintenance": maintenance,
-            "reproduction": reproduction,
-            "s_trade": s_trade,
-            "p_trade": p_trade,
-            "phosphorus_acquired": p_acquired,
-            "sugars_generated": agent_mod.sugars - state.agents[agt_id].sugars,
-            "health": new_health,
-            "biomass": state.agents[agt_id].biomass,
-            "avail_sugars": state.agents[agt_id].sugars,
-            "avail_phosphorus": state.agents[agt_id].phosphorus
+            "maint_c": required_maint_c,
+            "maint_p": required_maint_p,
+            "maint_c_used": maint_c_used,
+            "maint_p_used": maint_p_used,
+            "reproduction_c": reproduction_c,
+            "reproduction_p": reproduction_p,
+            "c_deficit": c_deficit,
+            "p_deficit": p_deficit,
         }
 
-        # Rewards for agent based on allocation.
-        reward = 0.0
-        shaped_rewards = {}
-        reward += props_generated * 1.5 # Reward for each seed produced
-        # reward += -100 * dead_this_step # Large penalty for death
+        return {
+            "growth": growth,
+            "maint_deficit_biomass": maint_deficit_biomass,
+            "reproduction_p": reproduction_p,
+            "c_pool": c_pool,
+            "p_pool": p_pool,
+            "reward": reward.squeeze(),
+            "info": info,
+        }
 
-        return state, reward, shaped_rewards, info
+    def step_fungus(self, key: jax.Array, state: State, action: jax.Array) -> dict:
+        """Step the fungus dynamics based on the action allocation.
 
-    def step_plant(self, key: jax.Array, state, action: jax.Array, agent: AgentState):
-        # Check agent is alive before processing plant-specific logic.
-        is_dead = self.check_agent_is_dead(agent)
-        p_trade = action[0]
+        Currently, assumes action allocations are valid and sum to 1.0.
+        """
+        operational = jnp.logical_and(
+            self.fungus_active, jnp.logical_not(state.fungus_dead)
+        )
+        action = jnp.where(operational, action, jnp.zeros_like(action))
+        active_biomass = jnp.where(operational, state.fungus_biomass, 0.0)
+        growth_alloc = action[Actions.growth]
+        maint_alloc = action[Actions.maintenance]
+        reproduction_alloc = action[Actions.reproduction]
 
-        # Sugars generated from sunlight, constrained by available phosphorus.
-        # If agent is dead, no sugars are generated and phosphorus is not used.
-        p_use = agent.phosphorus * (1 - is_dead) - p_trade
-        s_gen = jnp.clip(self.max_sugar_gen_rate * agent.biomass, 0, p_use // self.p_cost_per_sugar)
-
-        with jdc.copy_and_mutate(agent) as agent_mod:
-            agent_mod.sugars += s_gen
-            agent_mod.phosphorus -= s_gen * self.p_cost_per_sugar # Remove P based on sugars generated.
-
-        return agent_mod
-
-    def step_fungus(self, key: jax.Array, state, action: jax.Array, agent: AgentState):
-        # Placeholder implementation for stepping a fungus agent.
-        return agent
-
-    @staticmethod
-    def update_trade_flows(
-            state: State,
-            agt_id: int,
-            p_trade: jax.Array,
-            s_trade: jax.Array
-        ) -> State:
-        """Update state trade matrices for agt_id based on unilateral allocations."""
-
-        # Splits total allocation evenly to each partner.
-        # If agent has zero connections, the trade allocation has no effect.
-        no_of_partners = state.adj[agt_id].sum()
-        no_of_partners = jnp.where(no_of_partners > 0, no_of_partners, 1.0) # Avoid division by 0.
-
-        outgoing_p = (p_trade * state.adj[agt_id]) / no_of_partners
-        outgoing_s = (s_trade * state.adj[agt_id]) / no_of_partners
-
-        with jdc.copy_and_mutate(state) as new_state:
-            # Set outgoing trades for agent (only works since the adj is undirected).
-            new_state.p_trades = state.p_trades.at[agt_id, :].add(outgoing_p)
-            new_state.s_trades = state.s_trades.at[agt_id, :].add(outgoing_s)
-
-        return new_state
-
-    @staticmethod
-    def step_trade(state: State, agt_id: int) -> State:
-        """Update agent states based on trade flows."""
-        p_trade_in = state.p_trades[:, agt_id].sum()
-        s_trade_in = state.s_trades[:, agt_id].sum()
-
-        p_trade_out = state.p_trades[agt_id, :].sum()
-        s_trade_out = state.s_trades[agt_id, :].sum()
-
-        with jdc.copy_and_mutate(state) as new_state:
-            new_state.agents[agt_id].phosphorus += p_trade_in - p_trade_out
-            new_state.agents[agt_id].sugars += s_trade_in - s_trade_out
-
-        return new_state
-
-    @staticmethod
-    def create_adj_matrix_fc_interclass(agent_types: List[AgentType]) -> jax.Array:
-        """Create an fully connected interclass adjacency matrix."""
-        # All agents of fungi class connected with all agents of plant
-        # class, no connections within class.
-        agent_types_array = jnp.array(agent_types)
-        adj = jnp.not_equal(
-            agent_types_array[:, None],
-            agent_types_array[None, :]
-        ).astype(jnp.float32)
-
-        return adj
-
-    @staticmethod
-    def constrain_allocation(actions: jax.Array) -> jax.Array:
-        """Constrain resource allocations to ensure they sum to 1 or less."""
-        def constrain_resource_allocation(*args):
-            total = sum(args)
-            return jnp.array([x / total for x in args])
-
-        # Prevent negative values.
-        actions = jnp.clip(actions, 0)
-        p_trade = jnp.clip(actions[0], 0, 1)
-
-        # Constrain sugar allocations to sum to 1 or less.
-        constrained_allocations = jax.lax.cond(
-            sum(actions[1:]) > 1,
-            lambda x: constrain_resource_allocation(*x),
-            lambda x: x,
-            (actions[1:])
+        # Determine the growth based on essential resources.
+        growth_c_alloc = growth_alloc * state.fungus_c_pool
+        growth_p_alloc = growth_alloc * state.fungus_p_pool
+        growth = grow(
+            allocated_c=growth_c_alloc,
+            allocated_p=growth_p_alloc,
+            grow_c_cost=self.species.fungus.gamma_c,
+            grow_p_cost=self.species.fungus.gamma_p,
+            grow_type="essential",
         )
 
-        # Update actions with constrained values
-        return jnp.array([p_trade, *constrained_allocations])
+        # Determine real resources used for growth, e.g.,
+        # if using essential resources, the minimum of the two will determine actual growth.
+        growth_c_used = growth * self.species.fungus.gamma_c
+        growth_p_used = growth * self.species.fungus.gamma_p
 
-    @staticmethod
-    def allocate_resources(agent: AgentState, actions: jax.Array) -> jax.Array:
-        """Allocate resources based on agent budget (ratios) allocation actions."""
-        p_trade = jnp.floor(actions[0] * agent.phosphorus)
-        s_allocations = jnp.floor(actions[1:] * agent.sugars)
-
-        return jnp.array([p_trade, *s_allocations])
-
-    @staticmethod
-    def handle_agent_death(
-            is_dead: bool, state: State, agt_id: int, action: jax.Array
-        ) -> Tuple[State, jax.Array]:
-        """Set agent state to dead and remove connections if health <= 0."""
-        with jdc.copy_and_mutate(state) as new_state:
-            # Remove connections if agent is dead.
-            new_state.adj = new_state.adj.at[agt_id, :].multiply(1 - is_dead)
-            new_state.adj = new_state.adj.at[:, agt_id].multiply(1 - is_dead)
-
-            # Remove any incoming trades from agents already stepped.
-            new_state.p_trades = new_state.p_trades.at[:].multiply(new_state.adj)
-            new_state.s_trades = new_state.s_trades.at[:].multiply(new_state.adj)
-
-        action = jax.lax.cond(
-            is_dead,
-            lambda x: jnp.zeros_like(x), # If dead, zero out all actions.
-            lambda x: x, # If alive, keep actions unchanged.
-            action
+        # Determine required maintenance resources based on biomass and species traits.
+        required_maint_c, required_maint_p = fungal_maintenance_demand(
+            active_biomass,
+            self.species.fungus.kappa_c,
+            self.species.fungus.kappa_p,
+            self.config.dt,
         )
-        return new_state, action
 
-    def agent_obs_space(self, size: int) -> spaces.Space:
-        return spaces.Box(-jnp.inf, jnp.inf, shape=(size,), dtype=jnp.float32)
+        # Calculate allocated maintenance resources.
+        allocated_maint_c = maint_alloc * state.fungus_c_pool
+        allocated_maint_p = maint_alloc * state.fungus_p_pool
 
-    def agent_action_space(self, size: int) -> spaces.Space:
-        return spaces.Box(0., 1.0, shape=(size,), dtype=jnp.float32)
+        # Calculate actual maintenance resources used, which cannot exceed required amount.
+        # Over-allocated resources are returned to their pools.
+        maint_c_used = jnp.minimum(allocated_maint_c, required_maint_c)
+        maint_p_used = jnp.minimum(allocated_maint_p, required_maint_p)
 
-    def is_terminal(self, state: State) -> jax.Array:
+        # Calculate maintenance resource deficit, if any.
+        c_deficit = jnp.maximum(required_maint_c - allocated_maint_c, 0.0)
+        p_deficit = jnp.maximum(required_maint_p - allocated_maint_p, 0.0)
+
+        # Calculate the biomass deficit due to maintenance shortfall.
+        # Taking the maximum of carbon and phosphorus deficits converted to biomass.
+        maint_deficit_biomass = jnp.maximum(
+            c_deficit / self.species.fungus.gamma_c,
+            p_deficit / self.species.fungus.gamma_p,
+        )
+
+        # Calculate the resources allocated to reproduction.
+        reproduction_c = reproduction_alloc * state.fungus_c_pool
+        reproduction_p = reproduction_alloc * state.fungus_p_pool
+
+        # Calculate total resources used for maintenance, reproduction, and growth.
+        c_used = maint_c_used + reproduction_c + growth_c_used
+        p_used = maint_p_used + reproduction_p + growth_p_used
+
+        # Update the carbon and phosphorus pools after accounting for used resources.
+        c_pool = jnp.clip(state.fungus_c_pool - c_used, 0.0, jnp.inf)
+        p_pool = jnp.clip(state.fungus_p_pool - p_used, 0.0, jnp.inf)
+
+        # Get reward for reproduction based on Cobb-Douglas function of carbon and phosphorus.
+        # Scale reproduction C and P to be in terms of biomass for reward calculation.
+        reproductive_c = reproduction_c / self.species.fungus.gamma_c
+        reproductive_p = reproduction_p / self.species.fungus.gamma_p
+        reward = self._cobb_douglas(reproductive_c, reproductive_p, self.config.alpha)
+
+        info = {
+            "growth": growth,
+            "maint_c": required_maint_c,
+            "maint_p": required_maint_p,
+            "maint_c_used": maint_c_used,
+            "maint_p_used": maint_p_used,
+            "reproduction_c": reproduction_c,
+            "reproduction_p": reproduction_p,
+            "c_deficit": c_deficit,
+            "p_deficit": p_deficit,
+        }
+
+        return {
+            "growth": growth,
+            "maint_deficit_biomass": maint_deficit_biomass,
+            "reproduction_p": reproduction_p,
+            "c_pool": c_pool,
+            "p_pool": p_pool,
+            "reward": reward.squeeze(),
+            "info": info,
+        }
+
+    @staticmethod
+    def _validate_soil_config(config: EnvConfig) -> None:
+        """Validate all reset-critical soil scalars before allocating arrays.
+
+        This is the configuration boundary for grid geometry, topsoil extent,
+        non-negative initial solution P, linear buffering, diffusion, and CFL
+        safety. Numerical helpers can therefore stay branch-free and
+        JAX-compatible.
+        """
+        validate_axisymmetric_grid_parameters(
+            config.soil_radius_cm,
+            config.soil_depth_cm,
+            config.radial_interval_cm,
+            config.depth_interval_cm,
+        )
+        validate_linear_buffer_parameters(config.theta_water, config.b_p)
+        validate_diffusion_parameters(
+            config.phosphate_diffusion_coefficient_cm2_s,
+            config.theta_water,
+            config.phosphate_impedance_factor,
+            config.diffusion_cfl_safety,
+        )
+        if not math.isfinite(config.dt) or config.dt <= 0.0:
+            raise ValueError("dt must be finite and greater than zero")
+        if config.consumer_mode not in {"mixed", "plant-only", "fungus-only"}:
+            raise ValueError(
+                "consumer_mode must be 'mixed', 'plant-only', or 'fungus-only'"
+            )
+        if not isinstance(config.norm_obs, bool):
+            raise ValueError("norm_obs must be a boolean")
+        if not math.isfinite(config.alpha) or not 0.0 <= config.alpha <= 1.0:
+            raise ValueError("alpha must be finite and within [0, 1]")
+        if (
+            isinstance(config.max_steps, bool)
+            or not isinstance(config.max_steps, int)
+            or config.max_steps <= 0
+        ):
+            raise ValueError("max_steps must be a positive integer")
+        if (
+            not math.isfinite(config.uptake_reference_time_days)
+            or config.uptake_reference_time_days <= 0.0
+        ):
+            raise ValueError(
+                "uptake_reference_time_days must be finite and greater than zero"
+            )
+        if (
+            not math.isfinite(config.uptake_transition_exponent)
+            or config.uptake_transition_exponent <= 0.0
+        ):
+            raise ValueError(
+                "uptake_transition_exponent must be finite and greater than zero"
+            )
+        if not math.isfinite(config.topsoil_depth_cm) or not (
+            0.0 <= config.topsoil_depth_cm <= config.soil_depth_cm
+        ):
+            raise ValueError(
+                "topsoil_depth_cm must be finite and within the soil domain"
+            )
+        if not math.isfinite(config.initial_solution_p_um) or (
+            config.initial_solution_p_um < 0.0
+        ):
+            raise ValueError(
+                "initial_solution_p_um must be finite and non-negative"
+            )
+
+    def _cobb_douglas(self, c: chex.Array, p: chex.Array, alpha: float) -> chex.Array:
+        """Compute Cobb-Douglas rewarding for reproduction based on phosphorus and carbon."""
+        return (c ** alpha) * (p ** (1 - alpha))
+
+    def is_terminal(self, state: State) -> chex.Array:
         return state.terminal | \
                (state.step >= self.max_episode_steps) | \
-               jnp.all(jnp.array([agent.health <= 0.0 for agent in state.agents]))
-
-    def check_agent_is_dead(self, agent: AgentState) -> jax.Array:
-        return jnp.array(agent.health <= 0.0)
+               jnp.all(jnp.concatenate([state.plant_dead, state.fungus_dead]))
