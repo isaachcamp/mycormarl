@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
+from mycormarl.actions import physical_action
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
@@ -31,7 +32,6 @@ def _p3_config(initial_solution_p_um=1.0):
         initial_solution_p_um=initial_solution_p_um,
         theta_water=0.3,
         b_p=0.0,
-        norm_obs=False,
     )
 
 
@@ -244,8 +244,8 @@ def test_uptake_credit_cannot_fund_growth_in_the_same_step():
     env = BaseMycorMarl(_p3_config(), species)
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: jnp.array([0.0, 1.0, 0.0, 0.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(0.0, 1.0, 0.0, 0.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
 
     _, next_state, _, _, infos = env.step_env(
@@ -268,8 +268,8 @@ def test_end_to_end_uptake_conserves_soil_plus_free_pool_p():
         + state.fungus_p_pool[0]
     )
     actions = {
-        PLANT: jnp.array([0.0, 0.0, 1.0, 0.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
 
     _, next_state, _, _, _ = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -326,8 +326,8 @@ def test_structural_p_removed_with_biomass_is_recorded_as_mortality_loss():
     env = BaseMycorMarl(_p3_config(initial_solution_p_um=0.0), species)
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: jnp.array([0.0, 0.0, 1.0, 0.0]),
-        FUNGUS: jnp.array([0.0, 0.0, 1.0, 0.0]),
+        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
     }
 
     _, next_state, _, _, _ = env.step_env(jax.random.PRNGKey(1), state, actions)

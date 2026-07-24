@@ -12,10 +12,8 @@ import jax
 import jax.numpy as jnp
 
 from mycormarl import fungus, plant
-from mycormarl.fungus.physiology import fungal_maintenance_demand
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.growth import grow
-from mycormarl.plant.physiology import plant_maintenance_demand
 from mycormarl.soil import (
     axisymmetric_cylindrical_cell_volumes,
     axisymmetric_diffusion_conductances,
@@ -31,9 +29,9 @@ from mycormarl.soil import (
     validate_linear_buffer_parameters,
 )
 from mycormarl.plant import photosynthesise
-from mycormarl.actions import constrain_allocation
-from mycormarl.observations import _normalize_if
+from mycormarl.observations import actor_observation
 from mycormarl.state import State
+from mycormarl.transition import Transition
 
 
 # TODO: consider more complex allocation strategies based on past allocations.
@@ -45,11 +43,11 @@ FUNGUS = "fungus"
 AGENTS = (PLANT, FUNGUS)
 
 class Actions(IntEnum):
-    # Trade, growth, maintenance, reproduction fractions.
+    # Physical action: independent trade plus a biological allocation simplex.
     trade = 0
     growth = 1
-    maintenance = 2
-    reproduction = 3
+    reproduction = 2
+    reserve = 3
 
 
 class BaseMycorMarl(MultiAgentEnv):
@@ -120,17 +118,17 @@ class BaseMycorMarl(MultiAgentEnv):
             self.z_edges.shape[0] - 1,
         )
 
-        obs_dim = 4 # [biomass, carbon_pool, phosphorus_pool, received_trades] normalised
+        obs_dim = 5
 
         self.action_set = jnp.array(
-            [Actions.trade, Actions.growth, Actions.maintenance, Actions.reproduction]
+            [Actions.trade, Actions.growth, Actions.reproduction, Actions.reserve]
         )
 
         self.observation_spaces = {
-            PLANT: Box(low=-jnp.inf, high=jnp.inf, shape=(obs_dim,), dtype=jnp.float32),
-            FUNGUS: Box(low=-jnp.inf, high=jnp.inf, shape=(obs_dim,), dtype=jnp.float32),
+            PLANT: Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=jnp.float32),
+            FUNGUS: Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=jnp.float32),
         }
-        # Four continuous allocations: trade, growth, maintenance, reproduction.
+        # Physical action: trade, growth, reproduction, reserve.
         self.action_spaces = {
             PLANT: Box(low=0.0, high=1.0, shape=self.action_set.shape, dtype=jnp.float32),
             FUNGUS: Box(low=0.0, high=1.0, shape=self.action_set.shape, dtype=jnp.float32),
@@ -147,36 +145,61 @@ class BaseMycorMarl(MultiAgentEnv):
     def agent_classes(self) -> dict:
         return {PLANT: [PLANT], FUNGUS: [FUNGUS]}
 
-    def _get_obs(
-        self,
-        state: State,
-        last_trade: Optional[Dict[str, chex.Array]] = None,
-    ) -> Dict[str, chex.Array]:
+    def get_obs(self, state: State) -> Dict[str, chex.Array]:
+        """Reconstruct bounded actor observations entirely from environment state."""
+        # Calculate reference biomasses for normalization.
+        # Use 0.5 * maximum so that normed obs is also half-maximum.
+        plant_biomass_reference = 0.5 * self.species.plant.biomass_cap
 
-        if last_trade is None:
-            plant_trade_obs = jnp.zeros_like(state.plant_p_pool)
-            fungus_trade_obs = jnp.zeros_like(state.fungus_c_pool)
-        else:
-            plant_trade_obs = last_trade[PLANT]
-            fungus_trade_obs = last_trade[FUNGUS]
+        # Calculate ref biomass based on maximum radius possible constrained by
+        # grid boundaries.
+        fungus_biomass_reference = (
+            0.5
+            * fungus.fungal_biomass_for_colony_radius(
+                self.config.soil_radius_cm,
+                self.species.fungus,
+            )
+        )
 
-        plant_obs = jnp.concatenate([
-            _normalize_if(self.config.norm_obs, state.plant_biomass, self.species.plant.biomass_cap),
-            _normalize_if(self.config.norm_obs, state.plant_c_pool, state.plant_biomass),
-            _normalize_if(self.config.norm_obs, state.plant_p_pool, state.plant_biomass),
-            _normalize_if(self.config.norm_obs, plant_trade_obs, state.plant_p_pool),
-        ])
-
-        fungus_obs = jnp.concatenate([
-            _normalize_if(self.config.norm_obs, state.fungus_biomass, self.species.plant.biomass_cap),
-            _normalize_if(self.config.norm_obs, state.fungus_c_pool, state.fungus_biomass),
-            _normalize_if(self.config.norm_obs, state.fungus_p_pool, state.fungus_biomass),
-            _normalize_if(self.config.norm_obs, fungus_trade_obs, state.fungus_c_pool),
-        ])
+        association = (
+            jnp.asarray(self.plant_active and self.fungus_active)
+            & ~state.plant_dead
+            & ~state.fungus_dead
+        )
 
         return {
-            PLANT: plant_obs.astype(jnp.float32),
-            FUNGUS: fungus_obs.astype(jnp.float32),
+            PLANT: actor_observation(
+                biomass=state.plant_biomass,
+                biomass_reference=plant_biomass_reference,
+                c_pool=state.plant_c_pool,
+                gamma_c=self.species.plant.gamma_c,
+                p_pool=state.plant_p_pool,
+                gamma_p=self.species.plant.gamma_p,
+                last_received=state.plant_last_p_received,
+                maintenance_need=(
+                    self.species.plant.kappa_p
+                    * state.plant_biomass
+                    * self.config.dt
+                ),
+                association=association,
+                operational=~state.plant_dead,
+            ),
+            FUNGUS: actor_observation(
+                biomass=state.fungus_biomass,
+                biomass_reference=fungus_biomass_reference,
+                c_pool=state.fungus_c_pool,
+                gamma_c=self.species.fungus.gamma_c,
+                p_pool=state.fungus_p_pool,
+                gamma_p=self.species.fungus.gamma_p,
+                last_received=state.fungus_last_c_received,
+                maintenance_need=(
+                    self.species.fungus.kappa_c
+                    * state.fungus_biomass
+                    * self.config.dt
+                ),
+                association=association,
+                operational=~state.fungus_dead,
+            ),
         }
 
     def _initial_state(self) -> State:
@@ -197,12 +220,15 @@ class BaseMycorMarl(MultiAgentEnv):
             self.config.b_p,
         )
 
+        # Positive initial biomass only if the organism is active.
         plant_biomass = jnp.array([
             self.species.plant.initial_biomass if self.plant_active else 0.0
         ])
         fungus_biomass = jnp.array([
             self.species.fungus.initial_biomass if self.fungus_active else 0.0
         ])
+
+        # Calculate root density fields from initial biomass.
         root_length_density = plant.density_field_from_biomass(
             plant_biomass,
             self.species.plant,
@@ -235,11 +261,15 @@ class BaseMycorMarl(MultiAgentEnv):
             fungus_p_pool=jnp.array([
                 self.species.fungus.initial_p_pool if self.fungus_active else 0.0
             ]),
+            plant_last_p_received=jnp.array([0.0]),
+            fungus_last_c_received=jnp.array([0.0]),
             soil_labile_p=soil_labile_p,
             root_length_density=root_length_density,
             hyphae_length_density=hyphae_length_density,
             cumulative_plant_p_mortality_loss_mg=jnp.array([0.0]),
             cumulative_fungus_p_mortality_loss_mg=jnp.array([0.0]),
+            cumulative_plant_p_maintenance_loss_mg=jnp.array([0.0]),
+            cumulative_fungus_p_maintenance_loss_mg=jnp.array([0.0]),
             cumulative_plant_p_reproduction_export_mg=jnp.array([0.0]),
             cumulative_fungus_p_reproduction_export_mg=jnp.array([0.0]),
             plant_dead=jnp.array([not self.plant_active]),
@@ -250,7 +280,7 @@ class BaseMycorMarl(MultiAgentEnv):
     def reset(self, key: chex.PRNGKey) -> Tuple[Dict[str, chex.Array], State]:
         state = self._initial_state()
 
-        obs = self._get_obs(state)
+        obs = self.get_obs(state)
         return obs, state
 
     def step_env(
@@ -259,109 +289,164 @@ class BaseMycorMarl(MultiAgentEnv):
             state: State,
             actions: Dict[str, chex.Array]
         ) -> Tuple[Dict[str, chex.Array], State, Dict[str, float], Dict[str, bool], Dict]:
+        """Apply a valid Physical action to the environment state.
 
-        plant_operational = jnp.logical_and(
+        Checks plant/fungus operational status, pays maintenance, applies growth and
+        reproduction, and updates the soil P field. Returns the next observation, state,
+        rewards, dones, and infos. The labile P field is a conserved quantity.
+
+        # TODO: decrease root/hyphal density with biomass loss.
+        """
+        plant_operational_at_start = jnp.logical_and(
             self.plant_active, jnp.logical_not(state.plant_dead)
         )
-        fungus_operational = jnp.logical_and(
+        fungus_operational_at_start = jnp.logical_and(
             self.fungus_active, jnp.logical_not(state.fungus_dead)
         )
-        plant_actions = jnp.where(
-            plant_operational,
-            constrain_allocation(actions[PLANT]),
-            jnp.zeros_like(actions[PLANT]),
+
+        plant_maintenance = self._pay_maintenance(
+            state.plant_biomass,
+            state.plant_c_pool,
+            state.plant_p_pool,
+            self.species.plant,
+            plant_operational_at_start,
         )
-        fungus_actions = jnp.where(
-            fungus_operational,
-            constrain_allocation(actions[FUNGUS]),
-            jnp.zeros_like(actions[FUNGUS]),
+        fungus_maintenance = self._pay_maintenance(
+            state.fungus_biomass,
+            state.fungus_c_pool,
+            state.fungus_p_pool,
+            self.species.fungus,
+            fungus_operational_at_start,
         )
 
-        # Agents spend only the pools that were observable at the start of the
-        # timestep. Newly acquired resources are credited after allocation.
-        plant_c_start = state.plant_c_pool
-        plant_p_start = state.plant_p_pool
-        fungus_c_start = state.fungus_c_pool
-        fungus_p_start = state.fungus_p_pool
+        plant_biomass_after_maintenance = plant_maintenance["biomass"]
+        fungus_biomass_after_maintenance = fungus_maintenance["biomass"]
 
-        # Trade is an allocation choice on the same simplex as the other
-        # actions, but it only affects the traded currency for each partner.
-        trading_enabled = jnp.logical_and(plant_operational, fungus_operational)
-        plant_c_trade_out = jnp.where(
-            trading_enabled, plant_actions[Actions.trade] * plant_c_start, 0.0
-        )
-        fungus_p_trade_out = jnp.where(
-            trading_enabled, fungus_actions[Actions.trade] * fungus_p_start, 0.0
-        )
-
-        plant_step = self.step_plant(key, state, plant_actions)
-        fungus_step = self.step_fungus(key, state, fungus_actions)
-
-        plant_biomass_before_mortality = jnp.clip(
-            state.plant_biomass + plant_step["growth"],
-            0.0,
-            self.species.plant.biomass_cap,
-        )
-        fungus_biomass_before_mortality = jnp.clip(
-            state.fungus_biomass + fungus_step["growth"],
-            0.0,
-            jnp.inf,
-        )
-        plant_biomass = jnp.clip(
-            state.plant_biomass + plant_step["growth"] - plant_step["maint_deficit_biomass"],
-            0.0,
-            self.species.plant.biomass_cap,
-        )
-        fungus_biomass = jnp.clip(
-            state.fungus_biomass + fungus_step["growth"] - fungus_step["maint_deficit_biomass"],
-            0.0,
-            jnp.inf,
-        )
-        plant_mortality_biomass = jnp.maximum(
-            plant_biomass_before_mortality - plant_biomass, 0.0
-        )
-        fungus_mortality_biomass = jnp.maximum(
-            fungus_biomass_before_mortality - fungus_biomass, 0.0
-        )
-
-        plant_history_max = jnp.maximum(state.plant_history_max_biomass, plant_biomass)
-        fungus_history_max = jnp.maximum(state.fungus_history_max_biomass, fungus_biomass)
-
+        # Check biomass has not fallen below death threshold. If so, mark dead and zero pools.
         plant_dead = jnp.logical_or(
             state.plant_dead,
             jnp.logical_or(
                 not self.plant_active,
-                plant_biomass < (
-                self.species.plant.death_fraction * jnp.maximum(plant_history_max, 1e-8)
-                ),
+                plant_biomass_after_maintenance
+                < self.species.plant.death_fraction
+                * jnp.maximum(state.plant_history_max_biomass, 1e-8),
             ),
         )
         fungus_dead = jnp.logical_or(
             state.fungus_dead,
             jnp.logical_or(
                 not self.fungus_active,
-                fungus_biomass < (
-                self.species.fungus.death_fraction * jnp.maximum(fungus_history_max, 1e-8)
+                fungus_biomass_after_maintenance
+                < self.species.fungus.death_fraction
+                * jnp.maximum(state.fungus_history_max_biomass, 1e-8),
+            ),
+        )
+
+        # Re-check operational status after maintenance and death.
+        plant_operational_at_end = jnp.logical_and(
+            self.plant_active, jnp.logical_not(plant_dead)
+        )
+        fungus_operational_at_end = jnp.logical_and(
+            self.fungus_active, jnp.logical_not(fungus_dead)
+        )
+
+        # Bilateral trade is resolved after maintenance. If either organism died
+        # while paying maintenance, neither proposed transfer leaves its owner.
+        trading_enabled = jnp.logical_and(
+            plant_operational_at_end, fungus_operational_at_end
+        )
+        plant_c_trade_proposed = jnp.where(
+            plant_operational_at_start,
+            actions[PLANT][Actions.trade] * plant_maintenance["c_pool"],
+            0.0,
+        )
+        fungus_p_trade_proposed = jnp.where(
+            fungus_operational_at_start,
+            actions[FUNGUS][Actions.trade] * fungus_maintenance["p_pool"],
+            0.0,
+        )
+        plant_c_trade_out = jnp.where(
+            trading_enabled,
+            plant_c_trade_proposed,
+            0.0,
+        )
+        fungus_p_trade_out = jnp.where(
+            trading_enabled,
+            fungus_p_trade_proposed,
+            0.0,
+        )
+
+        # Add a flag to indicate whether a trade was proposed but cancelled due
+        # to one party dying or being non-operational.
+        trade_cancelled = jnp.logical_and(
+            jnp.logical_and(
+                plant_operational_at_start, fungus_operational_at_start
+            ),
+            jnp.logical_and(
+                jnp.logical_not(trading_enabled),
+                jnp.logical_or(
+                    plant_c_trade_proposed > 0.0,
+                    fungus_p_trade_proposed > 0.0,
                 ),
             ),
         )
 
-        state = state.replace(
+        # Update state with post-maintenance biomass and pools, then apply growth
+        # and reproduction.
+        allocation_state = state.replace(
+            plant_biomass=plant_biomass_after_maintenance,
+            fungus_biomass=fungus_biomass_after_maintenance,
+            plant_c_pool=plant_maintenance["c_pool"] - plant_c_trade_out,
+            plant_p_pool=plant_maintenance["p_pool"],
+            fungus_c_pool=fungus_maintenance["c_pool"],
+            fungus_p_pool=fungus_maintenance["p_pool"] - fungus_p_trade_out,
+            plant_dead=plant_dead,
+            fungus_dead=fungus_dead,
+        )
+        # Perform allocations.
+        plant_step = self.step_plant(key, allocation_state, actions[PLANT])
+        fungus_step = self.step_fungus(key, allocation_state, actions[FUNGUS])
+
+        plant_biomass = jnp.minimum(
+            plant_biomass_after_maintenance + plant_step["growth"],
+            self.species.plant.biomass_cap,
+        )
+        fungus_biomass = fungus_biomass_after_maintenance + fungus_step["growth"]
+        plant_history_max = jnp.maximum(state.plant_history_max_biomass, plant_biomass)
+        fungus_history_max = jnp.maximum(state.fungus_history_max_biomass, fungus_biomass)
+
+        state = allocation_state.replace(
             plant_biomass=plant_biomass,
             fungus_biomass=fungus_biomass,
             plant_history_max_biomass=plant_history_max,
             fungus_history_max_biomass=fungus_history_max,
-            plant_c_pool=jnp.clip(plant_step["c_pool"] - plant_c_trade_out, 0.0, jnp.inf),
+            plant_c_pool=plant_step["c_pool"],
             plant_p_pool=plant_step["p_pool"] + fungus_p_trade_out,
             fungus_c_pool=fungus_step["c_pool"] + plant_c_trade_out,
-            fungus_p_pool=jnp.clip(fungus_step["p_pool"] - fungus_p_trade_out, 0.0, jnp.inf),
+            fungus_p_pool=fungus_step["p_pool"],
+            plant_last_p_received=jnp.where(
+                plant_operational_at_end, fungus_p_trade_out, 0.0
+            ),
+            fungus_last_c_received=jnp.where(
+                fungus_operational_at_end, plant_c_trade_out, 0.0
+            ),
             cumulative_plant_p_mortality_loss_mg=(
                 state.cumulative_plant_p_mortality_loss_mg
-                + plant_mortality_biomass * self.species.plant.gamma_p
+                + plant_maintenance["mortality_biomass"]
+                * self.species.plant.gamma_p
             ),
             cumulative_fungus_p_mortality_loss_mg=(
                 state.cumulative_fungus_p_mortality_loss_mg
-                + fungus_mortality_biomass * self.species.fungus.gamma_p
+                + fungus_maintenance["mortality_biomass"]
+                * self.species.fungus.gamma_p
+            ),
+            cumulative_plant_p_maintenance_loss_mg=(
+                state.cumulative_plant_p_maintenance_loss_mg
+                + plant_maintenance["p_used"]
+            ),
+            cumulative_fungus_p_maintenance_loss_mg=(
+                state.cumulative_fungus_p_maintenance_loss_mg
+                + fungus_maintenance["p_used"]
             ),
             cumulative_plant_p_reproduction_export_mg=(
                 state.cumulative_plant_p_reproduction_export_mg
@@ -371,8 +456,6 @@ class BaseMycorMarl(MultiAgentEnv):
                 state.cumulative_fungus_p_reproduction_export_mg
                 + fungus_step["reproduction_p"]
             ),
-            plant_dead=plant_dead,
-            fungus_dead=fungus_dead,
         )
 
         # New resources acquired during the transition are added after
@@ -407,13 +490,7 @@ class BaseMycorMarl(MultiAgentEnv):
         done = self.is_terminal(state)
         state = state.replace(terminal=done)
 
-        obs = self._get_obs(
-            state,
-            last_trade={
-                PLANT: fungus_p_trade_out,
-                FUNGUS: plant_c_trade_out,
-            },
-        )
+        obs = self.get_obs(state)
 
         rewards = {
             PLANT: plant_step["reward"],
@@ -424,22 +501,76 @@ class BaseMycorMarl(MultiAgentEnv):
             FUNGUS: fungus_dead.squeeze(),
             "__all__": done,
         }
+
+        def completed_transition(
+            requested_action,
+            operational_at_start,
+            operational_at_end,
+            final_observation,
+        ):
+            realised_action = jnp.concatenate(
+                [
+                    jnp.atleast_1d(
+                        jnp.where(
+                            trading_enabled,
+                            requested_action[Actions.trade],
+                            0.0,
+                        )
+                    ),
+                    jnp.where(
+                        operational_at_end,
+                        requested_action[Actions.growth :],
+                        0.0,
+                    ),
+                ]
+            )
+            return Transition(
+                requested_action=requested_action,
+                realised_action=realised_action,
+                operational_at_start=operational_at_start.squeeze(),
+                operational_at_end=operational_at_end.squeeze(),
+                allocation_executed=operational_at_end.squeeze(),
+                trade_executed=trading_enabled.squeeze(),
+                truncated=state.step >= self.max_episode_steps,
+                final_observation=final_observation,
+            )
+
         infos = {
             PLANT: {
                 **plant_step["info"],
+                **plant_maintenance["info"],
                 "biomass": state.plant_biomass,
                 "c_pool": state.plant_c_pool,
                 "p_pool": state.plant_p_pool,
+                "proposed_trade_out": plant_c_trade_proposed,
                 "trade_out": plant_c_trade_out,
                 "trade_in": fungus_p_trade_out,
+                "trade_cancelled": trade_cancelled,
             },
             FUNGUS: {
                 **fungus_step["info"],
+                **fungus_maintenance["info"],
                 "biomass": state.fungus_biomass,
                 "c_pool": state.fungus_c_pool,
                 "p_pool": state.fungus_p_pool,
+                "proposed_trade_out": fungus_p_trade_proposed,
                 "trade_out": fungus_p_trade_out,
                 "trade_in": plant_c_trade_out,
+                "trade_cancelled": trade_cancelled,
+            },
+            "transitions": {
+                PLANT: completed_transition(
+                    actions[PLANT],
+                    plant_operational_at_start,
+                    plant_operational_at_end,
+                    obs[PLANT],
+                ),
+                FUNGUS: completed_transition(
+                    actions[FUNGUS],
+                    fungus_operational_at_start,
+                    fungus_operational_at_end,
+                    obs[FUNGUS],
+                ),
             },
         }
 
@@ -469,206 +600,129 @@ class BaseMycorMarl(MultiAgentEnv):
             self.config.uptake_transition_exponent,
         )
 
+    def _pay_maintenance(
+        self,
+        biomass: chex.Array,
+        c_pool: chex.Array,
+        p_pool: chex.Array,
+        traits,
+        operational: chex.Array,
+    ) -> dict:
+        """Pay unavoidable maintenance from start-of-step free pools."""
+        active_biomass = jnp.where(operational, biomass, 0.0)
+        required_c = traits.kappa_c * active_biomass * self.config.dt
+        required_p = traits.kappa_p * active_biomass * self.config.dt
+        c_used = jnp.minimum(c_pool, required_c)
+        p_used = jnp.minimum(p_pool, required_p)
+        c_deficit = required_c - c_used
+        p_deficit = required_p - p_used
+        mortality_biomass = jnp.maximum(
+            c_deficit / traits.gamma_c,
+            p_deficit / traits.gamma_p,
+        )
+        mortality_biomass = jnp.minimum(mortality_biomass, active_biomass)
+        return {
+            "biomass": jnp.where(
+                operational, biomass - mortality_biomass, biomass
+            ),
+            "c_pool": jnp.where(operational, c_pool - c_used, c_pool),
+            "p_pool": jnp.where(operational, p_pool - p_used, p_pool),
+            "p_used": p_used,
+            "mortality_biomass": mortality_biomass,
+            "info": {
+                "maint_c": required_c,
+                "maint_p": required_p,
+                "maint_c_used": c_used,
+                "maint_p_used": p_used,
+                "c_deficit": c_deficit,
+                "p_deficit": p_deficit,
+            },
+        }
+
+    def _apply_allocation(
+        self,
+        biomass: chex.Array,
+        c_pool: chex.Array,
+        p_pool: chex.Array,
+        action: chex.Array,
+        traits,
+        operational: chex.Array,
+        biomass_cap: float | None = None,
+    ) -> dict:
+        """Apply growth/reproduction/reserve fractions to disposable C and P."""
+        action = jnp.where(operational, action, jnp.zeros_like(action))
+        growth_alloc = action[Actions.growth]
+        reproduction_alloc = action[Actions.reproduction]
+
+        growth_c_alloc = growth_alloc * c_pool
+        growth_p_alloc = growth_alloc * p_pool
+        growth = grow(
+            allocated_c=growth_c_alloc,
+            allocated_p=growth_p_alloc,
+            grow_c_cost=traits.gamma_c,
+            grow_p_cost=traits.gamma_p,
+            grow_type="essential",
+        )
+        if biomass_cap is not None:
+            growth = jnp.minimum(
+                growth,
+                jnp.maximum(biomass_cap - biomass, 0.0),
+            )
+        growth_c_used = growth * traits.gamma_c
+        growth_p_used = growth * traits.gamma_p
+        reproduction_c = reproduction_alloc * c_pool
+        reproduction_p = reproduction_alloc * p_pool
+        remaining_c_pool = c_pool - reproduction_c - growth_c_used
+        remaining_p_pool = p_pool - reproduction_p - growth_p_used
+        reproduction_c_scaled = reproduction_c / traits.gamma_c
+        reproduction_p_scaled = reproduction_p / traits.gamma_p
+        reward = self._cobb_douglas(reproduction_c_scaled, reproduction_p_scaled, self.config.alpha)
+        info = {
+            "growth": growth,
+            "growth_c_allocated": growth_c_alloc,
+            "growth_p_allocated": growth_p_alloc,
+            "growth_c_used": growth_c_used,
+            "growth_p_used": growth_p_used,
+            "reproduction_c": reproduction_c,
+            "reproduction_p": reproduction_p,
+        }
+        return {
+            "growth": growth,
+            "reproduction_p": reproduction_p,
+            "c_pool": remaining_c_pool,
+            "p_pool": remaining_p_pool,
+            "reward": reward.squeeze(),
+            "info": info,
+        }
+
     def step_plant(self, key: jax.Array, state: State, action: jax.Array) -> dict:
-        """Step the plant dynamics based on the action allocation.
-
-        Currently, assumes action allocations are valid and sum to 1.0.
-        """
-
+        """Apply a valid Physical action to the plant's disposable pools."""
         operational = jnp.logical_and(
             self.plant_active, jnp.logical_not(state.plant_dead)
         )
-        action = jnp.where(operational, action, jnp.zeros_like(action))
-        active_biomass = jnp.where(operational, state.plant_biomass, 0.0)
-        growth_alloc = action[Actions.growth]
-        maintenance_alloc = action[Actions.maintenance]
-        reproduction_alloc = action[Actions.reproduction]
-
-        # Determine the growth based on essential resources.
-        growth_c_alloc = growth_alloc * state.plant_c_pool
-        growth_p_alloc = growth_alloc * state.plant_p_pool
-        growth = grow(
-            allocated_c=growth_c_alloc,
-            allocated_p=growth_p_alloc,
-            grow_c_cost=self.species.plant.gamma_c,
-            grow_p_cost=self.species.plant.gamma_p,
-            grow_type="essential",
+        return self._apply_allocation(
+            state.plant_biomass,
+            state.plant_c_pool,
+            state.plant_p_pool,
+            action,
+            self.species.plant,
+            operational,
+            biomass_cap=self.species.plant.biomass_cap,
         )
-        growth = jnp.minimum(
-            growth,
-            jnp.maximum(self.species.plant.biomass_cap - state.plant_biomass, 0.0),
-        )
-
-        # Determine real resources used for growth, e.g.,
-        # if using essential resources, the minimum of the two will determine actual growth.
-        growth_c_used = growth * self.species.plant.gamma_c
-        growth_p_used = growth * self.species.plant.gamma_p
-
-        # Determine required maintenance resources based on biomass and species traits.
-        required_maint_c, required_maint_p = plant_maintenance_demand(
-            active_biomass,
-            self.species.plant.kappa_c,
-            self.species.plant.kappa_p,
-            self.config.dt,
-        )
-
-        # Calculate allocated maintenance resources.
-        allocated_maint_c = maintenance_alloc * state.plant_c_pool
-        allocated_maint_p = maintenance_alloc * state.plant_p_pool
-
-        # Calculate actual maintenance resources used, which cannot exceed required amount.
-        # Over-allocated resources are returned to their pools.
-        maint_c_used = jnp.minimum(allocated_maint_c, required_maint_c)
-        maint_p_used = jnp.minimum(allocated_maint_p, required_maint_p)
-
-        # Calculate maintenance resource deficit, if any.
-        c_deficit = jnp.maximum(required_maint_c - allocated_maint_c, 0.0)
-        p_deficit = jnp.maximum(required_maint_p - allocated_maint_p, 0.0)
-
-        # Calculate the biomass deficit due to maintenance shortfall.
-        # Taking the maximum of carbon and phosphorus deficits converted to biomass.
-        maint_deficit_biomass = jnp.maximum(
-            c_deficit / self.species.plant.gamma_c,
-            p_deficit / self.species.plant.gamma_p,
-        )
-
-        # Calculate the resources allocated to reproduction.
-        reproduction_c = reproduction_alloc * state.plant_c_pool
-        reproduction_p = reproduction_alloc * state.plant_p_pool
-
-        # Calculate total resources used for maintenance, reproduction, and growth.
-        c_used = maint_c_used + reproduction_c + growth_c_used
-        p_used = maint_p_used + reproduction_p + growth_p_used
-
-        # Update the carbon and phosphorus pools after accounting for used resources.
-        c_pool = jnp.clip(state.plant_c_pool - c_used, 0.0, jnp.inf)
-        p_pool = jnp.clip(state.plant_p_pool - p_used, 0.0, jnp.inf)
-
-        # Get reward for reproduction based on Cobb-Douglas function of carbon and phosphorus.
-        # Scale reproduction C and P to be in terms of biomass for reward calculation.
-        reproduction_c_scaled = reproduction_c / self.species.plant.gamma_c
-        reproduction_p_scaled = reproduction_p / self.species.plant.gamma_p
-        reward = self._cobb_douglas(reproduction_c_scaled, reproduction_p_scaled, self.config.alpha)
-
-        info = {
-            "growth": growth,
-            "maint_c": required_maint_c,
-            "maint_p": required_maint_p,
-            "maint_c_used": maint_c_used,
-            "maint_p_used": maint_p_used,
-            "reproduction_c": reproduction_c,
-            "reproduction_p": reproduction_p,
-            "c_deficit": c_deficit,
-            "p_deficit": p_deficit,
-        }
-
-        return {
-            "growth": growth,
-            "maint_deficit_biomass": maint_deficit_biomass,
-            "reproduction_p": reproduction_p,
-            "c_pool": c_pool,
-            "p_pool": p_pool,
-            "reward": reward.squeeze(),
-            "info": info,
-        }
 
     def step_fungus(self, key: jax.Array, state: State, action: jax.Array) -> dict:
-        """Step the fungus dynamics based on the action allocation.
-
-        Currently, assumes action allocations are valid and sum to 1.0.
-        """
+        """Apply a valid Physical action to the fungus's disposable pools."""
         operational = jnp.logical_and(
             self.fungus_active, jnp.logical_not(state.fungus_dead)
         )
-        action = jnp.where(operational, action, jnp.zeros_like(action))
-        active_biomass = jnp.where(operational, state.fungus_biomass, 0.0)
-        growth_alloc = action[Actions.growth]
-        maint_alloc = action[Actions.maintenance]
-        reproduction_alloc = action[Actions.reproduction]
-
-        # Determine the growth based on essential resources.
-        growth_c_alloc = growth_alloc * state.fungus_c_pool
-        growth_p_alloc = growth_alloc * state.fungus_p_pool
-        growth = grow(
-            allocated_c=growth_c_alloc,
-            allocated_p=growth_p_alloc,
-            grow_c_cost=self.species.fungus.gamma_c,
-            grow_p_cost=self.species.fungus.gamma_p,
-            grow_type="essential",
+        return self._apply_allocation(
+            state.fungus_biomass,
+            state.fungus_c_pool,
+            state.fungus_p_pool,
+            action,
+            self.species.fungus,
+            operational,
         )
-
-        # Determine real resources used for growth, e.g.,
-        # if using essential resources, the minimum of the two will determine actual growth.
-        growth_c_used = growth * self.species.fungus.gamma_c
-        growth_p_used = growth * self.species.fungus.gamma_p
-
-        # Determine required maintenance resources based on biomass and species traits.
-        required_maint_c, required_maint_p = fungal_maintenance_demand(
-            active_biomass,
-            self.species.fungus.kappa_c,
-            self.species.fungus.kappa_p,
-            self.config.dt,
-        )
-
-        # Calculate allocated maintenance resources.
-        allocated_maint_c = maint_alloc * state.fungus_c_pool
-        allocated_maint_p = maint_alloc * state.fungus_p_pool
-
-        # Calculate actual maintenance resources used, which cannot exceed required amount.
-        # Over-allocated resources are returned to their pools.
-        maint_c_used = jnp.minimum(allocated_maint_c, required_maint_c)
-        maint_p_used = jnp.minimum(allocated_maint_p, required_maint_p)
-
-        # Calculate maintenance resource deficit, if any.
-        c_deficit = jnp.maximum(required_maint_c - allocated_maint_c, 0.0)
-        p_deficit = jnp.maximum(required_maint_p - allocated_maint_p, 0.0)
-
-        # Calculate the biomass deficit due to maintenance shortfall.
-        # Taking the maximum of carbon and phosphorus deficits converted to biomass.
-        maint_deficit_biomass = jnp.maximum(
-            c_deficit / self.species.fungus.gamma_c,
-            p_deficit / self.species.fungus.gamma_p,
-        )
-
-        # Calculate the resources allocated to reproduction.
-        reproduction_c = reproduction_alloc * state.fungus_c_pool
-        reproduction_p = reproduction_alloc * state.fungus_p_pool
-
-        # Calculate total resources used for maintenance, reproduction, and growth.
-        c_used = maint_c_used + reproduction_c + growth_c_used
-        p_used = maint_p_used + reproduction_p + growth_p_used
-
-        # Update the carbon and phosphorus pools after accounting for used resources.
-        c_pool = jnp.clip(state.fungus_c_pool - c_used, 0.0, jnp.inf)
-        p_pool = jnp.clip(state.fungus_p_pool - p_used, 0.0, jnp.inf)
-
-        # Get reward for reproduction based on Cobb-Douglas function of carbon and phosphorus.
-        # Scale reproduction C and P to be in terms of biomass for reward calculation.
-        reproductive_c = reproduction_c / self.species.fungus.gamma_c
-        reproductive_p = reproduction_p / self.species.fungus.gamma_p
-        reward = self._cobb_douglas(reproductive_c, reproductive_p, self.config.alpha)
-
-        info = {
-            "growth": growth,
-            "maint_c": required_maint_c,
-            "maint_p": required_maint_p,
-            "maint_c_used": maint_c_used,
-            "maint_p_used": maint_p_used,
-            "reproduction_c": reproduction_c,
-            "reproduction_p": reproduction_p,
-            "c_deficit": c_deficit,
-            "p_deficit": p_deficit,
-        }
-
-        return {
-            "growth": growth,
-            "maint_deficit_biomass": maint_deficit_biomass,
-            "reproduction_p": reproduction_p,
-            "c_pool": c_pool,
-            "p_pool": p_pool,
-            "reward": reward.squeeze(),
-            "info": info,
-        }
 
     @staticmethod
     def _validate_soil_config(config: EnvConfig) -> None:
@@ -698,8 +752,6 @@ class BaseMycorMarl(MultiAgentEnv):
             raise ValueError(
                 "consumer_mode must be 'mixed', 'plant-only', or 'fungus-only'"
             )
-        if not isinstance(config.norm_obs, bool):
-            raise ValueError("norm_obs must be a boolean")
         if not math.isfinite(config.alpha) or not 0.0 <= config.alpha <= 1.0:
             raise ValueError("alpha must be finite and within [0, 1]")
         if (

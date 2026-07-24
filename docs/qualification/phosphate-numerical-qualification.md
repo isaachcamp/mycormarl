@@ -69,6 +69,6 @@ The selection uses a 5% next-finer/next-smaller comparison on fixed-geometry upt
 - No scientific matrix row was inventory-capped. Fixed-soil outputs changed by less than 0.5% across the timestep candidates, but endpoint coupled free-P pools changed by approximately 98–102%; none of the coarser timestep candidates passed the 5% gate.
 - 0.025 day is the finest tested timestep and was selected as the fallback. Because it has no finer reference, this result does not demonstrate timestep convergence; a finer follow-up study or a revised scientifically justified endpoint metric is required.
 - Reduced-domain convergence retains a topsoil diffusion front but cannot reproduce every full-domain spatial scale.
-- Coupled actions are fixed at `[trade=0.25, growth=0.75, maintenance=0, reproduction=0]`; maintenance costs are disabled only in this qualification fixture so the unresolved maintenance-P fate cannot contaminate balance interpretation.
+- Coupled Physical actions are fixed at `[trade=0.25, growth=1, reproduction=0, reserve=0]`; automatic maintenance costs are disabled in this fixture to isolate timestep sensitivity in growth and uptake.
 - Annual runtime is projected from both warmed soil-only and deterministic full-environment steps. MARL training, learned-policy inference, output, and accelerator transfer costs are excluded.
 - The complete machine-readable tables and exact platform metadata are in `phosphate-numerical-qualification.json`.

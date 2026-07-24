@@ -69,8 +69,10 @@ geometry and boundary behaviour are tested in
 ## Coupling pipeline
 
 ```text
-start-of-step organism pools + allocation actions
-  -> trade, stoichiometric growth, maintenance and reproduction
+start-of-step organism pools + Physical actions
+  -> automatic maintenance and maintenance-deficit mortality
+  -> bilateral trade, or cancellation after maintenance death
+  -> stoichiometric growth, reproduction and reserve
   -> surviving biomass and mortality/export accounting
   -> photosynthetic C fixation
   -> biomass-derived root and hyphal density on the shared grid
@@ -164,9 +166,8 @@ mortality and reproduction are explicit exports from the represented system.
   represented.
 - **Limitation:** Mortality P leaves the system and reproduction P is exported;
   there is no litter, mineralisation, or recycling pool.
-- **Limitation:** Maintenance P is removed from free pools but has no explicit
-  destination, so whole-system P conservation must not be claimed for
-  maintenance-active trajectories.
+- **Limitation:** Paid maintenance P is represented as an external
+  maintenance/turnover loss rather than a recyclable biological or soil pool.
 - **Interpretation:** The shared grid is a coupling abstraction, not a claim
   that root and fungal architectures are physically continuous at all scales.
 

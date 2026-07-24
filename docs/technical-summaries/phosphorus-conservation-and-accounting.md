@@ -173,6 +173,7 @@ P_{\mathrm{extended}}={}&
 +P_{p,\mathrm{free}}+P_{f,\mathrm{free}}\\
 &+\gamma_{P,p}G_p+\gamma_{P,f}G_f\\
 &+P_{\mathrm{mortality,cumulative}}
++P_{\mathrm{maintenance,cumulative}}
 +P_{\mathrm{reproduction,cumulative}}.
 \end{aligned}
 \]
@@ -183,45 +184,30 @@ Fungal-to-plant P trade is internal: the same `fungus_p_trade_out` is added to
 the plant pool and subtracted from the fungal pool
 ([`base_mycor.py`, lines 287–295](../mycormarl/mycormarl/environments/base_mycor.py#L287-L295);
 [`base_mycor.py`, lines 349–357](../mycormarl/mycormarl/environments/base_mycor.py#L349-L357)).
-Reproduction and mortality are not treated as disappearing silently; cumulative
-counters retain their amounts in the ledger
+Reproduction, mortality, and paid maintenance P are not treated as disappearing
+silently; cumulative counters retain their amounts in the ledger
 ([`base_mycor.py`, lines 358–373](../mycormarl/mycormarl/environments/base_mycor.py#L358-L373)).
 
 The extended-balance qualification test verifies closure to relative tolerance
 \(10^{-5}\)
 ([`test_phosphate_qualification.py`, lines 263–279](../tests/test_phosphate_qualification.py#L263-L279)).
-However, its fixture sets both maintenance coefficients to zero and uses zero
-maintenance allocation
+Its fixture sets both maintenance coefficients to zero
 ([`phosphate_qualification.py`, lines 43–61](../scripts/phosphate_qualification.py#L43-L61);
 [`phosphate_qualification.py`, lines 275–279](../scripts/phosphate_qualification.py#L275-L279)).
-It therefore proves conservation for that defined pathway, not for arbitrary
-agent actions.
+This isolates growth and uptake sensitivity; maintenance-active closure is
+covered separately by focused environment tests.
 
-## 5. Why maintenance prevents a general whole-system claim
+## 5. How paid maintenance P closes the extended ledger
 
-For both organisms, `maint_p_used` is included in total P use and deducted from
-the free pool
+For both organisms, `maint_p_used` is deducted automatically from the
+start-of-step free pool
 ([`base_mycor.py`, lines 519–545](../mycormarl/mycormarl/environments/base_mycor.py#L519-L545);
 [`base_mycor.py`, lines 617–643](../mycormarl/mycormarl/environments/base_mycor.py#L617-L643)).
-Unlike reproduction and mortality P, it is not:
-
-- transferred to another modeled pool;
-- returned to the soil;
-- incorporated into additional structural biomass; or
-- accumulated in an explicit maintenance/turnover loss counter.
-
-Accordingly, \(P_{\mathrm{extended}}\) falls by `maint_p_used` in a
-maintenance-active step. This is not a diffusion error or an uptake error. It is
-an incomplete biological fate specification. Until a scientific destination is
-chosen and represented, the precise statement is:
-
-> Diffusion, competition, uptake credit, trade, growth, recorded mortality, and
-> recorded reproduction obey their local or extended accounting contracts.
-> Whole-system P conservation is not established for maintenance-active
-> trajectories.
-
-The distinction matters because a strict balance test is useful precisely when
-it exposes an omitted store or flux rather than concealing it.
+The amount actually paid is accumulated in the species-specific
+`cumulative_*_p_maintenance_loss_mg` counter. Unmet demand is not added to this
+counter; it drives deterministic biomass loss instead. Treating paid P as an
+external maintenance/turnover loss closes the extended diagnostic ledger
+without claiming recycling into a biological or soil compartment.
 
 ## Relationship to the literature
 
@@ -255,7 +241,8 @@ it exposes an omitted store or flux rather than concealing it.
   inventory using solution concentration as the driving potential.
 - Numerical conservation is subject to floating-point round-off and the stated
   test tolerances.
-- The current qualification evidence does not cover non-zero maintenance P use.
+- Paid maintenance P is treated as an external loss rather than recycled into
+  soil or another biological compartment.
 
 ## Practical interpretation
 
@@ -265,4 +252,3 @@ beside competing uptake, read it as exact allocation of a finite cell inventory.
 For a whole simulation, use the extended ledger and state its boundary and
 export conventions explicitly. Under the current code, add the qualification
 that maintenance P has an unresolved fate.
-

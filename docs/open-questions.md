@@ -6,12 +6,6 @@ verification records are retained under [`archive/`](archive/).
 
 ## Phosphorus accounting
 
-- **Maintenance-P accounting implementation:** current maintenance removes P
-  from the free organism pool without assigning it to structure, recycling,
-  soil, or a loss diagnostic. The agreed next treatment is to record it as an
-  explicit unmodelled maintenance/turnover loss in separate plant and fungal
-  counters. Until that change is implemented and tested, whole-system
-  conservation must not be claimed for maintenance-active runs.
 - **Mortality and recycling:** structural P lost through mortality is recorded
   as leaving the simulated system. Decide whether litter, mineralisation, and
   re-uptake pools are needed for the intended experiments.

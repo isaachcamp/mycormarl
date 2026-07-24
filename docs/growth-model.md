@@ -8,12 +8,14 @@
 
 ## Executive summary
 
-Plant and fungus allocate fractions of their start-of-step free C and P pools
-to trade, growth, maintenance, and reproduction. Growth treats C and P as
-essential resources: the scarcer resource after conversion by organism-specific
-stoichiometric costs limits new dry biomass. Maintenance shortfalls remove
-biomass, reproduction exports resources and generates reward, and death does not
-replenish C or P resources.
+Plant and fungus pay unavoidable maintenance from their start-of-step free C
+and P pools, then execute a Physical action
+`[trade, growth, reproduction, reserve]`. Trade is independently bounded;
+growth, reproduction, and reserve form a simplex applied separately to
+remaining C and P. Growth treats C and P as essential resources: the scarcer
+resource after conversion by organism-specific stoichiometric costs limits new
+dry biomass. Maintenance shortfalls remove biomass, reproduction exports
+resources and generates reward, and death does not replenish C or P resources.
 
 Surviving plant biomass is mapped to a stack of depth-dependent root discs with
 uniform within-disc length density. Surviving fungal biomass is mapped to an
@@ -62,8 +64,8 @@ P_{o,m}^{*}=G_o\kappa_{P,o}\Delta t,
 $$
 
 with $\kappa_C$ in g C g⁻¹ day⁻¹, $\kappa_P$ in mg P g⁻¹ day⁻¹, and
-$\Delta t$ in days. Actual use is the lesser of allocated and required
-resource. A deficit is translated to lost biomass using the more severe
+$\Delta t$ in days. Actual use is the lesser of the start-of-step free pool and
+required resource. A deficit is translated to lost biomass using the more severe
 stoichiometric deficit:
 
 $$
@@ -72,12 +74,10 @@ $$
           \frac{P_{o,m}^{*}-P_{o,m}}{\gamma_{P,o}},0\right).
 $$
 
-The current implementation is visible for the plant at
-[`base_mycor.py:508–546`](../mycormarl/mycormarl/environments/base_mycor.py#L508-L546)
-and fungus at
-[`base_mycor.py:606–644`](../mycormarl/mycormarl/environments/base_mycor.py#L606-L644).
-Over-allocation is returned to the pools, as tested by
-[`test_excess_maintenance_allocation_is_not_wasted`](../tests/test_base_mycor_refactor.py#L288-L315).
+The shared automatic payment transaction is implemented in
+[`BaseMycorMarl._pay_maintenance`](../mycormarl/mycormarl/environments/base_mycor.py).
+Reserved resources remain untouched after maintenance, as tested by
+[`test_automatic_maintenance_does_not_spend_reserved_resources`](../tests/test_base_mycor_refactor.py).
 
 Reproduction removes allocated C and P and scores a Cobb–Douglas reward after
 both resources are converted to dry-biomass equivalents. Plant C trade and
@@ -87,9 +87,9 @@ trade is unavailable for same-step growth. See
 [`test_incoming_trade_is_not_available_for_same_step_growth`](../tests/test_base_mycor_refactor.py#L209-L221).
 
 Structural P associated with biomass lost to maintenance shortfall is added to
-cumulative mortality-loss diagnostics. It is not recycled to soil. Free P used
-for maintenance is deducted but currently has no destination; this is an
-acknowledged accounting gap rather than a C-only maintenance assumption.
+cumulative mortality-loss diagnostics. It is not recycled to soil. Free P
+actually paid for maintenance is recorded separately in plant and fungal
+maintenance-loss counters; unmet demand is recorded only as a deficit.
 
 ## Plant biomass to root geometry
 
@@ -156,6 +156,12 @@ The length fills a hemisphere at saturation density $\lambda_{sat}$:
 $$
 R_f=\left(\frac{3L_h}{2\pi\lambda_{sat}}\right)^{1/3}.
 $$
+
+The inverse transformations from colony radius to saturated length and from
+length to dry biomass are owned by the same mycelium module. Their composition,
+[`fungal_biomass_for_colony_radius`](../mycormarl/mycormarl/fungus/mycelium.py),
+provides the radial-fill biomass. Half of that value is used as the fungal
+actor-observation reference.
 
 Each annular cell receives $\lambda_{sat}$ times its exact occupied-volume
 fraction. Implemented by

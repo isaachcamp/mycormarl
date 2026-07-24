@@ -306,9 +306,9 @@ Refinement is not the only requirement. Every scenario also reports or tests:
 
 The executable contracts are in
 [`tests/test_phosphate_qualification.py`, lines 61–280](../tests/test_phosphate_qualification.py#L61-L280).
-The present coupled balance fixture sets maintenance demand and allocation to
-zero because maintenance P still lacks an explicit destination. Its successful
-balance must not be generalized to maintenance-active trajectories.
+The present coupled balance fixture sets maintenance demand to zero so the
+timestep comparison isolates growth and uptake. Paid maintenance P now has
+explicit plant and fungal loss counters and is included in the extended ledger.
 
 ## Performance qualification
 

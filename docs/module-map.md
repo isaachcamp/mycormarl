@@ -35,7 +35,7 @@ configuration and organism traits
 | `fungus/mycelium.py` | Converts fungal biomass to a volume-averaged saturated hemispherical hyphal field. | Reset and post-growth geometry refresh. |
 | `plant/traits.py`, `fungus/traits.py` | Organism stoichiometry, kinetics, geometry, maintenance, and initial pools. | Biological and soil calculations. |
 | `growth.py`, `maintenance.py` | Shared realised-growth and maintenance calculations. | Plant and fungal environment steps. |
-| `observations.py` | Optional numerical normalisation for policy observations. | Environment observation construction. |
+| `observations.py` | Finite bounded transforms for the stable five-feature actor observations. | Environment observation construction. |
 | `algos/ppo.py` | Two-policy PPO integration using the `plant` and `fungus` interfaces. | Training launcher and experiments. |
 
 ## Executable and evidence modules
@@ -50,6 +50,7 @@ configuration and organism traits
 | `tests/test_environment_phosphate_uptake.py` | Protects soil-to-organism pool credit, competition, loss accounting, and environment integration. |
 | `tests/test_growth_geometry.py` | Protects biomass-to-length and spatial conservation rules. |
 | `tests/test_base_mycor_refactor.py` | Protects environment ordering, death, trade, growth, and observations. |
+| `tests/test_actor_observations.py` | Protects actor feature meaning, bounds, state reconstruction, lifecycle masking, JIT, and vectorisation. |
 | `tests/test_review_repairs.py` | Protects public entry points, independent modes, PPO integration, and repaired regressions. |
 
 ## Key ownership boundaries

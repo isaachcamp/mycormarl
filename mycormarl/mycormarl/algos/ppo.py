@@ -10,6 +10,7 @@ from flax.training.train_state import TrainState
 import distrax
 import optax
 
+from mycormarl.actions import physical_action
 from mycormarl.environments.base_mycor import FUNGUS, PLANT
 
 
@@ -173,16 +174,28 @@ def make_train(env, config):
 
                 # Get actions from tree and fungus networks
                 tree_pi, tree_value = tree_policy.apply(train_state["plant"].params, tree_obs_batch)
-                tree_action = tree_pi.sample(seed=tree_act_rng)
-                tree_log_prob = tree_pi.log_prob(tree_action)
+                tree_latent_action = tree_pi.sample(seed=tree_act_rng)
+                tree_log_prob = tree_pi.log_prob(tree_latent_action)
+                tree_physical_action = physical_action(
+                    tree_latent_action[..., 0],
+                    tree_latent_action[..., 1],
+                    tree_latent_action[..., 2],
+                    tree_latent_action[..., 3],
+                )
 
                 fungus_pi, fungus_value = fungus_policy.apply(train_state["fungus"].params, fungus_obs_batch)
-                fungus_action = fungus_pi.sample(seed=fungus_act_rng)
-                fungus_log_prob = fungus_pi.log_prob(fungus_action)
+                fungus_latent_action = fungus_pi.sample(seed=fungus_act_rng)
+                fungus_log_prob = fungus_pi.log_prob(fungus_latent_action)
+                fungus_physical_action = physical_action(
+                    fungus_latent_action[..., 0],
+                    fungus_latent_action[..., 1],
+                    fungus_latent_action[..., 2],
+                    fungus_latent_action[..., 3],
+                )
 
                 # Unbatchify the actions to match the environment's expected input format
                 env_act = unbatchify(
-                    jnp.stack([tree_action, fungus_action]),
+                    jnp.stack([tree_physical_action, fungus_physical_action]),
                     env.agents, config.NUM_ENVS, config.NUM_ACTORS
                 )
 
@@ -195,7 +208,7 @@ def make_train(env, config):
                 # Collect Trajectory object
                 tree_transition = Trajectory(
                     done[PLANT].squeeze(),
-                    tree_action,
+                    tree_latent_action,
                     jnp.array(tree_value),
                     reward[PLANT].squeeze(),
                     tree_log_prob,
@@ -205,7 +218,7 @@ def make_train(env, config):
                 )
                 fungus_transition = Trajectory(
                     done[FUNGUS].squeeze(),
-                    fungus_action,
+                    fungus_latent_action,
                     jnp.array(fungus_value),
                     reward[FUNGUS].squeeze(),
                     fungus_log_prob,

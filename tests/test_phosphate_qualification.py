@@ -49,7 +49,6 @@ def _diagnostic_environment():
         depth_interval_cm=1.0,
         topsoil_depth_cm=1.0,
         initial_solution_p_um=1.0,
-        norm_obs=False,
     )
     species = SpeciesParams(
         plant=PlantTraits(initial_biomass=0.0, initial_p_pool=0.0),

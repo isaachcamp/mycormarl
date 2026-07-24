@@ -19,6 +19,7 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
+from mycormarl.actions import physical_action
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
@@ -81,7 +82,6 @@ def qualification_config(
         initial_solution_p_um=concentration_um,
         uptake_reference_time_days=reference_time_days,
         uptake_transition_exponent=exponent,
-        norm_obs=False,
     )
 
 
@@ -267,6 +267,8 @@ def run_coupled_scenario(interval_cm: float, dt_days: float) -> dict:
             + float(
                 current_state.cumulative_plant_p_mortality_loss_mg[0]
                 + current_state.cumulative_fungus_p_mortality_loss_mg[0]
+                + current_state.cumulative_plant_p_maintenance_loss_mg[0]
+                + current_state.cumulative_fungus_p_maintenance_loss_mg[0]
                 + current_state.cumulative_plant_p_reproduction_export_mg[0]
                 + current_state.cumulative_fungus_p_reproduction_export_mg[0]
             )
@@ -274,8 +276,8 @@ def run_coupled_scenario(interval_cm: float, dt_days: float) -> dict:
 
     initial_extended_p_mg = extended_p_mg(state)
     actions = {
-        PLANT: jnp.array([0.25, 0.75, 0.0, 0.0]),
-        FUNGUS: jnp.array([0.25, 0.75, 0.0, 0.0]),
+        PLANT: physical_action(0.25, 1.0, 0.0, 0.0),
+        FUNGUS: physical_action(0.25, 1.0, 0.0, 0.0),
     }
     for step_index in range(round(HORIZON_DAYS / dt_days)):
         plant_p_before = float(state.plant_p_pool[0])
@@ -340,6 +342,8 @@ def run_coupled_scenario(interval_cm: float, dt_days: float) -> dict:
         "fungus_p_pool_mg": float(state.fungus_p_pool[0]),
         "plant_mortality_loss_mg": float(state.cumulative_plant_p_mortality_loss_mg[0]),
         "fungus_mortality_loss_mg": float(state.cumulative_fungus_p_mortality_loss_mg[0]),
+        "plant_maintenance_loss_mg": float(state.cumulative_plant_p_maintenance_loss_mg[0]),
+        "fungus_maintenance_loss_mg": float(state.cumulative_fungus_p_maintenance_loss_mg[0]),
         "plant_reproduction_export_mg": float(state.cumulative_plant_p_reproduction_export_mg[0]),
         "fungus_reproduction_export_mg": float(state.cumulative_fungus_p_reproduction_export_mg[0]),
         "initial_extended_p_mg": initial_extended_p_mg,
@@ -401,8 +405,8 @@ def benchmark_environment(config: EnvConfig, repeats: int = 20) -> dict:
     soil_projection = annual_runtime_projection(config.dt, warmed_seconds)
     _, full_state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: jnp.array([0.25, 0.75, 0.0, 0.0]),
-        FUNGUS: jnp.array([0.25, 0.75, 0.0, 0.0]),
+        PLANT: physical_action(0.25, 1.0, 0.0, 0.0),
+        FUNGUS: physical_action(0.25, 1.0, 0.0, 0.0),
     }
     key = jax.random.PRNGKey(1)
     compiled_full_step = jax.jit(
@@ -533,7 +537,7 @@ def run_studies(include_target_benchmark: bool) -> dict:
     if include_target_benchmark:
         annual_steps = annual_runtime_projection(selected_dt, 0.0)["steps_per_year"]
         target_benchmark = benchmark_environment(
-            EnvConfig(dt=selected_dt, max_steps=annual_steps, norm_obs=False),
+            EnvConfig(dt=selected_dt, max_steps=annual_steps),
             repeats=20,
         )
     return {
@@ -669,7 +673,7 @@ def render_markdown(results: dict) -> str:
         "- No scientific matrix row was inventory-capped. Fixed-soil outputs changed by less than 0.5% across the timestep candidates, but endpoint coupled free-P pools changed by approximately 98–102%; none of the coarser timestep candidates passed the 5% gate.",
         "- 0.025 day is the finest tested timestep and was selected as the fallback. Because it has no finer reference, this result does not demonstrate timestep convergence; a finer follow-up study or a revised scientifically justified endpoint metric is required.",
         "- Reduced-domain convergence retains a topsoil diffusion front but cannot reproduce every full-domain spatial scale.",
-        "- Coupled actions are fixed at `[trade=0.25, growth=0.75, maintenance=0, reproduction=0]`; maintenance costs are disabled only in this qualification fixture so the unresolved maintenance-P fate cannot contaminate balance interpretation.",
+        "- Coupled Physical actions are fixed at `[trade=0.25, growth=1, reproduction=0, reserve=0]`; automatic maintenance costs are disabled in this fixture to isolate timestep sensitivity in growth and uptake.",
         "- Annual runtime is projected from both warmed soil-only and deterministic full-environment steps. MARL training, learned-policy inference, output, and accelerator transfer costs are excluded.",
         "- The complete machine-readable tables and exact platform metadata are in `phosphate-numerical-qualification.json`.",
         "",

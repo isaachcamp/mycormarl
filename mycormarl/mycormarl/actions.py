@@ -3,34 +3,39 @@ import chex
 import jax.numpy as jnp
 
 
-def _check_action(action: chex.Array, n_parts: int = 4) -> chex.Array:
-    """Convert, sanitize, and clip an action vector.
+def physical_action(
+    trade: chex.Numeric,
+    growth: chex.Numeric,
+    reproduction: chex.Numeric,
+    reserve: chex.Numeric,
+) -> chex.Array:
+    """Construct ``[trade, growth, reproduction, reserve]``.
 
-    This intentionally avoids value-based Python checks so it remains compatible
-    with JAX transformations. The final allocation simplex is enforced by
-    ``_allocation_from_action``.
+    Trade is bounded independently; the remaining components are interpreted
+    as non-negative biological weights and normalised onto their simplex.
     """
-
-    action = jnp.asarray(action, dtype=jnp.float32)
-    if action.shape[-1] != n_parts:
-        raise ValueError(f"Expected action with {n_parts} components, got shape {action.shape}")
-
-    action = jnp.where(jnp.isfinite(action), action, 0.0)
-    return jnp.clip(action, 0.0, 1.0)
-
-def _allocation_from_action(action: chex.Array, n_parts: int = 4) -> chex.Array:
-    """Map an action vector to growth / maintenance / reproduction / trade weights.
-
-    The weights are renormalised internally to keep the resource accounting
-    stable even when the policy emits arbitrary values. If clipping and
-    sanitising leaves no positive allocation, return a uniform allocation.
-    """
-    a = _check_action(action, n_parts=n_parts)
-
-    total = jnp.sum(a, axis=-1, keepdims=True)
-    uniform = jnp.ones_like(a) / n_parts # Return uniform allocation if total is zero.
-    return jnp.where(total > 0.0, a / total, uniform)
-
-def constrain_allocation(action: chex.Array, n_parts: int = 4) -> chex.Array:
-    """Return a JIT-friendly allocation vector on the simplex."""
-    return _allocation_from_action(action, n_parts=n_parts)
+    trade_fraction = jnp.asarray(trade, dtype=jnp.float32)
+    trade_fraction = jnp.where(jnp.isfinite(trade_fraction), trade_fraction, 0.0)
+    trade_fraction = jnp.clip(trade_fraction, 0.0, 1.0)
+    biological_weights = jnp.stack(
+        [
+            jnp.asarray(growth, dtype=jnp.float32),
+            jnp.asarray(reproduction, dtype=jnp.float32),
+            jnp.asarray(reserve, dtype=jnp.float32),
+        ],
+        axis=-1,
+    )
+    biological_weights = jnp.where(
+        jnp.isfinite(biological_weights), biological_weights, 0.0
+    )
+    biological_weights = jnp.maximum(biological_weights, 0.0)
+    total = jnp.sum(biological_weights, axis=-1, keepdims=True)
+    biological_allocation = jnp.where(
+        total > 0.0,
+        biological_weights / total,
+        jnp.ones_like(biological_weights) / 3.0,
+    )
+    return jnp.concatenate(
+        [jnp.expand_dims(trade_fraction, axis=-1), biological_allocation],
+        axis=-1,
+    )
