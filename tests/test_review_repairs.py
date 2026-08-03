@@ -135,7 +135,6 @@ def test_ppo_stack_accepts_current_agent_identifiers():
         GAE_LAMBDA=0.95,
         CLIP_EPS=0.2,
         VF_COEF=0.5,
-        ENT_COEF=0.01,
     )
 
     output = make_train(env, cfg)(jax.random.PRNGKey(0))
