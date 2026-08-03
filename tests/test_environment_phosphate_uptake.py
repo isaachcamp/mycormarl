@@ -6,6 +6,7 @@ import pytest
 
 from mycormarl.actions import physical_action
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
+from mycormarl.fungus.mycelium import fungal_biomass_for_colony_radius
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
@@ -255,6 +256,65 @@ def test_uptake_credit_cannot_fund_growth_in_the_same_step():
     assert infos[PLANT]["growth"][0] == pytest.approx(0.0)
     assert next_state.plant_biomass[0] == pytest.approx(state.plant_biomass[0])
     assert next_state.plant_p_pool[0] > 0.0
+
+
+def test_compiled_step_confines_post_growth_fungal_geometry_and_uptake():
+    """Keeps fungal uptake inside the colony rebuilt after growth."""
+    fungus_traits = FungusTraits(
+        initial_biomass=0.0,
+        initial_c_pool=1.0,
+        initial_p_pool=1.0,
+        gamma_c=1.0,
+        gamma_p=1.0,
+        kappa_c=0.0,
+        kappa_p=0.0,
+        death_fraction=0.0,
+        hyphal_radius=0.1,
+        hyphal_tissue_carbon_density=1.0,
+        saturation_density=1.0,
+        jmax=1e6,
+        km=1e-3,
+    )
+    target_biomass = fungal_biomass_for_colony_radius(0.5, fungus_traits)
+    fungus_traits = fungus_traits.replace(
+        initial_biomass=target_biomass / 2.0,
+        initial_c_pool=target_biomass / 2.0,
+        initial_p_pool=target_biomass / 2.0,
+    )
+    species = SpeciesParams(plant=PlantTraits(), fungus=fungus_traits)
+    config = EnvConfig(
+        consumer_mode="fungus-only",
+        dt=0.01,
+        soil_radius_cm=2.0,
+        soil_depth_cm=2.0,
+        radial_interval_cm=1.0,
+        depth_interval_cm=1.0,
+        topsoil_depth_cm=2.0,
+        initial_solution_p_um=1.0,
+        phosphate_diffusion_coefficient_cm2_s=1e-30,
+        b_p=0.0,
+    )
+    env = BaseMycorMarl(config, species)
+    _, state = env.reset(jax.random.PRNGKey(0))
+    actions = {
+        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
+        FUNGUS: physical_action(0.0, 1.0, 0.0, 0.0),
+    }
+    outside_colony = jnp.array([
+        [False, True],
+        [True, True],
+    ])
+
+    _, next_state, _, _, infos = jax.jit(env.step_env)(
+        jax.random.PRNGKey(1), state, actions
+    )
+
+    assert infos[FUNGUS]["growth"][0] > 0.0
+    assert jnp.array_equal(
+        next_state.soil_labile_p[outside_colony],
+        state.soil_labile_p[outside_colony],
+    )
+    assert jnp.all(next_state.hyphae_length_density[outside_colony] == 0.0)
 
 
 def test_end_to_end_uptake_conserves_soil_plus_free_pool_p():
