@@ -331,6 +331,26 @@ def test_fungal_extent_is_monotonic_with_biomass():
     assert jnp.sum(larger) > jnp.sum(smaller)
 
 
+def test_fungal_hemisphere_has_exact_zero_fraction_outside_colony_under_jit():
+    """Keeps wholly exterior cells empty in eager and compiled geometry."""
+    r_edges = jnp.array([0.0, 1.0, 2.0])
+    z_edges = jnp.array([0.0, 1.0, 2.0])
+    outside_colony = jnp.array([
+        [False, True],
+        [True, True],
+    ])
+
+    eager = axisymmetric_hemisphere_cell_fractions(
+        r_edges, z_edges, colony_radius=jnp.array(0.5)
+    )
+    compiled = jax.jit(axisymmetric_hemisphere_cell_fractions)(
+        r_edges, z_edges, colony_radius=jnp.array(0.5)
+    )
+
+    assert jnp.all(eager[outside_colony] == 0.0)
+    assert jnp.all(compiled[outside_colony] == 0.0)
+
+
 def test_fungal_density_clips_at_saturated_domain_capacity():
     """Makes out-of-domain fungal length explicit without exceeding saturation."""
     traits = FungusTraits(

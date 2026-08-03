@@ -136,6 +136,9 @@ def axisymmetric_hemisphere_cell_fractions(
     """
     r_edges = jnp.asarray(r_edges, dtype=jnp.float32)
     z_edges = jnp.asarray(z_edges, dtype=jnp.float32)
+    colony_radius = jnp.maximum(
+        jnp.asarray(colony_radius, dtype=jnp.float32), 0.0
+    )
 
     r_inner = r_edges[:-1, None]
     r_outer = r_edges[1:, None]
@@ -148,7 +151,12 @@ def axisymmetric_hemisphere_cell_fractions(
     inner_volume = _volume_under_sphere_within_radius(
         r_inner, z_inner, z_outer, colony_radius
     )
-    occupied_volume = outer_volume - inner_volume
+    wholly_outside = (
+        r_inner ** 2 + z_inner ** 2 >= colony_radius ** 2
+    )
+    occupied_volume = jnp.where(
+        wholly_outside, 0.0, outer_volume - inner_volume
+    )
 
     cell_volume = jnp.pi * (r_outer ** 2 - r_inner ** 2) * (z_outer - z_inner)
     fraction = occupied_volume / jnp.maximum(cell_volume, 1e-12)
