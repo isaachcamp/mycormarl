@@ -10,21 +10,25 @@ class FungusTraits:
     Biomass is in grams dry mass. ``gamma_c`` is g C per g dry biomass,
     ``gamma_p`` is mg P per g dry biomass, hyphal radius is in cm,
     ``hyphal_tissue_carbon_density`` is g C per cm³ living fungal tissue, and
-    saturation density is cm hypha per cm³ bulk soil. ``jmax`` is µmol P
-    cm^-2 s^-1 and ``km`` is µmol P cm^-3.
+    saturation density is cm hypha per cm³ bulk soil. ``kappa_p`` is
+    irreversible free-P loss in mg P per g dry biomass per day; structural P
+    is represented only by ``gamma_p``. ``jmax`` is µmol P cm^-2 s^-1 and
+    ``km`` is µmol P cm^-3. Initial biomass is a one-spore mass proxy mapped
+    entirely to living external hyphae, and each initial free pool contains one
+    structural-biomass equivalent.
     """
 
-    initial_biomass: float = 1.0
-    initial_c_pool: float = 0.5
-    initial_p_pool: float = 0.05
+    initial_biomass: float = 7.97e-7
+    initial_c_pool: float = 3.985e-7
+    initial_p_pool: float = 1.594e-6
     gamma_c: float = 0.5
-    gamma_p: float = 40.0
+    gamma_p: float = 2.0
     kappa_c: float = 0.03
     kappa_p: float = 0.003
     death_fraction: float = 0.05
     hyphal_radius: float = 5e-4
     hyphal_tissue_carbon_density: float = 0.1155
-    saturation_density: float = 168.75
+    saturation_density: float = 2_000.0
     jmax: float = 3.26e-6  # µmol P cm^-2 s^-1
     km: float = 5.8e-3  # µmol P cm^-3
 

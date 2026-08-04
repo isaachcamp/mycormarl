@@ -9,6 +9,7 @@ from mycormarl.fungus.mycelium import (
     _volume_under_sphere_within_radius,
     axisymmetric_density_from_biomass,
     axisymmetric_hemisphere_cell_fractions,
+    colony_radius_from_length_axisymmetric,
     fungal_biomass_for_colony_radius,
     hyphal_length_from_fungal_biomass,
 )
@@ -23,13 +24,24 @@ from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.soil.phosphate_grid import axisymmetric_cylindrical_cell_volumes
 
 
-def test_provisional_growth_geometry_trait_defaults():
+def test_accepted_growth_geometry_trait_defaults():
     """Locks agreed plant and fungal growth-geometry parameters and units."""
     plant = PlantTraits()
     fungus = FungusTraits()
 
+    assert plant.initial_biomass == pytest.approx(0.001)
+    assert plant.initial_c_pool == pytest.approx(
+        plant.initial_biomass * plant.gamma_c
+    )
+    assert plant.initial_p_pool == pytest.approx(
+        plant.initial_biomass * plant.gamma_p
+    )
     assert plant.gamma_c == pytest.approx(0.402)
     assert plant.gamma_p == pytest.approx(1.92)
+    assert plant.amass == pytest.approx(0.05)
+    assert plant.kappa_c == pytest.approx(0.007)
+    assert plant.kappa_p == pytest.approx(0.001)
+    assert plant.kleaf * plant.amass - plant.kappa_c == pytest.approx(0.008)
     assert plant.kroot == pytest.approx(0.62)
     assert plant.specific_root_length == pytest.approx(25_434.3)
     assert plant.root_radius == pytest.approx(0.01)
@@ -37,10 +49,18 @@ def test_provisional_growth_geometry_trait_defaults():
     assert plant.max_rooting_depth_cm == pytest.approx(150.0)
 
     assert fungus.gamma_c == pytest.approx(0.5)
-    assert fungus.gamma_p == pytest.approx(40.0)
+    assert fungus.gamma_p == pytest.approx(2.0)
+    assert fungus.kappa_p == pytest.approx(0.003)
+    assert fungus.initial_biomass == pytest.approx(7.97e-7)
+    assert fungus.initial_c_pool == pytest.approx(
+        fungus.initial_biomass * fungus.gamma_c
+    )
+    assert fungus.initial_p_pool == pytest.approx(
+        fungus.initial_biomass * fungus.gamma_p
+    )
     assert fungus.hyphal_radius == pytest.approx(5e-4)
     assert fungus.hyphal_tissue_carbon_density == pytest.approx(0.1155)
-    assert fungus.saturation_density == pytest.approx(168.75)
+    assert fungus.saturation_density == pytest.approx(2_000.0)
 
 
 def test_one_gram_biomass_has_expected_root_and_hyphal_length():
@@ -59,6 +79,25 @@ def test_one_gram_biomass_has_expected_root_and_hyphal_length():
 
     assert root_length == pytest.approx(15_769.266, rel=1e-6)
     assert hyphal_length == pytest.approx(5_511_859.501, rel=1e-6)
+
+
+def test_one_spore_proxy_maps_entirely_to_initial_external_hyphae():
+    """Locks the accepted pre-established-symbiosis initial-condition closure."""
+    traits = FungusTraits()
+
+    length = hyphal_length_from_fungal_biomass(
+        traits.initial_biomass,
+        traits.gamma_c,
+        traits.hyphal_tissue_carbon_density,
+        traits.hyphal_radius,
+    )
+    radius = colony_radius_from_length_axisymmetric(
+        length,
+        traits.saturation_density,
+    )
+
+    assert length == pytest.approx(4.392952, rel=1e-6)
+    assert radius == pytest.approx(0.101599, rel=1e-6)
 
 
 def test_fungal_biomass_for_colony_radius_inverts_geometry_pipeline():

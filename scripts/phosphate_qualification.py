@@ -553,7 +553,9 @@ def run_studies(include_target_benchmark: bool) -> dict:
             "float_precision": "JAX default float32",
             "fixed_density_fixture": {
                 "root_density_cm_cm3": 1.0,
-                "hyphal_density_cm_cm3": 168.75,
+                "hyphal_density_cm_cm3": (
+                    qualification_species().fungus.saturation_density
+                ),
                 "occupied_depth_cm": 1.0,
             },
             "coupled_fixture": {

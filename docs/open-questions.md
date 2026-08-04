@@ -23,9 +23,10 @@ verification records are retained under [`archive/`](archive/).
 
 ## Organism parameters and geometry
 
-- Validate the provisional fungal P mass fraction of `40 mg P g^-1 dry mass`
-  against the underlying studies rather than treating the reported maximum as
-  representative.
+- Obtain a direct *R. irregularis* spore dry-mass measurement to validate or
+  replace the accepted `7.97e-7 g` cross-species AMF regression estimate. At
+  reset, the model deliberately maps the entire one-spore mass proxy to
+  external absorptive hyphae rather than simulating a spore.
 - Corroborate the provisional *Daucus carota* P concentration independently of
   the current MDPI source and obtain a whole-plant carbon measurement if
   possible.
@@ -37,6 +38,22 @@ verification records are retained under [`archive/`](archive/).
 - Determine when the stacked-disc root and saturated-hemisphere fungal
   closures need explicit branching, directional growth, or intraradical and
   spore compartments.
+- Re-run numerical qualification for the `2,000 cm cm^-3` fungal saturation
+  density together with the deep-soil qualification tracked by
+  [issue #18](https://github.com/isaachcamp/mycormarl/issues/18). Preserve the
+  existing generated artifacts until that reproducible comparison is run.
+
+## Carbon accounting and light
+
+- Add growth respiration or construction efficiency as a future parameter
+  separate from standing-biomass maintenance `kappa_c`. Until then, growth
+  consumes only structural carbon through `gamma_c` and therefore implies
+  100% conversion of allocated substrate C into structural C.
+- When adding a diurnal cycle, retain `amass` as an apparent-gross carbon
+  budget for one stated reference day and multiply it by a dimensionless
+  `f_light(t)`. Normalise the profile so its one-day integral is one day when
+  preserving the calibrated daily budget; `f_light = 1` is the current
+  uniform-in-time special case.
 
 ## Uptake regimes and time
 

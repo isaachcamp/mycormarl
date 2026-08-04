@@ -145,8 +145,8 @@ mortality and reproduction are explicit exports from the represented system.
 | Source | Relevant contribution | Relationship to this implementation |
 |---|---|---|
 | [Schnepf & Roose (2006)](https://doi.org/10.1111/j.1469-8137.2006.01771.x) | Couples root/fungal geometry with phosphate transport and uptake; analyses overlapping hyphal depletion zones. | Direct methodological precedent for the model’s coupled geometry–uptake structure, but the code uses a finite-volume axisymmetric grid and a smooth sparse/continuous closure. |
-| [Jakobsen et al. (1992)](https://doi.org/10.1111/j.1469-8137.1992.tb01077.x) | Measures external AM hyphal spread and P inflow into roots. | Empirical motivation for treating external hyphae as a spatially extended P-acquisition pathway; not a direct parameter calibration here. |
-| [Oyarte Galvez et al. (2025)](https://doi.org/10.1038/s41586-025-08614-x) | Describes extraradical mycelial growth dynamics. | Supplies provisional fungal biomass/geometry parameters; its reported planar saturation density is transformed into the provisional 3-D fungal density used here. |
+| [Jakobsen et al. (1992)](https://doi.org/10.1111/j.1469-8137.1992.tb01077.x) | Measures external AM hyphal spread, density profiles, and P inflow into roots. | Supplies the `2,000 cm cm⁻³` estimated local saturation-density default from the lower end of observed upper profiles; it is not treated as a universal AMF constant. |
+| [Oyarte Galvez et al. (2025)](https://doi.org/10.1038/s41586-025-08614-x) | Describes extraradical mycelial growth dynamics. | Supports the provisional fungal growth and hemispherical-geometry relationship, but no longer supplies the saturation-density default. |
 | [Schnepf et al. (2008)](https://www.jstor.org/stable/24124123) | Describes coupled spatial growth and plant–fungal resource exchange |
 | [Bisot et al. (2026)](https://doi.org/10.1073/pnas.2512182123) | Describes coupled spatial growth and plant–fungal resource exchange. | Modern conceptual support for spatially coupled trade and growth; the current model simplifies colony development to a saturated hemisphere. |
 
@@ -166,8 +166,12 @@ mortality and reproduction are explicit exports from the represented system.
   represented.
 - **Limitation:** Mortality P leaves the system and reproduction P is exported;
   there is no litter, mineralisation, or recycling pool.
-- **Limitation:** Paid maintenance P is represented as an external
-  maintenance/turnover loss rather than a recyclable biological or soil pool.
+- **Limitation:** Plant and fungal `kappa_p` are represented as irreversible
+  free-P losses rather than recyclable biological or soil pools. The plant
+  value is a deliberately small abstraction for herbivory, leakage, and
+  unrecovered turnover; experiments record minimal irrecoverable loss in
+  carrot and do not directly estimate this coefficient. Structural P is
+  represented separately by `gamma_p`.
 - **Interpretation:** The shared grid is a coupling abstraction, not a claim
   that root and fungal architectures are physically continuous at all scales.
 

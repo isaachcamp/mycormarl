@@ -1,20 +1,20 @@
 # Plant and fungal growth model
 
-> **Scope:** This document covers resource-limited biomass growth, maintenance,
-> reproduction, mortality, and conversion of surviving biomass into root and
-> hyphal length-density fields. Soil-P diffusion and uptake are covered in the
+> **Scope:** This document covers resource-limited biomass growth, carbon
+> maintenance, irreversible free-P loss, reproduction, mortality, and
+> conversion of surviving biomass into root and hyphal length-density fields. Soil-P diffusion and uptake are covered in the
 > [phosphate model](phosphate-model.md); shared scheduling is covered in the
 > [model overview](model-overview.md).
 
 ## Executive summary
 
-Plant and fungus pay unavoidable maintenance from their start-of-step free C
-and P pools, then execute a Physical action
+Plant and fungus pay unavoidable carbon maintenance and irreversible free-P
+loss from their start-of-step pools, then execute a Physical action
 `[trade, growth, reproduction, reserve]`. Trade is independently bounded;
 growth, reproduction, and reserve form a simplex applied separately to
 remaining C and P. Growth treats C and P as essential resources: the scarcer
 resource after conversion by organism-specific stoichiometric costs limits new
-dry biomass. Maintenance shortfalls remove biomass, reproduction exports
+dry biomass. Payment shortfalls remove biomass, reproduction exports
 resources and generates reward, and death does not replenish C or P resources.
 
 Surviving plant biomass is mapped to a stack of depth-dependent root discs with
@@ -54,9 +54,31 @@ Start-pool timing and the biomass cap are protected by
 [`test_newly_fixed_carbon_is_not_available_for_same_step_growth`](../tests/test_base_mycor_refactor.py#L114-L128)
 and [`test_plant_growth_at_biomass_cap_charges_only_realised_structure`](../tests/test_base_mycor_refactor.py#L129-L155).
 
-## Maintenance, mortality, reproduction, and trade
+## Plant carbon input
 
-Maintenance demand is proportional to active biomass and timestep,
+The plant receives apparent-gross carbon according to
+
+$$
+\Delta C_{fix}=G_p k_{leaf} a_{mass}\Delta t,
+$$
+
+where $G_p$ is whole-plant dry biomass (g), $k_{leaf}$ is the leaf dry-mass
+fraction, $a_{mass}$ is g C g⁻¹ leaf dry mass for one reference day, and
+$\Delta t$ is days. The selected `amass = 0.05` is a daily carbon budget for
+the 16 h light regime used to parameterise it, not fixation under literal
+24 h illumination. The current implementation spreads this budget uniformly
+through numerical time.
+
+A future diurnal implementation can preserve the parameter and its units by
+multiplying by a dimensionless $f_{light}(t)$ whose one-day integral is one
+day. The present behaviour is $f_{light}=1$. The selected value is an
+acknowledged apparent-gross approximation: the source data do not isolate
+biochemical gross photosynthesis, and photorespiration remains embedded.
+
+## Carbon maintenance, irreversible P loss, mortality, reproduction, and trade
+
+Carbon-maintenance demand and irreversible free-P loss are proportional to
+active biomass and timestep,
 
 $$
 C_{o,m}^{*}=G_o\kappa_{C,o}\Delta t,\qquad
@@ -64,9 +86,11 @@ P_{o,m}^{*}=G_o\kappa_{P,o}\Delta t,
 $$
 
 with $\kappa_C$ in g C g⁻¹ day⁻¹, $\kappa_P$ in mg P g⁻¹ day⁻¹, and
-$\Delta t$ in days. Actual use is the lesser of the start-of-step free pool and
-required resource. A deficit is translated to lost biomass using the more severe
-stoichiometric deficit:
+$\Delta t$ in days. $\kappa_P$ has the same irreversible-loss interpretation
+for plant and fungus; it does not include P immobilised in structure, which is
+already represented by $\gamma_P$. Actual use is the lesser of the
+start-of-step free pool and required resource. A deficit is translated to lost
+biomass using the more severe stoichiometric deficit:
 
 $$
 \Delta G_{o,\mathrm{loss}}=
@@ -76,7 +100,7 @@ $$
 
 The shared automatic payment transaction is implemented in
 [`BaseMycorMarl._pay_maintenance`](../mycormarl/mycormarl/environments/base_mycor.py).
-Reserved resources remain untouched after maintenance, as tested by
+Reserved resources remain untouched after automatic payment, as tested by
 [`test_automatic_maintenance_does_not_spend_reserved_resources`](../tests/test_base_mycor_refactor.py).
 
 Reproduction removes allocated C and P and scores a Cobb–Douglas reward after
@@ -86,10 +110,10 @@ trade is unavailable for same-step growth. See
 [`step_env`](../mycormarl/mycormarl/environments/base_mycor.py#L281-L377) and
 [`test_incoming_trade_is_not_available_for_same_step_growth`](../tests/test_base_mycor_refactor.py#L209-L221).
 
-Structural P associated with biomass lost to maintenance shortfall is added to
+Structural P associated with biomass lost to a payment shortfall is added to
 cumulative mortality-loss diagnostics. It is not recycled to soil. Free P
-actually paid for maintenance is recorded separately in plant and fungal
-maintenance-loss counters; unmet demand is recorded only as a deficit.
+removed by $\kappa_P$ is recorded separately in the legacy-named plant and
+fungal maintenance-loss counters; unmet demand is recorded only as a deficit.
 
 ## Plant biomass to root geometry
 
@@ -178,13 +202,18 @@ justification.
 
 | Parameter | Default | Evidence and status |
 |---|---:|---|
+| Plant initial biomass and free pools | `0.001 g`; `0.000402 g C`; `0.00192 mg P` | A representative low-end one-milligram propagule, bounded by the `0.7–3.3 mg` *Daucus carota* population means reported by [Vandelook et al. (2024)](https://doi.org/10.1017/S0960258524000230). This is a literature-bounded model choice, not a directly reported species mean. Each free pool contains one structural-biomass equivalent: $G_0\gamma_C$ and $G_0\gamma_P$. |
+| Fungal initial biomass and free pools | `7.97e-7 g`; `3.985e-7 g C`; `1.594e-6 mg P` | One-spore mass proxy derived from the counted-and-dried five-species AMF regression $M_{\mu g}=0.4458\times10^{-5}d_{\mu m}^{2.5372}$ in [Sieverding et al. (1989)](https://doi.org/10.1016/0038-0717(89)90013-8), evaluated at the `117.5 µm` midpoint of the reported *R. irregularis* `70–165 µm` diameter range. This is a cross-species estimate, not a measured species mean. Each free pool contains one structural-biomass equivalent. |
 | Plant $\gamma_C$ | `0.402 g C g⁻¹` | Carrot-root elemental analysis from [Kaur et al. (2022)](https://doi.org/10.1038/s41598-022-20971-5); a root-dominated proxy, not whole-plant calibration. |
 | Plant $\gamma_P$ | `1.92 mg P g⁻¹` | Derived dry-mass-weighted carrot value from [Kováčik et al. (2022)](https://doi.org/10.3390/agronomy12112770), an MDPI *Agronomy* paper; independent validation remains required. |
 | $k_{root}$, $SRL$ | `0.62`, `25,434.3 cm g⁻¹` | Separate *Daucus carota* medians from the [GRooT database](https://doi.org/10.1111/geb.13179); not matched observations from one specimen. |
 | $\beta$, $D_{root}$ | `0.96`, `150 cm` | Provisional depth profile and near-infinite rooting horizon. A shallower simulated domain retains only $F(D_{soil})/F(D_{root})$ of total roots. |
 | Fungal $\gamma_C$, $M_C$ | `0.5`, `0.1155 g C cm⁻³` | Provisional values from [Bisot et al. (2026)](https://doi.org/10.1073/pnas.2512182123). |
-| Fungal $\gamma_P$ | `40 mg P g⁻¹` | Upper-bound 4% mass fraction reported by the Bisot et al. literature search; underlying evidence still needs validation. |
-| $\lambda_{sat}$ | `168.75 cm cm⁻³` | Converted from the 2-D density reported by [Oyarte Galvez et al. (2025)](https://doi.org/10.1038/s41586-025-08614-x) using the stipulated $\rho_{3D}=3\rho_{2D}^2/4$; not a direct 3-D soil measurement. |
+| Fungal $\gamma_P$ | `2 mg P g⁻¹` | Approximate ordinary P concentration measured inside *Glomus intraradices* spores, a lineage now assigned to *Rhizophagus irregularis*, by [Olsson et al. (2008)](https://doi.org/10.1128/AEM.00376-08). This is a spore measurement used as fixed structural stoichiometry, not a maintenance measurement. |
+| Plant $a_{mass}$ | `0.05 g C g⁻¹ leaf DM d⁻¹` | Apparent-gross reference-day carbon input derived from carrot light-response curves at 450 µmol photons m⁻² s⁻¹ over a 16 h photoperiod, converted with carrot SLA. It is spread uniformly through time by the current implementation; see the [research review](research/default-biomass-stoichiometry-and-photosynthesis-parameters.md). |
+| Plant $\kappa_C$ | `0.007 g C g⁻¹ whole-plant DM d⁻¹` | Full standing-biomass maintenance, rounded from the `0.00694` whole-carrot conversion of shoot and root coefficients fitted by [Reid (2019)](https://doi.org/10.1080/01140671.2019.1588134). Growth/construction efficiency remains separate and unmodelled. |
+| Plant and fungal $\kappa_P$ | `0.001`, `0.003 mg P g⁻¹ d⁻¹` | Interpreted for both organisms as irreversible free-P losses, not physiological maintenance or structural immobilisation. The plant value is an explicit small model abstraction for herbivory, leakage, and unrecovered turnover; carrot studies record minimal irrecoverable loss and do not directly estimate this coefficient. The fungal value is an explicit minimal-loss assumption equivalent to approximately 1% non-recycling under a 5–7 d fine-hyphal turnover envelope. Structural P is represented only by $\gamma_P$. |
+| $\lambda_{sat}$ | `2,000 cm cm⁻³` | Lower end of the approximately `2,000–2,500 cm cm⁻³` upper external-hypha profiles observed by [Jakobsen et al. (1992)](https://doi.org/10.1111/j.1469-8137.1992.tb01077.x). It is an estimated local saturation density, not a universal AMF constant. |
 | $\lambda_{root}$, $\beta$ | `1 cm cm⁻³`, `0.96` | Provisional inherited geometry choices without empirical calibration. |
 
 Runtime defaults and units are defined in
@@ -202,6 +231,10 @@ construction-time validation immediately below those definitions.
   marginal conversion from whole-plant biomass; allometry is constant.
 - **Assumption:** Fungal biomass is treated as external cylindrical hyphae for
   geometry; spores and intraradical biomass are omitted.
+- **Initial-condition assumption:** The symbiosis is pre-established. Initial
+  fungal biomass may use one spore's dry mass as a magnitude proxy, but all of
+  that mass is immediately mapped to living, external, absorptive hyphae; the
+  model does not simulate dormancy or germination.
 - **Assumption:** Mycelial density remains constant independent of soil
   P concentration.
 - **Limitation:** Plant root fraction covers fine- and taproots yet the length
@@ -211,13 +244,20 @@ construction-time validation immediately below those definitions.
   networks, and their saturation/density parameters require calibration.
 - **Limitation:** No maximum tissue age, turnover, dormancy, remobilisation, or
   age-dependent uptake activity is represented.
-- **Accounting limitation:** Maintenance P has no destination, while mortality
-  P and reproduction P are explicit exports.
+- **Accounting limitation:** Paid irreversible-loss P has no represented
+  destination, while mortality P and reproduction P are explicit exports.
+- **Qualification gap:** The `2,000 cm cm⁻³` fungal-density default changes
+  colony extent and the sparse/continuous uptake blend. The numerical
+  qualification artifacts predate this change and will be regenerated with
+  the deep-soil rerun tracked by
+  [issue #18](https://github.com/isaachcamp/mycormarl/issues/18).
 
 ## References
 
 1. Bisot, C. et al. “Carbon-phosphorus exchange rate constrains density-speed trade-off in arbuscular mycorrhizal fungal growth.” *PNAS* 123 (2026). [DOI](https://doi.org/10.1073/pnas.2512182123).
 2. Oyarte Galvez, L. et al. “A travelling-wave strategy for plant–fungal trade.” *Nature* 639 (2025). [DOI](https://doi.org/10.1038/s41586-025-08614-x).
-3. Guerrero-Ramírez, N. R. et al. “Global root traits (GRooT) database.” *Global Ecology and Biogeography* 30 (2021). [DOI](https://doi.org/10.1111/geb.13179).
-4. Kaur, P. et al. “Green extraction of bioactive components from carrot industry waste and evaluation of spent residue as an energy source.” *Scientific Reports* (2022). [DOI](https://doi.org/10.1038/s41598-022-20971-5).
-5. Kováčik, P. et al. “The Effect of Vermicompost and Earthworms (*Eisenia fetida*) Application on Phytomass and Macroelement Concentration and Tetanic Ratio in Carrot.” *Agronomy* 12 (2022). [DOI](https://doi.org/10.3390/agronomy12112770).
+3. Jakobsen, I., Abbott, L. K. & Robson, A. D. “External hyphae of vesicular-arbuscular mycorrhizal fungi associated with *Trifolium subterraneum* L. 1. Spread of hyphae and phosphorus inflow into roots.” *New Phytologist* 120 (1992). [DOI](https://doi.org/10.1111/j.1469-8137.1992.tb01077.x).
+4. Olsson, P. A. et al. “Elemental composition in vesicles of an arbuscular mycorrhizal fungus, as revealed by PIXE analysis.” *Applied and Environmental Microbiology* 74 (2008). [DOI](https://doi.org/10.1128/AEM.00376-08).
+5. Guerrero-Ramírez, N. R. et al. “Global root traits (GRooT) database.” *Global Ecology and Biogeography* 30 (2021). [DOI](https://doi.org/10.1111/geb.13179).
+6. Kaur, P. et al. “Green extraction of bioactive components from carrot industry waste and evaluation of spent residue as an energy source.” *Scientific Reports* (2022). [DOI](https://doi.org/10.1038/s41598-022-20971-5).
+7. Kováčik, P. et al. “The Effect of Vermicompost and Earthworms (*Eisenia fetida*) Application on Phytomass and Macroelement Concentration and Tetanic Ratio in Carrot.” *Agronomy* 12 (2022). [DOI](https://doi.org/10.3390/agronomy12112770).

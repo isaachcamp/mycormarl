@@ -11,15 +11,24 @@ class PlantTraits:
     ``gamma_p`` is mg P per g dry biomass, root radius is in cm, and specific
     root length is cm root per g root dry mass. ``root_length_density`` is the
     uniform within-disc ``lambda_root`` in cm root per cm³ bulk soil.
-    ``jmax`` is µmol P cm^-2 s^-1 and ``km`` is µmol P cm^-3.
+    ``amass`` is apparent-gross g C fixed per g leaf dry biomass for one
+    reference day, spread uniformly through time by the current model.
+    ``kappa_c`` is g C maintenance per g whole-plant dry biomass per day.
+    ``kappa_p`` is a lumped irreversible free-P loss in mg P per g
+    whole-plant dry biomass per day; it abstracts small losses such as
+    herbivory and unrecovered turnover rather than measured P maintenance.
+    Structural P is represented only by ``gamma_p``. ``jmax`` is µmol P
+    cm^-2 s^-1 and ``km`` is µmol P cm^-3. Initial free C and P pools each
+    contain one structural-biomass equivalent at the configured initial
+    biomass.
     """
 
-    initial_biomass: float = 1.0
-    initial_c_pool: float = 0.5
-    initial_p_pool: float = 0.05
+    initial_biomass: float = 0.001
+    initial_c_pool: float = 0.000402
+    initial_p_pool: float = 0.00192
     kleaf: float = 0.30  # biomass fraction dedicated to photosynthesis
     kroot: float = 0.62  # dry-biomass fraction assigned to roots
-    amass: float = 1.0  # photosynthetic rate per unit leaf dry mass
+    amass: float = 0.05
     jmax: float = 3.26e-6  # µmol P cm^-2 s^-1
     km: float = 5.8e-3  # µmol P cm^-3
     root_radius: float = 0.01
@@ -29,8 +38,8 @@ class PlantTraits:
     max_rooting_depth_cm: float = 150.0
     gamma_c: float = 0.402
     gamma_p: float = 1.92
-    kappa_c: float = 0.02
-    kappa_p: float = 0.002
+    kappa_c: float = 0.007
+    kappa_p: float = 0.001
     death_fraction: float = 0.20
     biomass_cap: float = 100.0
 

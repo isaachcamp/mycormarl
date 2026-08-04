@@ -21,12 +21,13 @@ call every trajectory a closed, whole-system phosphorus balance**.
 | Growth | Free P becomes structural P represented by biomass × \(\gamma_P\) | Conservative if inferred structural P is included |
 | Reproduction | P leaves the living pools | Accounted as cumulative export |
 | Mortality | Structural P leaves with lost biomass | Accounted as cumulative loss |
-| Maintenance | Free P is spent, but has no explicit receiving pool or loss counter | **Accounting gap** |
+| Irreversible free-P loss (`kappa_p`) | Free P is removed and recorded in a cumulative external-loss counter | Accounted export with no represented receiving pool |
 
 The P-accounting stringency therefore serves a broader purpose than checking
-diffusion. It tests whether every modeled P transfer has an equal destination or
-an explicit export. At present, the extended whole-system claim is deliberately
-restricted to trajectories with maintenance P use disabled.
+diffusion. It tests whether every modeled P transfer has an equal destination
+or an explicit export. The `kappa_p` counters close the diagnostic ledger as
+explicit exports, while deliberately leaving their environmental destination
+unrepresented.
 
 ## Where conservation sits in the pipeline
 
@@ -184,29 +185,30 @@ Fungal-to-plant P trade is internal: the same `fungus_p_trade_out` is added to
 the plant pool and subtracted from the fungal pool
 ([`base_mycor.py`, lines 287–295](../mycormarl/mycormarl/environments/base_mycor.py#L287-L295);
 [`base_mycor.py`, lines 349–357](../mycormarl/mycormarl/environments/base_mycor.py#L349-L357)).
-Reproduction, mortality, and paid maintenance P are not treated as disappearing
+Reproduction, mortality, and irreversible free-P losses are not treated as disappearing
 silently; cumulative counters retain their amounts in the ledger
 ([`base_mycor.py`, lines 358–373](../mycormarl/mycormarl/environments/base_mycor.py#L358-L373)).
 
 The extended-balance qualification test verifies closure to relative tolerance
 \(10^{-5}\)
 ([`test_phosphate_qualification.py`, lines 263–279](../tests/test_phosphate_qualification.py#L263-L279)).
-Its fixture sets both maintenance coefficients to zero
+Its fixture sets both loss coefficients to zero
 ([`phosphate_qualification.py`, lines 43–61](../scripts/phosphate_qualification.py#L43-L61);
 [`phosphate_qualification.py`, lines 275–279](../scripts/phosphate_qualification.py#L275-L279)).
-This isolates growth and uptake sensitivity; maintenance-active closure is
+This isolates growth and uptake sensitivity; loss-active closure is
 covered separately by focused environment tests.
 
-## 5. How paid maintenance P closes the extended ledger
+## 5. How irreversible free-P loss closes the extended ledger
 
 For both organisms, `maint_p_used` is deducted automatically from the
 start-of-step free pool
 ([`base_mycor.py`, lines 519–545](../mycormarl/mycormarl/environments/base_mycor.py#L519-L545);
 [`base_mycor.py`, lines 617–643](../mycormarl/mycormarl/environments/base_mycor.py#L617-L643)).
-The amount actually paid is accumulated in the species-specific
+The amount actually removed is accumulated in the species-specific,
+legacy-named
 `cumulative_*_p_maintenance_loss_mg` counter. Unmet demand is not added to this
-counter; it drives deterministic biomass loss instead. Treating paid P as an
-external maintenance/turnover loss closes the extended diagnostic ledger
+counter; it drives deterministic biomass loss instead. Treating this P as an
+external irreversible loss closes the extended diagnostic ledger
 without claiming recycling into a biological or soil compartment.
 
 ## Relationship to the literature
@@ -241,8 +243,10 @@ without claiming recycling into a biological or soil compartment.
   inventory using solution concentration as the driving potential.
 - Numerical conservation is subject to floating-point round-off and the stated
   test tolerances.
-- Paid maintenance P is treated as an external loss rather than recycled into
+- `kappa_p` loss is treated as an external loss rather than recycled into
   soil or another biological compartment.
+- Plant and fungal structural P is represented separately by fixed
+  $\gamma_P$; structurally immobilised P is not charged through `kappa_p`.
 
 ## Practical interpretation
 
@@ -251,4 +255,4 @@ closed-domain redistribution without creation or destruction. If it appears
 beside competing uptake, read it as exact allocation of a finite cell inventory.
 For a whole simulation, use the extended ledger and state its boundary and
 export conventions explicitly. Under the current code, add the qualification
-that maintenance P has an unresolved fate.
+that irreversible free-P loss has an unresolved environmental destination.

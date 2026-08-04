@@ -306,9 +306,10 @@ Refinement is not the only requirement. Every scenario also reports or tests:
 
 The executable contracts are in
 [`tests/test_phosphate_qualification.py`, lines 61–280](../tests/test_phosphate_qualification.py#L61-L280).
-The present coupled balance fixture sets maintenance demand to zero so the
-timestep comparison isolates growth and uptake. Paid maintenance P now has
-explicit plant and fungal loss counters and is included in the extended ledger.
+The present coupled balance fixture sets carbon maintenance and irreversible
+free-P loss to zero so the timestep comparison isolates growth and uptake.
+Paid irreversible-loss P has explicit plant and fungal counters and is included
+in the extended ledger.
 
 ## Performance qualification
 
