@@ -15,9 +15,6 @@ def photosynthesise(state: State, traits: PlantTraits, config: EnvConfig) -> che
 
     return _photosynthesise_simple(state.plant_biomass, traits.kleaf, traits.amass, config.dt)
 
-def plant_maintenance_demand(biomass: chex.Array, kappa_c: float, kappa_p: float, dt: float) -> tuple[chex.Array, chex.Array]:
-    return kappa_c * biomass * dt, kappa_p * biomass * dt
-
 
 if __name__ == "__main__":
     pass
