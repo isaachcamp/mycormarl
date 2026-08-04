@@ -284,7 +284,13 @@ def unbatchify(
     return {a: x[i] for i, a in enumerate(agent_list)}
 
 def make_train(env, config):
-    """Factory function to create training function for PPO."""
+    """Build a JIT-compatible independent-PPO trainer for the fixed agent API.
+
+    Each policy consumes its own bounded observation and learns only from the
+    validity, bootstrap, and trace controls derived from typed Transitions.
+    The returned training output contains both policy states, trajectories,
+    losses, advantages, targets, and returns for smoke validation.
+    """
 
     gamma = discount_from_half_life(
         env.config.dt, config.DISCOUNT_HALF_LIFE_DAYS

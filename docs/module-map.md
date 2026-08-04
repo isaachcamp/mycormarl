@@ -37,6 +37,7 @@ configuration and organism traits
 | `growth.py`, `maintenance.py` | Shared realised-growth and maintenance calculations. | Plant and fungal environment steps. |
 | `observations.py` | Finite bounded transforms for the stable five-feature actor observations. | Environment observation construction. |
 | `algos/ppo.py` | Two-policy PPO integration using the `plant` and `fungus` interfaces. | Training launcher and experiments. |
+| `policy_artifacts.py` | Versioned persistence and compatibility checks for the current actor and environment-state contracts. | Training launcher and policy consumers. |
 
 ## Executable and evidence modules
 
@@ -45,7 +46,8 @@ configuration and organism traits
 | `scripts/phosphate_examples.py` | Runs small deterministic plant-only, fungus-only, or mixed uptake examples. |
 | `scripts/phosphate_qualification.py` | Regenerates the convergence, conservation, sensitivity, and performance evidence. |
 | `scripts/geometry_growth_video.py` | Visualises the production root and fungal geometry mappings. |
-| `scripts/train_ppo.py` | Runs a small explicit PPO development job. |
+| `scripts/train_ppo.py` | Runs a reproducible JIT PPO development job in mixed or single-consumer mode and saves a versioned policy bundle. |
+| `tests/test_policy_artifacts.py` | Protects saved-policy compatibility and the public training CLI. |
 | `tests/test_phosphate_*.py` | Protects units, state, diffusion, uptake, competition, and qualification contracts. |
 | `tests/test_environment_phosphate_uptake.py` | Protects soil-to-organism pool credit, competition, loss accounting, and environment integration. |
 | `tests/test_growth_geometry.py` | Protects biomass-to-length and spatial conservation rules. |
