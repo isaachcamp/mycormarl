@@ -1,5 +1,5 @@
 from .traits import PlantTraits, validate_plant_growth_geometry_traits
-from .physiology import photosynthesise, plant_maintenance_demand
+from .photosynthesis import photosynthesise
 from .roots import (
     axisymmetric_disc_overlap_fractions,
     axisymmetric_stacked_disc_root_density,
