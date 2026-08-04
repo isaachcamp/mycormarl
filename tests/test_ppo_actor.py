@@ -138,6 +138,7 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
         NUM_MINIBATCHES=1,
         UPDATE_EPOCHS=1,
         LR=0.0,
+        DISCOUNT_HALF_LIFE_DAYS=30.0,
     )
 
     output = jax.jit(make_train(environment, config))(jax.random.PRNGKey(4))
@@ -149,6 +150,10 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
         assert trajectory.latent_trade_action.shape == (1, 2, 2)
         assert trajectory.latent_allocation_action.shape == (1, 2, 2, 2)
         assert trajectory.physical_action.shape == (1, 2, 2, 4)
+        assert trajectory.critic_valid.shape == (1, 2, 2)
+        assert trajectory.allocation_actor_valid.shape == (1, 2, 2)
+        assert trajectory.trade_actor_valid.shape == (1, 2, 2)
+        assert trajectory.bootstrap_observation.shape == (1, 2, 2, 5)
         for values in (
             trajectory.latent_trade_action,
             trajectory.latent_allocation_action,
@@ -192,9 +197,30 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
             atol=1e-6,
         )
 
+        advantages = output["advantages"][agent]
+        targets = output["targets"][agent]
+        returns = output["returns"][agent]
+        metrics = output["metrics"][agent]
+        assert advantages.shape == (1, 2, 2)
+        assert targets.shape == (1, 2, 2)
+        assert returns.shape == (1, 2, 2)
+        assert jnp.all(jnp.isfinite(trajectory.reward))
+        assert jnp.all(jnp.isfinite(advantages))
+        assert jnp.all(jnp.isfinite(targets))
+        assert jnp.all(jnp.isfinite(returns))
+        assert jnp.array_equal(returns, targets)
+        assert jnp.all(jnp.isfinite(metrics.total_loss))
+        assert jnp.all(jnp.isfinite(metrics.value_loss))
+        assert jnp.all(jnp.isfinite(metrics.actor_loss))
+
     plant_leaves = jax.tree.leaves(train_states[PLANT].params)
     fungus_leaves = jax.tree.leaves(train_states[FUNGUS].params)
     assert any(
         not jnp.array_equal(plant, fungus)
         for plant, fungus in zip(plant_leaves, fungus_leaves, strict=True)
+    )
+    assert all(
+        jnp.all(jnp.isfinite(leaf))
+        for state in train_states.values()
+        for leaf in jax.tree.leaves(state.params)
     )

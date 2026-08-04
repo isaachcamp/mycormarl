@@ -131,7 +131,7 @@ def test_ppo_stack_accepts_current_agent_identifiers():
         UPDATE_EPOCHS=1,
         LR=2.5e-4,
         ACTIVATION="tanh",
-        GAMMA=0.995,
+        DISCOUNT_HALF_LIFE_DAYS=3.457_795,
         GAE_LAMBDA=0.95,
         CLIP_EPS=0.2,
         VF_COEF=0.5,
