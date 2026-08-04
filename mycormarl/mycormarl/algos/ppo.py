@@ -228,7 +228,6 @@ class ActorCritic(nn.Module):
 class Trajectory(NamedTuple):
     """PPO rollout fields for one policy, distinct from environment transitions."""
 
-    done: jnp.ndarray
     latent_trade_action: jnp.ndarray
     latent_allocation_action: jnp.ndarray
     physical_action: jnp.ndarray
@@ -238,7 +237,6 @@ class Trajectory(NamedTuple):
     allocation_log_probability: jnp.ndarray
     obs: jnp.ndarray
     info: dict
-    terminal: jnp.ndarray
     critic_valid: jnp.ndarray
     allocation_actor_valid: jnp.ndarray
     trade_actor_valid: jnp.ndarray
@@ -475,7 +473,7 @@ def make_train(env, config):
 
                 rng, _rng = jax.random.split(rng)
                 rng_step = jax.random.split(_rng, config.NUM_ENVS)
-                obs, env_state, reward, done, info = jax.vmap(env.step, in_axes=(0,0,0))(
+                obs, env_state, reward, _, info = jax.vmap(env.step, in_axes=(0,0,0))(
                     rng_step, env_state, env_act
                 )
                 plant_fields = transition_to_ppo_fields(
@@ -487,7 +485,6 @@ def make_train(env, config):
 
                 # Collect Trajectory object
                 plant_trajectory = Trajectory(
-                    done=done[PLANT].squeeze(),
                     latent_trade_action=plant_latent_trade,
                     latent_allocation_action=plant_latent_allocation,
                     physical_action=plant_physical_action,
@@ -497,7 +494,6 @@ def make_train(env, config):
                     allocation_log_probability=plant_allocation_log_probability,
                     obs=plant_obs_batch,
                     info=info[PLANT],
-                    terminal=done["__all__"].squeeze(),
                     critic_valid=plant_fields.critic_valid,
                     allocation_actor_valid=plant_fields.allocation_actor_valid,
                     trade_actor_valid=plant_fields.trade_actor_valid,
@@ -508,7 +504,6 @@ def make_train(env, config):
                     bootstrap_observation=plant_fields.bootstrap_observation,
                 )
                 fungus_trajectory = Trajectory(
-                    done=done[FUNGUS].squeeze(),
                     latent_trade_action=fungus_latent_trade,
                     latent_allocation_action=fungus_latent_allocation,
                     physical_action=fungus_physical_action,
@@ -518,7 +513,6 @@ def make_train(env, config):
                     allocation_log_probability=fungus_allocation_log_probability,
                     obs=fungus_obs_batch,
                     info=info[FUNGUS],
-                    terminal=done["__all__"].squeeze(),
                     critic_valid=fungus_fields.critic_valid,
                     allocation_actor_valid=fungus_fields.allocation_actor_valid,
                     trade_actor_valid=fungus_fields.trade_actor_valid,

@@ -12,6 +12,7 @@ from mycormarl.algos.ppo import (
     masked_mean,
     masked_normalize,
     PPOConfig,
+    Trajectory,
     transition_to_ppo_fields,
 )
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
@@ -19,6 +20,14 @@ from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
 from mycormarl.transition import Transition
+
+
+def test_trajectory_uses_explicit_ppo_boundary_controls_only():
+    """Legacy done fields cannot compete with PPO bootstrap and trace masks."""
+    assert "done" not in Trajectory._fields
+    assert "terminal" not in Trajectory._fields
+    assert "bootstrap_valid" in Trajectory._fields
+    assert "gae_trace_continues" in Trajectory._fields
 
 
 def _transition(
