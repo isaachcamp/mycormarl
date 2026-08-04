@@ -407,6 +407,9 @@ class BaseMycorMarl(MultiAgentEnv):
         plant_step = self.step_plant(key, allocation_state, actions[PLANT])
         fungus_step = self.step_fungus(key, allocation_state, actions[FUNGUS])
 
+        # Update biomass and historical max. after growth.
+        # Biomass cap sort of performed twice, since growth is limited in
+        # _apply_allocation.
         plant_biomass = jnp.minimum(
             plant_biomass_after_maintenance + plant_step["growth"],
             self.species.plant.biomass_cap,
@@ -430,6 +433,7 @@ class BaseMycorMarl(MultiAgentEnv):
             fungus_last_c_received=jnp.where(
                 fungus_operational_at_end, plant_c_trade_out, 0.0
             ),
+            # P accounting vars.
             cumulative_plant_p_mortality_loss_mg=(
                 state.cumulative_plant_p_mortality_loss_mg
                 + plant_maintenance["mortality_biomass"]

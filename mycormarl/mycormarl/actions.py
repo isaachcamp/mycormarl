@@ -11,8 +11,11 @@ def physical_action(
 ) -> chex.Array:
     """Construct ``[trade, growth, reproduction, reserve]``.
 
-    Trade is bounded independently; the remaining components are interpreted
-    as non-negative biological weights and normalised onto their simplex.
+    Trade is bounded independently between [0, 1]; the remaining components
+    are interpreted as non-negative biological weights and normalised onto
+    their simplex.
+    If simplex fractions are undefined (all zero), they are replaced with
+    uniform fractions.
     """
     trade_fraction = jnp.asarray(trade, dtype=jnp.float32)
     trade_fraction = jnp.where(jnp.isfinite(trade_fraction), trade_fraction, 0.0)
