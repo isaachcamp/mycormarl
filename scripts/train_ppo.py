@@ -6,7 +6,6 @@ import argparse
 import json
 from pathlib import Path
 
-from flax import serialization
 import jax
 
 from mycormarl.algos.ppo import PPOConfig, make_train
@@ -14,6 +13,7 @@ from mycormarl.environments.base_mycor import BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
+from mycormarl.policy_artifacts import save_policy_artifact
 
 
 def main() -> None:
@@ -23,6 +23,12 @@ def main() -> None:
     parser.add_argument("--num-steps", type=int, default=128)
     parser.add_argument("--num-envs", type=int, default=1)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--mode",
+        choices=("mixed", "plant-only", "fungus-only"),
+        default="mixed",
+        help="Consumer configuration; the fixed plant/fungus API is retained.",
+    )
     parser.add_argument(
         "--output", type=Path, default=Path("outputs/ppo_parameters.msgpack")
     )
@@ -35,6 +41,7 @@ def main() -> None:
         radial_interval_cm=0.1,
         depth_interval_cm=0.1,
         topsoil_depth_cm=1.0,
+        consumer_mode=args.mode,
     )
     species = SpeciesParams(plant=PlantTraits(), fungus=FungusTraits())
     env = BaseMycorMarl(config, species)
@@ -48,10 +55,10 @@ def main() -> None:
     output = jax.jit(make_train(env, ppo))(jax.random.PRNGKey(args.seed))
     train_state = output["runner_state"][0]
     parameters = {name: state.params for name, state in train_state.items()}
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_bytes(serialization.to_bytes(parameters))
+    save_policy_artifact(args.output, parameters, consumer_mode=args.mode)
     print(json.dumps({
         "agents": list(env.agents),
+        "consumer_mode": args.mode,
         "output": str(args.output),
         "seed": args.seed,
         "total_timesteps": args.total_timesteps,
