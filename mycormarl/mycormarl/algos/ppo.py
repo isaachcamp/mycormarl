@@ -1,5 +1,6 @@
 
 from dataclasses import dataclass
+import math
 from typing import Dict, List, NamedTuple, Tuple
 
 import jax
@@ -10,6 +11,7 @@ from flax.training.train_state import TrainState
 import optax
 
 from mycormarl.environments.base_mycor import FUNGUS, PLANT
+from mycormarl.transition import Transition
 
 
 class PolicyParameters(NamedTuple):
@@ -19,6 +21,110 @@ class PolicyParameters(NamedTuple):
     trade_log_std: jax.Array
     allocation_loc: jax.Array
     allocation_log_std: jax.Array
+
+
+class PPOStepFields(NamedTuple):
+    """Learning controls derived from one environment transition."""
+
+    critic_valid: jax.Array
+    allocation_actor_valid: jax.Array
+    trade_actor_valid: jax.Array
+    terminated: jax.Array
+    truncated: jax.Array
+    bootstrap_valid: jax.Array
+    gae_trace_continues: jax.Array
+    bootstrap_observation: jax.Array
+
+
+def transition_to_ppo_fields(transition: Transition) -> PPOStepFields:
+    """Convert algorithm-independent lifecycle facts into PPO controls."""
+    critic_valid = transition.operational_at_start
+    terminated = transition.operational_at_start & ~transition.operational_at_end
+    return PPOStepFields(
+        critic_valid=critic_valid,
+        allocation_actor_valid=transition.allocation_executed,
+        trade_actor_valid=transition.trade_executed,
+        terminated=terminated,
+        truncated=transition.truncated,
+        bootstrap_valid=transition.operational_at_end,
+        gae_trace_continues=(
+            critic_valid & ~terminated & ~transition.truncated
+        ),
+        bootstrap_observation=transition.final_observation,
+    )
+
+
+def discount_from_half_life(
+    dt_days: float,
+    half_life_days: float | None,
+) -> float:
+    """Convert a physical reward half-life to one environment-step discount."""
+    dt_days = float(dt_days)
+    if not math.isfinite(dt_days) or dt_days <= 0.0:
+        raise ValueError("dt_days must be positive")
+    if half_life_days is None:
+        return 1.0
+    half_life_days = float(half_life_days)
+    if half_life_days == math.inf:
+        return 1.0
+    if not math.isfinite(half_life_days) or half_life_days <= 0.0:
+        raise ValueError("half_life_days must be positive, infinite, or None")
+    return math.exp(-math.log(2.0) * dt_days / half_life_days)
+
+
+def calculate_gae(
+    *,
+    rewards: jax.Array,
+    values: jax.Array,
+    bootstrap_values: jax.Array,
+    critic_valid: jax.Array,
+    bootstrap_valid: jax.Array,
+    gae_trace_continues: jax.Array,
+    gamma: float,
+    gae_lambda: float,
+) -> tuple[jax.Array, jax.Array]:
+    """Calculate masked GAE from explicit bootstrap and trace controls."""
+
+    def _step(next_advantage, step):
+        reward, value, bootstrap_value, valid, bootstrap, trace = step
+        delta = reward + gamma * bootstrap * bootstrap_value - value
+        advantage = valid * (
+            delta + gamma * gae_lambda * trace * next_advantage
+        )
+        return advantage, advantage
+
+    initial_advantage = jnp.zeros_like(values[-1])
+    _, advantages = jax.lax.scan(
+        _step,
+        initial_advantage,
+        (
+            rewards,
+            values,
+            bootstrap_values,
+            critic_valid,
+            bootstrap_valid,
+            gae_trace_continues,
+        ),
+        reverse=True,
+    )
+    return advantages, advantages + values
+
+
+def masked_mean(values: jax.Array, mask: jax.Array) -> jax.Array:
+    """Return the mean over valid samples, or zero when none are valid."""
+    mask = jnp.asarray(mask, dtype=bool)
+    weights = mask.astype(values.dtype)
+    count = jnp.sum(weights)
+    return jnp.sum(jnp.where(mask, values, 0.0)) / jnp.maximum(count, 1.0)
+
+
+def masked_normalize(values: jax.Array, mask: jax.Array) -> jax.Array:
+    """Normalise valid values and return zero for every invalid sample."""
+    mask = jnp.asarray(mask, dtype=bool)
+    mean = masked_mean(values, mask)
+    variance = masked_mean(jnp.square(values - mean), mask)
+    normalized = (values - mean) / (jnp.sqrt(variance) + 1e-8)
+    return jnp.where(mask, normalized, 0.0)
 
 
 def normal_log_probability(
@@ -63,7 +169,7 @@ class PPOConfig:
     NUM_ACTORS: int = 2
     UPDATE_EPOCHS: int = 4
     NUM_MINIBATCHES: int = 4
-    GAMMA: float = 0.995
+    DISCOUNT_HALF_LIFE_DAYS: float | None = None
     GAE_LAMBDA: float = 0.95
     VF_COEF: float = 0.5
     CLIP_EPS: float = 0.2
@@ -133,6 +239,28 @@ class Trajectory(NamedTuple):
     obs: jnp.ndarray
     info: dict
     terminal: jnp.ndarray
+    critic_valid: jnp.ndarray
+    allocation_actor_valid: jnp.ndarray
+    trade_actor_valid: jnp.ndarray
+    terminated: jnp.ndarray
+    truncated: jnp.ndarray
+    bootstrap_valid: jnp.ndarray
+    gae_trace_continues: jnp.ndarray
+    bootstrap_observation: jnp.ndarray
+
+
+class PPOUpdateMetrics(NamedTuple):
+    """Per-species PPO losses and rollout-validity diagnostics."""
+
+    total_loss: jnp.ndarray
+    value_loss: jnp.ndarray
+    actor_loss: jnp.ndarray
+    critic_valid_count: jnp.ndarray
+    allocation_actor_valid_count: jnp.ndarray
+    trade_actor_valid_count: jnp.ndarray
+    critic_valid_fraction: jnp.ndarray
+    allocation_actor_valid_fraction: jnp.ndarray
+    trade_actor_valid_fraction: jnp.ndarray
 
 
 def batchify(
@@ -159,6 +287,26 @@ def unbatchify(
 
 def make_train(env, config):
     """Factory function to create training function for PPO."""
+
+    gamma = discount_from_half_life(
+        env.config.dt, config.DISCOUNT_HALF_LIFE_DAYS
+    )
+    if gamma == 1.0:
+        configured_consumers = []
+        if env.config.consumer_mode in ("mixed", "plant-only"):
+            configured_consumers.append((PLANT, env.species.plant))
+        if env.config.consumer_mode in ("mixed", "fungus-only"):
+            configured_consumers.append((FUNGUS, env.species.fungus))
+        for agent, traits in configured_consumers:
+            if (
+                traits.initial_biomass <= 0.0
+                or traits.kappa_p <= 0.0
+                or traits.death_fraction <= 0.0
+            ):
+                raise ValueError(
+                    "undiscounted PPO requires a guaranteed finite lifetime "
+                    f"for each configured consumer; {agent} does not satisfy it"
+                )
 
     if config.NUM_ACTORS != len(env.agents):
         raise ValueError("NUM_ACTORS must match the environment agent count")
@@ -330,6 +478,12 @@ def make_train(env, config):
                 obs, env_state, reward, done, info = jax.vmap(env.step, in_axes=(0,0,0))(
                     rng_step, env_state, env_act
                 )
+                plant_fields = transition_to_ppo_fields(
+                    info["transitions"][PLANT]
+                )
+                fungus_fields = transition_to_ppo_fields(
+                    info["transitions"][FUNGUS]
+                )
 
                 # Collect Trajectory object
                 plant_trajectory = Trajectory(
@@ -338,12 +492,20 @@ def make_train(env, config):
                     latent_allocation_action=plant_latent_allocation,
                     physical_action=plant_physical_action,
                     value=jnp.array(plant_value),
-                    reward=reward[PLANT].squeeze(),
+                    reward=reward[PLANT].reshape((config.NUM_ENVS,)),
                     trade_log_probability=plant_trade_log_probability,
                     allocation_log_probability=plant_allocation_log_probability,
                     obs=plant_obs_batch,
                     info=info[PLANT],
                     terminal=done["__all__"].squeeze(),
+                    critic_valid=plant_fields.critic_valid,
+                    allocation_actor_valid=plant_fields.allocation_actor_valid,
+                    trade_actor_valid=plant_fields.trade_actor_valid,
+                    terminated=plant_fields.terminated,
+                    truncated=plant_fields.truncated,
+                    bootstrap_valid=plant_fields.bootstrap_valid,
+                    gae_trace_continues=plant_fields.gae_trace_continues,
+                    bootstrap_observation=plant_fields.bootstrap_observation,
                 )
                 fungus_trajectory = Trajectory(
                     done=done[FUNGUS].squeeze(),
@@ -351,12 +513,20 @@ def make_train(env, config):
                     latent_allocation_action=fungus_latent_allocation,
                     physical_action=fungus_physical_action,
                     value=jnp.array(fungus_value),
-                    reward=reward[FUNGUS].squeeze(),
+                    reward=reward[FUNGUS].reshape((config.NUM_ENVS,)),
                     trade_log_probability=fungus_trade_log_probability,
                     allocation_log_probability=fungus_allocation_log_probability,
                     obs=fungus_obs_batch,
                     info=info[FUNGUS],
                     terminal=done["__all__"].squeeze(),
+                    critic_valid=fungus_fields.critic_valid,
+                    allocation_actor_valid=fungus_fields.allocation_actor_valid,
+                    trade_actor_valid=fungus_fields.trade_actor_valid,
+                    terminated=fungus_fields.terminated,
+                    truncated=fungus_fields.truncated,
+                    bootstrap_valid=fungus_fields.bootstrap_valid,
+                    gae_trace_continues=fungus_fields.gae_trace_continues,
+                    bootstrap_observation=fungus_fields.bootstrap_observation,
                 )
 
                 runner_state = (train_state, env_state, obs, rng)
@@ -368,88 +538,33 @@ def make_train(env, config):
                 _env_step, runner_state, None, config.NUM_STEPS
             )
 
-            # CALCULATE ADVANTAGE
-            # Get last observations and apply the policy networks to get the last values.
             train_state, env_state, last_obs, rng = runner_state
-            last_obs_batch = batchify(
-                last_obs, env.agents, config.NUM_ENVS, config.NUM_ACTORS
+            _, plant_bootstrap_values = plant_policy.apply(
+                train_state[PLANT].params, plant_traj.bootstrap_observation
             )
-            _, plant_last_val = plant_policy.apply(
-                train_state[PLANT].params, last_obs_batch[0]
+            _, fungus_bootstrap_values = fungus_policy.apply(
+                train_state[FUNGUS].params, fungus_traj.bootstrap_observation
             )
-            _, fungus_last_val = fungus_policy.apply(
-                train_state[FUNGUS].params, last_obs_batch[1]
+            plant_advantages, plant_targets = calculate_gae(
+                rewards=plant_traj.reward,
+                values=plant_traj.value,
+                bootstrap_values=plant_bootstrap_values,
+                critic_valid=plant_traj.critic_valid,
+                bootstrap_valid=plant_traj.bootstrap_valid,
+                gae_trace_continues=plant_traj.gae_trace_continues,
+                gamma=gamma,
+                gae_lambda=config.GAE_LAMBDA,
             )
-
-            def _calculate_gae(traj_batch, last_val):
-                """
-                Calculate advantages using Generalized Advantage Estimation (GAE),
-                scanning over trajectories. Advantages and targets are used to calculate 
-                the loss for the PPO update.
-
-                Returns
-                advantages - (NUM_STEPS, NUM_ENVS)
-                targets - (NUM_STEPS, NUM_ENVS); one-step TD estimates.
-                """
-                def _get_advantages(gae_and_next_value, transition):
-                    """
-                    Calculate the Generalized Advantage Estimate (GAE) for a single transition.
-                    The GAE is calculated using the Temporal Difference (TD) error and the next value estimate.
-                    Update the GAE using TD error advantage from the "next" step (actually previous value, but reversed)
-
-                    GAMMA - the discount factor.
-                    GAE_LAMBDA - the smoothing factor for GAE, varies the bias-variance trade-off.
-                        if GAE_LAMBDA = 0, this is equivalent to one-step TD learning (TD(0))
-                            - high bias due to uncertainty in value estimates.
-                        if GAE_LAMBDA = 1, this is equivalent to Monte Carlo returns (full trajectory)
-                            - high variance due to propagating errors.
-                    
-                    Args:
-                        gae_and_next_value: Tuple containing the current GAE and the next value estimate.
-                            - gae: The current GAE value.
-                            - next_value: The next value estimate for the transition.
-                        transition: Transition object containing:
-                            - done: Boolean indicating if the episode is done.
-                            - value: Value estimate for the current transition.
-                            - reward: Reward received for the current transition.
-
-                    Returns:
-                        gae_and_next_value: Tuple containing the current GAE and the next value estimate.
-                        gae: The calculated GAE for the current transition.
-                    """
-                    gae, next_value = gae_and_next_value # carry value for scan
-                    # Unpack Transition object
-                    done, value, reward = (
-                        transition.done,
-                        transition.value,
-                        transition.reward,
-                    )
-                    # Calculate Temporal Difference (TD) error
-                    delta = reward + config.GAMMA * next_value * (1 - done) - value
-                    # TD error + next value estimate
-                    gae = (
-                        delta
-                        + config.GAMMA * config.GAE_LAMBDA * (1 - done) * gae
-                    )
-                    return (gae, value), gae
-
-                # Scan backwards over trajectory.
-                _, advantages = jax.lax.scan(
-                    _get_advantages,
-                    (jnp.zeros_like(last_val), last_val),
-                    xs=traj_batch, # Provides reward, value, done each iteration.
-                    reverse=True, # Reverse scan
-                    unroll=16, # Limit unroll for computational efficiency
-                )
-                return advantages, advantages + traj_batch.value
-
-            # Calculate advantages and targets for plant and fungus trajectories.
-            # plant_traj and fungus_traj have array-like structures,
-            # with shape (NUM_STEPS, NUM_ENVS).
-            plant_advantages, plant_targets = _calculate_gae(
-                plant_traj, plant_last_val
+            fungus_advantages, fungus_targets = calculate_gae(
+                rewards=fungus_traj.reward,
+                values=fungus_traj.value,
+                bootstrap_values=fungus_bootstrap_values,
+                critic_valid=fungus_traj.critic_valid,
+                bootstrap_valid=fungus_traj.bootstrap_valid,
+                gae_trace_continues=fungus_traj.gae_trace_continues,
+                gamma=gamma,
+                gae_lambda=config.GAE_LAMBDA,
             )
-            fungus_advantages, fungus_targets = _calculate_gae(fungus_traj, fungus_last_val)
 
             # UPDATE NETWORK
             def _update_epoch(update_state, unused):
@@ -487,20 +602,29 @@ def make_train(env, config):
                         ).clip(-config.CLIP_EPS, config.CLIP_EPS)
                         value_losses = jnp.square(value - targets)
                         value_losses_clipped = jnp.square(value_pred_clipped - targets)
-                        value_loss = (
-                            0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
+                        value_loss = 0.5 * masked_mean(
+                            jnp.maximum(value_losses, value_losses_clipped),
+                            traj_batch.critic_valid,
                         )
 
                         # CALCULATE ACTOR LOSS
-                        log_probability = (
-                            trade_log_probability + allocation_log_probability
+                        log_probability = allocation_log_probability + jnp.where(
+                            traj_batch.trade_actor_valid,
+                            trade_log_probability,
+                            0.0,
                         )
                         old_log_probability = (
-                            traj_batch.trade_log_probability
-                            + traj_batch.allocation_log_probability
+                            traj_batch.allocation_log_probability
+                            + jnp.where(
+                                traj_batch.trade_actor_valid,
+                                traj_batch.trade_log_probability,
+                                0.0,
+                            )
                         )
                         ratio = jnp.exp(log_probability - old_log_probability)
-                        gae = (gae - gae.mean()) / (gae.std() + 1e-8)
+                        gae = masked_normalize(
+                            gae, traj_batch.allocation_actor_valid
+                        )
                         loss_actor1 = ratio * gae
                         loss_actor2 = (
                             jnp.clip(
@@ -510,15 +634,33 @@ def make_train(env, config):
                             )
                             * gae
                         )
-                        loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-                        loss_actor = loss_actor.mean()
+                        loss_actor = masked_mean(
+                            -jnp.minimum(loss_actor1, loss_actor2),
+                            traj_batch.allocation_actor_valid,
+                        )
                         total_loss = loss_actor + config.VF_COEF * value_loss
                         return total_loss, (value_loss, loss_actor)
 
-                    grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
-                    total_loss, grads = grad_fn(agent_train_state.params, traj_batch, advantages, targets)
-                    agent_train_state = agent_train_state.apply_gradients(grads=grads)
-                    return agent_train_state, total_loss
+                    def _apply_update(state):
+                        grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
+                        (total_loss, losses), grads = grad_fn(
+                            state.params, traj_batch, advantages, targets
+                        )
+                        return state.apply_gradients(grads=grads), (
+                            total_loss,
+                            *losses,
+                        )
+
+                    def _skip_update(state):
+                        zero = jnp.asarray(0.0)
+                        return state, (zero, zero, zero)
+
+                    return jax.lax.cond(
+                        jnp.any(traj_batch.allocation_actor_valid),
+                        _apply_update,
+                        _skip_update,
+                        agent_train_state,
+                    )
 
                 agent_train_state, traj_batch, advantages, targets, rng = update_state
                 rng, _rng = jax.random.split(rng)
@@ -589,19 +731,62 @@ def make_train(env, config):
             }
             rng = update_fungus_state[-1]
 
+            def _metrics(trajectory, loss_info):
+                total_loss, value_loss, actor_loss = loss_info
+                sample_count = trajectory.critic_valid.size
+                critic_count = jnp.sum(trajectory.critic_valid)
+                allocation_count = jnp.sum(
+                    trajectory.allocation_actor_valid
+                )
+                trade_count = jnp.sum(trajectory.trade_actor_valid)
+                return PPOUpdateMetrics(
+                    total_loss=total_loss,
+                    value_loss=value_loss,
+                    actor_loss=actor_loss,
+                    critic_valid_count=critic_count,
+                    allocation_actor_valid_count=allocation_count,
+                    trade_actor_valid_count=trade_count,
+                    critic_valid_fraction=critic_count / sample_count,
+                    allocation_actor_valid_fraction=(
+                        allocation_count / sample_count
+                    ),
+                    trade_actor_valid_fraction=trade_count / sample_count,
+                )
+
+            plant_metrics = _metrics(plant_traj, plant_loss_info)
+            fungus_metrics = _metrics(fungus_traj, fungus_loss_info)
+
             runner_state = (train_state, env_state, last_obs, rng)
-            return runner_state, (plant_traj, fungus_traj)
+            return runner_state, (
+                (plant_traj, fungus_traj),
+                (plant_metrics, fungus_metrics),
+                (plant_advantages, fungus_advantages),
+                (plant_targets, fungus_targets),
+            )
 
         # Scan over update steps.
         rng, _rng = jax.random.split(rng)
         runner_state = (train_state, env_state, obs, _rng)
-        runner_state, (plant_traj, fungus_traj) = jax.lax.scan(
+        runner_state, (
+            (plant_traj, fungus_traj),
+            (plant_metrics, fungus_metrics),
+            (plant_advantages, fungus_advantages),
+            (plant_targets, fungus_targets),
+        ) = jax.lax.scan(
             _update_step, runner_state, None, NUM_UPDATES
         )
 
         return {
             "runner_state": runner_state,
             "trajectories": (plant_traj, fungus_traj),
+            "metrics": {PLANT: plant_metrics, FUNGUS: fungus_metrics},
+            "advantages": {
+                PLANT: plant_advantages,
+                FUNGUS: fungus_advantages,
+            },
+            "targets": {PLANT: plant_targets, FUNGUS: fungus_targets},
+            # GAE lambda-returns are the critic regression targets.
+            "returns": {PLANT: plant_targets, FUNGUS: fungus_targets},
         }
 
     return train
