@@ -13,7 +13,6 @@ __all__ = [
     "axisymmetric_disc_overlap_fractions",
     "axisymmetric_stacked_disc_root_density",
     "photosynthesise",
-    "plant_maintenance_demand",
     "density_field_from_biomass",
     "root_disc_radii_from_biomass",
     "root_length_from_plant_biomass",
