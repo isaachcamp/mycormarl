@@ -17,6 +17,8 @@ grid and couples buffered diffusion with root/fungal uptake and competition.
 - [Independent PPO walking skeleton](docs/ippo-walking-skeleton.md):
   actor observations, Physical actions, lifecycle semantics, training, and
   saved-policy compatibility.
+- [Model Parameter Register](docs/model-parameter-register.md): register
+  for all model parameters, estimated values and related literature.
 - [Numerical qualification](docs/qualification/phosphate-numerical-qualification.md):
   convergence, balance, sensitivity, and performance evidence.
 - [Open questions](docs/open-questions.md):
