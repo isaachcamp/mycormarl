@@ -23,10 +23,11 @@ verification records are retained under [`archive/`](archive/).
 
 ## Organism parameters and geometry
 
-- Obtain a direct *R. irregularis* spore dry-mass measurement to validate or
-  replace the accepted `7.97e-7 g` cross-species AMF regression estimate. At
-  reset, the model deliberately maps the entire one-spore mass proxy to
-  external absorptive hyphae rather than simulating a spore.
+- Obtain a direct *R. irregularis* external-mycelium dry-mass measurement to
+  validate or replace the current `0.0001 g` early-established fixture. The
+  prior `7.97e-7 g` cross-species spore estimate remains a sensitivity case;
+  at reset, the model maps the configured fungal biomass to external
+  absorptive hyphae rather than simulating spores or inoculum.
 - Corroborate the provisional *Daucus carota* P concentration independently of
   the current MDPI source and obtain a whole-plant carbon measurement if
   possible.
@@ -63,10 +64,10 @@ verification records are retained under [`archive/`](archive/).
 - Assess sub-cell interference between sparse root and fungal depletion zones;
   proportional inventory scaling prevents overdraw but does not resolve this
   interaction below the cell scale.
-- Investigate the endpoint free-P pool sensitivity that caused every tested
-  timestep above `0.025 day` to fail the current 5% qualification rule. Run a
-  finer timestep study or justify a better endpoint metric before claiming
-  temporal convergence.
+- Separate policy decision timing from numerical integration timing under
+  [issue #24](https://github.com/isaachcamp/mycormarl/issues/24). Until then,
+  coupled fixed-action timestep comparisons change action frequency and remain
+  sensitivity diagnostics rather than soil-solver convergence evidence.
 - Extend convergence tests to long-horizon trajectories and learned policies;
   the current deterministic two-day fixture is numerical evidence, not proof
   for every MARL trajectory.

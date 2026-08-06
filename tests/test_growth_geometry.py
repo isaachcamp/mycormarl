@@ -29,7 +29,7 @@ def test_accepted_growth_geometry_trait_defaults():
     plant = PlantTraits()
     fungus = FungusTraits()
 
-    assert plant.initial_biomass == pytest.approx(0.001)
+    assert plant.initial_biomass == pytest.approx(0.01)
     assert plant.initial_c_pool == pytest.approx(
         plant.initial_biomass * plant.gamma_c
     )
@@ -51,7 +51,7 @@ def test_accepted_growth_geometry_trait_defaults():
     assert fungus.gamma_c == pytest.approx(0.5)
     assert fungus.gamma_p == pytest.approx(2.0)
     assert fungus.kappa_p == pytest.approx(0.003)
-    assert fungus.initial_biomass == pytest.approx(7.97e-7)
+    assert fungus.initial_biomass == pytest.approx(0.0001)
     assert fungus.initial_c_pool == pytest.approx(
         fungus.initial_biomass * fungus.gamma_c
     )
@@ -81,8 +81,8 @@ def test_one_gram_biomass_has_expected_root_and_hyphal_length():
     assert hyphal_length == pytest.approx(5_511_859.501, rel=1e-6)
 
 
-def test_one_spore_proxy_maps_entirely_to_initial_external_hyphae():
-    """Locks the accepted pre-established-symbiosis initial-condition closure."""
+def test_established_fungal_fixture_maps_to_external_hyphae():
+    """Locks the established-symbiosis initial-condition geometry closure."""
     traits = FungusTraits()
 
     length = hyphal_length_from_fungal_biomass(
@@ -96,8 +96,8 @@ def test_one_spore_proxy_maps_entirely_to_initial_external_hyphae():
         traits.saturation_density,
     )
 
-    assert length == pytest.approx(4.392952, rel=1e-6)
-    assert radius == pytest.approx(0.101599, rel=1e-6)
+    assert length == pytest.approx(551.185974, rel=1e-6)
+    assert radius == pytest.approx(0.5086314, rel=1e-6)
 
 
 def test_fungal_biomass_for_colony_radius_inverts_geometry_pipeline():

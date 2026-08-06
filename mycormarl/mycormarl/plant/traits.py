@@ -23,9 +23,9 @@ class PlantTraits:
     biomass.
     """
 
-    initial_biomass: float = 0.001
-    initial_c_pool: float = 0.000402
-    initial_p_pool: float = 0.00192
+    initial_biomass: float = 0.01
+    initial_c_pool: float = 0.00402
+    initial_p_pool: float = 0.0192
     kleaf: float = 0.30  # biomass fraction dedicated to photosynthesis
     kroot: float = 0.62  # dry-biomass fraction assigned to roots
     amass: float = 0.05

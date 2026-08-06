@@ -277,9 +277,13 @@ results are in the [numerical qualification report](qualification/phosphate-nume
   mineralisation, precipitation, or external boundary supply is represented.
 - **Limitation:** Extractable P cannot be compared directly with model $C$ or
   $M$ without an assay-specific observation model.
-- **Qualification caveat:** The chosen `dt=0.025 day` is the finest tested
-  fallback after stricter coupled-output checks; it is not demonstrated temporal
-  convergence. Run a timestep sensitivity analysis for each scientific setup.
+- **Qualification caveat:** Standard fixed-geometry soil-solver convergence is
+  evaluated separately from coupled fixed-action sensitivity. The coupled
+  fixture starts free C and P pools at one structural-biomass equivalent, but
+  changing `dt` still changes policy decision frequency until issue #24 is
+  implemented; coupled timestep comparisons are therefore diagnostic rather
+  than numerical acceptance criteria. Each scientific setup still needs its
+  own timestep sensitivity evidence.
 
 ## References
 

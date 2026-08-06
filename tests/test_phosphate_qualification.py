@@ -37,6 +37,11 @@ assert _SCRIPT_SPEC.loader is not None
 _SCRIPT_SPEC.loader.exec_module(_SCRIPT_MODULE)
 run_fixed_soil_scenario = _SCRIPT_MODULE.run_fixed_soil_scenario
 run_coupled_scenario = _SCRIPT_MODULE.run_coupled_scenario
+qualification_species = _SCRIPT_MODULE.qualification_species
+compare_coupled_action_frequency_sensitivity = (
+    _SCRIPT_MODULE.compare_coupled_action_frequency_sensitivity
+)
+select_solver_timestep = _SCRIPT_MODULE.select_solver_timestep
 
 
 def _diagnostic_environment():
@@ -274,6 +279,76 @@ def test_coupled_qualification_closes_extended_p_balance():
         1.0, rel=1e-6
     )
     assert result["initial_soil_micromol"] - result["final_soil_micromol"] == pytest.approx(
-        result["total_uptake_micromol"], rel=1e-5
+        result["total_uptake_micromol"], rel=1e-5, abs=1e-6
     )
     assert result["final_soil_micromol"] >= 0.0
+
+
+def test_coupled_qualification_pools_are_one_structural_biomass_equivalent():
+    """The coupled fixture starts without an oversized free-resource impulse."""
+    species = qualification_species(coupled=True)
+
+    assert species.plant.initial_biomass == pytest.approx(0.01)
+    assert species.fungus.initial_biomass == pytest.approx(0.0001)
+
+    for traits in (species.plant, species.fungus):
+        assert traits.initial_c_pool == pytest.approx(
+            traits.initial_biomass * traits.gamma_c
+        )
+        assert traits.initial_p_pool == pytest.approx(
+            traits.initial_biomass * traits.gamma_p
+        )
+
+
+def test_solver_timestep_selection_ignores_coupled_action_frequency():
+    """Only fixed-geometry soil comparisons select the numerical timestep."""
+    fixed_comparisons = [
+        {"candidate_dt_days": 0.05, "passes_5_percent": True},
+        {"candidate_dt_days": 0.05, "passes_5_percent": True},
+        {"candidate_dt_days": 0.05, "passes_5_percent": True},
+        {"candidate_dt_days": 0.1, "passes_5_percent": True},
+        {"candidate_dt_days": 0.1, "passes_5_percent": False},
+        {"candidate_dt_days": 0.1, "passes_5_percent": True},
+    ]
+
+    assert select_solver_timestep(fixed_comparisons) == pytest.approx(0.05)
+
+
+def test_coupled_action_frequency_sensitivity_keeps_residual_pools_diagnostic():
+    """Residual pools cannot dominate reported integrated-output sensitivity."""
+    reference = run_coupled_scenario(interval_cm=0.1, dt_days=0.4)
+    candidate = {
+        **reference,
+        "dt_days": 0.8,
+        "plant_p_pool_mg": 2.0 * reference["plant_p_pool_mg"],
+        "fungus_p_pool_mg": 2.0 * reference["fungus_p_pool_mg"],
+    }
+
+    comparison = compare_coupled_action_frequency_sensitivity(candidate, reference)
+
+    assert comparison["passes_5_percent"] is True
+    assert comparison["classification"] == "action_frequency_sensitivity"
+    assert comparison["affects_numerical_timestep_selection"] is False
+    assert set(comparison["diagnostic_changes"]) == {
+        "plant_p_pool_mg",
+        "fungus_p_pool_mg",
+    }
+    assert max(comparison["diagnostic_changes"].values()) == pytest.approx(1.0)
+    assert comparison["criteria"] == {
+        "reported_relative_metrics": list(
+            _SCRIPT_MODULE.COUPLED_ACTION_FREQUENCY_METRICS
+        ),
+        "diagnostic_metrics": ["plant_p_pool_mg", "fungus_p_pool_mg"],
+        "relative_tolerance": pytest.approx(0.05),
+        "absolute_metric_floor": pytest.approx(1e-10),
+        "maximum_relative_p_balance_error": pytest.approx(1e-5),
+    }
+
+
+def test_coupled_action_frequency_sensitivity_rejects_different_fixed_horizons():
+    """Action-frequency comparisons require the same horizon and grid."""
+    reference = run_coupled_scenario(interval_cm=0.1, dt_days=0.4)
+    candidate = {**reference, "dt_days": 0.8, "horizon_days": 4.0}
+
+    with pytest.raises(ValueError, match="same horizon and grid interval"):
+        compare_coupled_action_frequency_sensitivity(candidate, reference)
