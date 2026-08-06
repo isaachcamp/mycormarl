@@ -14,6 +14,7 @@ from mycormarl.plant.traits import PlantTraits
 from mycormarl.soil.deep_soil_qualification import (
     StaticPolicy,
     compare_deep_soil_qualification,
+    compare_temporal_convergence,
     run_deep_soil_qualification,
     write_deep_soil_qualification_outputs,
 )
@@ -120,6 +121,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--original-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--dt", type=float)
+    parser.add_argument("--temporal-reference-dt", type=float)
     parser.add_argument("--software-revision")
     return parser.parse_args()
 
@@ -144,6 +146,26 @@ def main() -> None:
         seed=original_manifest["seed"],
         software_revision=args.software_revision or _software_revision(),
     )
+    temporal_comparison = None
+    if args.temporal_reference_dt is not None:
+        if args.temporal_reference_dt >= config.dt:
+            raise ValueError(
+                "temporal reference dt must be smaller than the candidate dt"
+            )
+        reference_environment = {
+            **environment,
+            "dt": args.temporal_reference_dt,
+        }
+        reference = run_deep_soil_qualification(
+            config=EnvConfig(**reference_environment),
+            species=SpeciesParams(plant=PlantTraits(), fungus=FungusTraits()),
+            plant_policy=_static_policy(policies["plant"]),
+            fungus_policy=_static_policy(policies["fungus"]),
+            duration_days=original_manifest["duration_days"],
+            seed=original_manifest["seed"],
+            software_revision=args.software_revision or _software_revision(),
+        )
+        temporal_comparison = compare_temporal_convergence(result, reference)
     comparison = compare_deep_soil_qualification(
         result,
         original_manifest_path=original_manifest_path,
@@ -156,6 +178,10 @@ def main() -> None:
     (args.output_dir / "comparison.md").write_text(
         _render_markdown(comparison, result.manifest) + "\n"
     )
+    if temporal_comparison is not None:
+        (args.output_dir / "temporal-convergence.json").write_text(
+            json.dumps(temporal_comparison, indent=2, sort_keys=True) + "\n"
+        )
     print(
         json.dumps(
             {

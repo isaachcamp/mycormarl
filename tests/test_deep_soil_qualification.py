@@ -1,5 +1,6 @@
 """Public contracts for the deep-soil phosphorus qualification."""
 
+from dataclasses import replace
 import json
 from pathlib import Path
 import subprocess
@@ -115,6 +116,71 @@ def test_qualification_reports_inventory_loss_for_required_depth_bands():
         (75.0, 100.0),
     ]
     assert all(band.loss_percent == pytest.approx(0.0) for band in result.depth_band_losses)
+
+
+def test_qualification_records_fixed_horizon_integrated_p_uptake_and_balance():
+    """Integrated uptake closes the independently observed soil-P inventory loss."""
+    species = SpeciesParams(
+        plant=PlantTraits(
+            initial_biomass=1e-5,
+            initial_c_pool=0.0,
+            initial_p_pool=0.0,
+            kappa_c=0.0,
+            kappa_p=0.0,
+            death_fraction=0.0,
+        ),
+        fungus=FungusTraits(
+            initial_biomass=1e-5,
+            initial_c_pool=0.0,
+            initial_p_pool=0.0,
+            kappa_c=0.0,
+            kappa_p=0.0,
+            death_fraction=0.0,
+        ),
+    )
+    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+
+    result = run_deep_soil_qualification(
+        config=EnvConfig(
+            dt=0.5,
+            soil_radius_cm=1.0,
+            soil_depth_cm=2.0,
+            radial_interval_cm=1.0,
+            depth_interval_cm=1.0,
+            topsoil_depth_cm=2.0,
+            initial_solution_p_um=1.0,
+            phosphate_diffusion_coefficient_cm2_s=1e-30,
+        ),
+        species=species,
+        plant_policy=policy,
+        fungus_policy=policy,
+        duration_days=1.0,
+        seed=7,
+        software_revision="test-revision",
+    )
+
+    fluxes = result.integrated_p_fluxes_micromol
+    observed_soil_loss = float(
+        result.daily_soil_labile_p_micromol[0].sum()
+        - result.daily_soil_labile_p_micromol[-1].sum()
+    )
+    assert fluxes["plant_uptake_micromol"] > 0.0
+    assert fluxes["fungus_uptake_micromol"] > 0.0
+    assert fluxes["total_uptake_micromol"] == pytest.approx(
+        fluxes["plant_uptake_micromol"]
+        + fluxes["fungus_uptake_micromol"],
+        rel=1e-6,
+    )
+    assert fluxes["total_uptake_micromol"] == pytest.approx(
+        observed_soil_loss,
+        rel=2e-5,
+        abs=1e-7,
+    )
+    assert result.relative_extended_p_balance_error <= 1e-5
+    assert result.manifest["qualification"]["integrated_p_fluxes_micromol"] == fluxes
+    assert result.manifest["qualification"][
+        "relative_extended_p_balance_error"
+    ] == pytest.approx(result.relative_extended_p_balance_error)
 
 
 def test_writer_emits_separate_soil_snapshots_and_complete_provenance(tmp_path):
@@ -315,6 +381,274 @@ def test_temporal_gate_accepts_matching_endpoint_metrics():
     assert comparison["maximum_relative_change"] == pytest.approx(0.0)
 
 
+def test_temporal_gate_rejects_different_fixed_horizons():
+    """Only timestep may differ between candidate and reference provenance."""
+    species = SpeciesParams(
+        plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
+        fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
+    )
+    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+
+    def run(dt, duration_days):
+        return run_deep_soil_qualification(
+            config=EnvConfig(
+                dt=dt,
+                soil_radius_cm=1.0,
+                soil_depth_cm=100.0,
+                radial_interval_cm=1.0,
+                depth_interval_cm=5.0,
+                topsoil_depth_cm=100.0,
+                initial_solution_p_um=1.0,
+                phosphate_diffusion_coefficient_cm2_s=1e-30,
+            ),
+            species=species,
+            plant_policy=policy,
+            fungus_policy=policy,
+            duration_days=duration_days,
+            seed=0,
+            software_revision="test-revision",
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="only environment dt may differ",
+    ):
+        compare_temporal_convergence(run(1.0, 1.0), run(0.5, 2.0))
+
+
+def test_temporal_gate_reports_timestep_scaled_pools_without_failing():
+    """Residual pools remain diagnostic when accepted quantities agree."""
+    species = SpeciesParams(
+        plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
+        fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
+    )
+    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+
+    def run(dt):
+        return run_deep_soil_qualification(
+            config=EnvConfig(
+                dt=dt,
+                soil_radius_cm=1.0,
+                soil_depth_cm=100.0,
+                radial_interval_cm=1.0,
+                depth_interval_cm=5.0,
+                topsoil_depth_cm=100.0,
+                initial_solution_p_um=1.0,
+                phosphate_diffusion_coefficient_cm2_s=1e-30,
+            ),
+            species=species,
+            plant_policy=policy,
+            fungus_policy=policy,
+            duration_days=1,
+            seed=0,
+            software_revision="test-revision",
+        )
+
+    candidate = run(1.0)
+    reference = run(0.5)
+    candidate = replace(
+        candidate,
+        endpoint_metrics={
+            **candidate.endpoint_metrics,
+            "final_plant_c_pool_g": 2.0,
+            "final_plant_p_pool_mg": 4.0,
+            "final_fungus_c_pool_g": 6.0,
+            "final_fungus_p_pool_mg": 8.0,
+        },
+    )
+    reference = replace(
+        reference,
+        endpoint_metrics={
+            **reference.endpoint_metrics,
+            "final_plant_c_pool_g": 1.0,
+            "final_plant_p_pool_mg": 2.0,
+            "final_fungus_c_pool_g": 3.0,
+            "final_fungus_p_pool_mg": 4.0,
+        },
+    )
+
+    comparison = compare_temporal_convergence(candidate, reference)
+
+    assert comparison["passes_5_percent"] is True
+    assert {row["metric"] for row in comparison["diagnostic_comparisons"]} == {
+        "final_plant_c_pool_g",
+        "final_plant_p_pool_mg",
+        "final_fungus_c_pool_g",
+        "final_fungus_p_pool_mg",
+    }
+    assert comparison["maximum_diagnostic_relative_change"] == pytest.approx(1.0)
+    assert comparison["criteria"]["diagnostic_metrics"] == sorted(
+        {
+            "final_plant_c_pool_g",
+            "final_plant_p_pool_mg",
+            "final_fungus_c_pool_g",
+            "final_fungus_p_pool_mg",
+        }
+    )
+    assert set(comparison["criteria"]["accepted_relative_metrics"]).issuperset(
+        {
+            "plant_uptake_micromol",
+            "fungus_uptake_micromol",
+            "total_uptake_micromol",
+            "final_plant_biomass_g",
+            "final_fungus_biomass_g",
+        }
+    )
+
+
+def test_temporal_gate_fails_when_integrated_p_uptake_does_not_converge():
+    """Fixed-horizon P uptake is an accepted temporal-convergence quantity."""
+    species = SpeciesParams(
+        plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
+        fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
+    )
+    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+
+    def run(dt):
+        return run_deep_soil_qualification(
+            config=EnvConfig(
+                dt=dt,
+                soil_radius_cm=1.0,
+                soil_depth_cm=100.0,
+                radial_interval_cm=1.0,
+                depth_interval_cm=5.0,
+                topsoil_depth_cm=100.0,
+                initial_solution_p_um=1.0,
+                phosphate_diffusion_coefficient_cm2_s=1e-30,
+            ),
+            species=species,
+            plant_policy=policy,
+            fungus_policy=policy,
+            duration_days=1,
+            seed=0,
+            software_revision="test-revision",
+        )
+
+    candidate = replace(
+        run(1.0),
+        integrated_p_fluxes_micromol={
+            "plant_uptake_micromol": 0.6,
+            "fungus_uptake_micromol": 0.6,
+            "total_uptake_micromol": 1.2,
+        },
+    )
+    reference = replace(
+        run(0.5),
+        integrated_p_fluxes_micromol={
+            "plant_uptake_micromol": 0.5,
+            "fungus_uptake_micromol": 0.5,
+            "total_uptake_micromol": 1.0,
+        },
+    )
+
+    comparison = compare_temporal_convergence(candidate, reference)
+
+    assert comparison["passes_5_percent"] is False
+    assert {
+        row["metric"] for row in comparison["metric_comparisons"]
+    }.issuperset(
+        {
+            "plant_uptake_micromol",
+            "fungus_uptake_micromol",
+            "total_uptake_micromol",
+        }
+    )
+
+
+def test_temporal_gate_requires_each_run_to_close_extended_p_balance():
+    """A converged trajectory still fails if either P ledger is not conservative."""
+    species = SpeciesParams(
+        plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
+        fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
+    )
+    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+
+    def run(dt):
+        return run_deep_soil_qualification(
+            config=EnvConfig(
+                dt=dt,
+                soil_radius_cm=1.0,
+                soil_depth_cm=100.0,
+                radial_interval_cm=1.0,
+                depth_interval_cm=5.0,
+                topsoil_depth_cm=100.0,
+                initial_solution_p_um=1.0,
+                phosphate_diffusion_coefficient_cm2_s=1e-30,
+            ),
+            species=species,
+            plant_policy=policy,
+            fungus_policy=policy,
+            duration_days=1,
+            seed=0,
+            software_revision="test-revision",
+        )
+
+    candidate = replace(
+        run(1.0),
+        relative_extended_p_balance_error=2e-5,
+    )
+    reference = run(0.5)
+
+    comparison = compare_temporal_convergence(candidate, reference)
+
+    assert comparison["passes_temporal_convergence"] is False
+    assert next(
+        row
+        for row in comparison["absolute_checks"]
+        if row["requirement"] == "candidate_relative_extended_p_balance_error"
+    ) == {
+        "requirement": "candidate_relative_extended_p_balance_error",
+        "value": pytest.approx(2e-5),
+        "maximum": pytest.approx(1e-5),
+        "passes": False,
+    }
+
+
+def test_temporal_gate_requires_each_run_to_preserve_fungal_confinement():
+    """Numerical agreement cannot excuse uptake geometry outside the colony."""
+    species = SpeciesParams(
+        plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
+        fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
+    )
+    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+
+    def run(dt):
+        return run_deep_soil_qualification(
+            config=EnvConfig(
+                dt=dt,
+                soil_radius_cm=1.0,
+                soil_depth_cm=100.0,
+                radial_interval_cm=1.0,
+                depth_interval_cm=5.0,
+                topsoil_depth_cm=100.0,
+                initial_solution_p_um=1.0,
+                phosphate_diffusion_coefficient_cm2_s=1e-30,
+            ),
+            species=species,
+            plant_policy=policy,
+            fungus_policy=policy,
+            duration_days=1,
+            seed=0,
+            software_revision="test-revision",
+        )
+
+    candidate = replace(
+        run(1.0),
+        max_fungal_density_outside_colony=2e-12,
+    )
+    comparison = compare_temporal_convergence(candidate, run(0.5))
+
+    assert comparison["passes_temporal_convergence"] is False
+    density_check = next(
+        row
+        for row in comparison["absolute_checks"]
+        if row["requirement"]
+        == "candidate_max_fungal_density_outside_colony"
+    )
+    assert density_check["maximum"] == pytest.approx(1e-12)
+    assert density_check["passes"] is False
+
+
 def test_cli_reruns_diagnosed_configuration_with_current_trait_defaults(tmp_path):
     """One command writes a separate corrected artifact and comparison report."""
     config = EnvConfig(
@@ -354,6 +688,8 @@ def test_cli_reruns_diagnosed_configuration_with_current_trait_defaults(tmp_path
             str(output_dir),
             "--software-revision",
             "corrected-revision",
+            "--temporal-reference-dt",
+            "0.5",
         ],
         check=True,
         capture_output=True,
@@ -368,12 +704,27 @@ def test_cli_reruns_diagnosed_configuration_with_current_trait_defaults(tmp_path
         "comparison.md",
         "daily-soil-p.npz",
         "manifest.json",
+        "temporal-convergence.json",
     }
     manifest = json.loads((output_dir / "manifest.json").read_text())
     comparison = json.loads((output_dir / "comparison.json").read_text())
-    assert manifest["traits"]["plant"]["initial_biomass"] == pytest.approx(0.001)
+    temporal = json.loads(
+        (output_dir / "temporal-convergence.json").read_text()
+    )
+    assert manifest["traits"]["plant"]["initial_biomass"] == pytest.approx(0.01)
     assert manifest["traits"]["fungus"]["initial_biomass"] == pytest.approx(
-        7.97e-7
+        0.0001
     )
     assert comparison["configuration_equivalence"]["environment"] is True
     assert "traits" in comparison["intentional_provenance_differences"]
+    assert temporal["candidate_dt_days"] == pytest.approx(1.0)
+    assert temporal["reference_dt_days"] == pytest.approx(0.5)
+    assert temporal["passes_temporal_convergence"] is True
+    assert temporal["criteria"]["diagnostic_metrics"] == sorted(
+        {
+            "final_plant_c_pool_g",
+            "final_plant_p_pool_mg",
+            "final_fungus_c_pool_g",
+            "final_fungus_p_pool_mg",
+        }
+    )
