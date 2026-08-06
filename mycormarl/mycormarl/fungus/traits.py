@@ -13,14 +13,15 @@ class FungusTraits:
     saturation density is cm hypha per cm³ bulk soil. ``kappa_p`` is
     irreversible free-P loss in mg P per g dry biomass per day; structural P
     is represented only by ``gamma_p``. ``jmax`` is µmol P cm^-2 s^-1 and
-    ``km`` is µmol P cm^-3. Initial biomass is a one-spore mass proxy mapped
-    entirely to living external hyphae, and each initial free pool contains one
+    ``km`` is µmol P cm^-3. Initial biomass is an early-established living
+    external-mycelium fixture; spores, inoculum, and colonized-root mass are
+    not represented, and each initial free pool contains one
     structural-biomass equivalent.
     """
 
-    initial_biomass: float = 7.97e-7
-    initial_c_pool: float = 3.985e-7
-    initial_p_pool: float = 1.594e-6
+    initial_biomass: float = 0.0001
+    initial_c_pool: float = 0.00005
+    initial_p_pool: float = 0.0002
     gamma_c: float = 0.5
     gamma_p: float = 2.0
     kappa_c: float = 0.03

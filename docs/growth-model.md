@@ -202,8 +202,8 @@ justification.
 
 | Parameter | Default | Evidence and status |
 |---|---:|---|
-| Plant initial biomass and free pools | `0.001 g`; `0.000402 g C`; `0.00192 mg P` | A representative low-end one-milligram propagule, bounded by the `0.7–3.3 mg` *Daucus carota* population means reported by [Vandelook et al. (2024)](https://doi.org/10.1017/S0960258524000230). This is a literature-bounded model choice, not a directly reported species mean. Each free pool contains one structural-biomass equivalent: $G_0\gamma_C$ and $G_0\gamma_P$. |
-| Fungal initial biomass and free pools | `7.97e-7 g`; `3.985e-7 g C`; `1.594e-6 mg P` | One-spore mass proxy derived from the counted-and-dried five-species AMF regression $M_{\mu g}=0.4458\times10^{-5}d_{\mu m}^{2.5372}$ in [Sieverding et al. (1989)](https://doi.org/10.1016/0038-0717(89)90013-8), evaluated at the `117.5 µm` midpoint of the reported *R. irregularis* `70–165 µm` diameter range. This is a cross-species estimate, not a measured species mean. Each free pool contains one structural-biomass equivalent. |
+| Plant initial biomass and free pools | `0.01 g`; `0.00402 g C`; `0.0192 mg P` | An early-established seedling fixture above the `0.7–3.3 mg` *Daucus carota* propagule means reported by [Vandelook et al. (2024)](https://doi.org/10.1017/S0960258524000230) and below later resource-exchange harvests. Each free pool contains one structural-biomass equivalent: $G_0\gamma_C$ and $G_0\gamma_P$. |
+| Fungal initial biomass and free pools | `0.0001 g`; `0.00005 g C`; `0.0002 mg P` | Living external mycelium in an early-established fixture, deliberately below the approximately `3–17 mg` mature external-mycelium measurements in *R. irregularis* root-organ microcosms ([Sun et al. (2024)](https://doi.org/10.1007/s00572-024-01154-8)). This is not inoculum, colonized-root mass, or a spore mass. Each free pool contains one structural-biomass equivalent. |
 | Plant $\gamma_C$ | `0.402 g C g⁻¹` | Carrot-root elemental analysis from [Kaur et al. (2022)](https://doi.org/10.1038/s41598-022-20971-5); a root-dominated proxy, not whole-plant calibration. |
 | Plant $\gamma_P$ | `1.92 mg P g⁻¹` | Derived dry-mass-weighted carrot value from [Kováčik et al. (2022)](https://doi.org/10.3390/agronomy12112770), an MDPI *Agronomy* paper; independent validation remains required. |
 | $k_{root}$, $SRL$ | `0.62`, `25,434.3 cm g⁻¹` | Separate *Daucus carota* medians from the [GRooT database](https://doi.org/10.1111/geb.13179); not matched observations from one specimen. |
@@ -246,11 +246,11 @@ construction-time validation immediately below those definitions.
   age-dependent uptake activity is represented.
 - **Accounting limitation:** Paid irreversible-loss P has no represented
   destination, while mortality P and reproduction P are explicit exports.
-- **Qualification gap:** The `2,000 cm cm⁻³` fungal-density default changes
-  colony extent and the sparse/continuous uptake blend. The numerical
-  qualification artifacts predate this change and will be regenerated with
-  the deep-soil rerun tracked by
-  [issue #18](https://github.com/isaachcamp/mycormarl/issues/18).
+- **Qualification scope:** The `2,000 cm cm⁻³` fungal-density default changes
+  colony extent and the sparse/continuous uptake blend. The canonical
+  numerical qualification now includes a deep-soil confinement and extended-P
+  balance check; issue #18 remains the tracking point for future parameter
+  requalification.
 
 ## References
 
