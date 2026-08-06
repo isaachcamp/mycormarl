@@ -39,10 +39,10 @@ verification records are retained under [`archive/`](archive/).
 - Determine when the stacked-disc root and saturated-hemisphere fungal
   closures need explicit branching, directional growth, or intraradical and
   spore compartments.
-- Re-run numerical qualification for the `2,000 cm cm^-3` fungal saturation
-  density together with the deep-soil qualification tracked by
-  [issue #18](https://github.com/isaachcamp/mycormarl/issues/18). Preserve the
-  existing generated artifacts until that reproducible comparison is run.
+- Re-run the canonical numerical qualification when the `2,000 cm cm^-3`
+  fungal saturation density or deep-soil fixture changes; the current run
+  includes the deep-soil confinement and extended-P balance check. Continue
+  tracking follow-up work in [issue #18](https://github.com/isaachcamp/mycormarl/issues/18).
 
 ## Carbon accounting and light
 

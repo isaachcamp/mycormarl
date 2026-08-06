@@ -3,21 +3,21 @@
     "reduced": {
       "cached_geometry_bytes": 8168,
       "cell_count": 400,
-      "compile_and_first_step_seconds": 0.22698316699825227,
+      "compile_and_first_step_seconds": 0.25397754192817956,
       "estimated_core_working_array_bytes": 41839,
       "full_annual_projection": {
-        "runtime_hours": 9.534784039715305e-05,
-        "runtime_seconds": 0.343252225429751,
+        "runtime_hours": 9.003333430478557e-05,
+        "runtime_seconds": 0.324120003497228,
         "steps_per_year": 7300
       },
-      "full_compile_and_first_step_seconds": 0.3031583330594003,
+      "full_compile_and_first_step_seconds": 0.3251685840077698,
       "grid_shape": [
         20,
         20
       ],
       "soil_annual_projection": {
-        "runtime_hours": 7.733436779946916e-05,
-        "runtime_seconds": 0.278403724078089,
+        "runtime_hours": 8.242916875234288e-05,
+        "runtime_seconds": 0.29674500750843436,
         "steps_per_year": 7300
       },
       "soil_substeps": 1,
@@ -26,27 +26,27 @@
       "temporary_array_estimate_bytes": 28800,
       "temporary_array_estimate_count": 18,
       "timing_repeats": 20,
-      "warmed_full_seconds_per_step": 4.702085279859602e-05,
-      "warmed_seconds_per_step": 3.8137496449053285e-05
+      "warmed_full_seconds_per_step": 4.440000047907233e-05,
+      "warmed_seconds_per_step": 4.065000102855265e-05
     },
     "target": {
       "cached_geometry_bytes": 10006008,
       "cell_count": 500000,
-      "compile_and_first_step_seconds": 0.2588180409511551,
+      "compile_and_first_step_seconds": 0.2574255829676986,
       "estimated_core_working_array_bytes": 52006079,
       "full_annual_projection": {
-        "runtime_hours": 0.007224900340305693,
-        "runtime_seconds": 26.009641225100495,
+        "runtime_hours": 0.007999207385324149,
+        "runtime_seconds": 28.797146587166935,
         "steps_per_year": 7300
       },
-      "full_compile_and_first_step_seconds": 0.37459754094015807,
+      "full_compile_and_first_step_seconds": 0.38802250009030104,
       "grid_shape": [
         500,
         1000
       ],
       "soil_annual_projection": {
-        "runtime_hours": 0.006662052705198423,
-        "runtime_seconds": 23.983389738714322,
+        "runtime_hours": 0.006856753135960187,
+        "runtime_seconds": 24.684311289456673,
         "steps_per_year": 7300
       },
       "soil_substeps": 1,
@@ -55,8 +55,8 @@
       "temporary_array_estimate_bytes": 36000000,
       "temporary_array_estimate_count": 18,
       "timing_repeats": 20,
-      "warmed_full_seconds_per_step": 0.0035629645513836294,
-      "warmed_seconds_per_step": 0.0032853958546184003
+      "warmed_full_seconds_per_step": 0.003944814600981772,
+      "warmed_seconds_per_step": 0.0033814125054050237
     }
   },
   "concentration_scenarios": [
@@ -1140,6 +1140,52 @@
       "total_uptake_micromol": 1.1392295520532612
     }
   ],
+  "deep_soil": {
+    "depth_band_losses": [
+      {
+        "end_depth_cm": 10.0,
+        "final_micromol": 28.644458770751953,
+        "initial_micromol": 30.07132339477539,
+        "loss_percent": 4.744934585324375,
+        "start_depth_cm": 0.0
+      },
+      {
+        "end_depth_cm": 25.0,
+        "final_micromol": 45.016380310058594,
+        "initial_micromol": 45.106990814208984,
+        "loss_percent": 0.20087907110364753,
+        "start_depth_cm": 10.0
+      },
+      {
+        "end_depth_cm": 50.0,
+        "final_micromol": 0.018816251307725906,
+        "initial_micromol": 0.0,
+        "loss_percent": null,
+        "start_depth_cm": 25.0
+      },
+      {
+        "end_depth_cm": 75.0,
+        "final_micromol": 0.0,
+        "initial_micromol": 0.0,
+        "loss_percent": null,
+        "start_depth_cm": 50.0
+      },
+      {
+        "end_depth_cm": 100.0,
+        "final_micromol": 0.0,
+        "initial_micromol": 0.0,
+        "loss_percent": null,
+        "start_depth_cm": 75.0
+      }
+    ],
+    "dt_days": 0.05,
+    "duration_days": 2.0,
+    "interval_cm": 0.1,
+    "max_fungal_density_outside_colony": 0.0,
+    "max_fungal_uptake_request_outside_colony_micromol": 0.0,
+    "passes": true,
+    "relative_extended_p_balance_error": 2.6830784199969098e-08
+  },
   "grid_comparisons": [
     {
       "candidate_interval_cm": 0.05,
@@ -1502,7 +1548,7 @@
       "root_density_cm_cm3": 1.0
     },
     "float_precision": "JAX default float32",
-    "generated_at": "2026-08-06T08:22:24+0200",
+    "generated_at": "2026-08-06T08:58:30+0200",
     "horizon_days": 2.0,
     "jax_backend": "cpu",
     "jax_devices": [
@@ -1513,6 +1559,7 @@
     "relative_tolerance": 0.05
   },
   "selection": {
+    "deep_soil_passes": true,
     "dt_days": 0.05,
     "dt_had_passing_candidate": true,
     "grid_had_passing_candidate": true,

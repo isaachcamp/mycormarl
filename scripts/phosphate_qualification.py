@@ -28,6 +28,10 @@ from mycormarl.soil.phosphate_qualification import (
     annual_runtime_projection,
     reference_relative_change,
 )
+from mycormarl.soil.deep_soil_qualification import (
+    StaticPolicy,
+    run_deep_soil_qualification,
+)
 from mycormarl.soil.soil import evolve_soil_p_with_diagnostics
 from mycormarl.soil.phosphate_units import MICROMOL_P_TO_MG_P
 
@@ -39,6 +43,10 @@ MODES = ("root_only", "fungus_only", "mixed")
 HORIZON_DAYS = 2.0
 COUPLED_PLANT_INITIAL_BIOMASS_G = 0.01
 COUPLED_FUNGUS_INITIAL_BIOMASS_G = 0.0001
+DEEP_SOIL_DURATION_DAYS = 2.0
+DEEP_SOIL_RADIUS_CM = 2.0
+DEEP_SOIL_DEPTH_CM = 100.0
+DEEP_SOIL_TOPSOIL_DEPTH_CM = 25.0
 ABSOLUTE_METRIC_FLOOR = 1e-10
 RELATIVE_TOLERANCE = 0.05
 MAXIMUM_RELATIVE_P_BALANCE_ERROR = 1e-5
@@ -380,6 +388,60 @@ def run_coupled_scenario(interval_cm: float, dt_days: float) -> dict:
     }
 
 
+def run_deep_soil_scenario(
+    interval_cm: float,
+    dt_days: float,
+    duration_days: float = DEEP_SOIL_DURATION_DAYS,
+) -> dict:
+    """Run the production deep-soil confinement and inventory check."""
+    config = EnvConfig(
+        dt=dt_days,
+        max_steps=math.ceil(duration_days / dt_days),
+        soil_radius_cm=DEEP_SOIL_RADIUS_CM,
+        soil_depth_cm=DEEP_SOIL_DEPTH_CM,
+        radial_interval_cm=interval_cm,
+        depth_interval_cm=interval_cm,
+        topsoil_depth_cm=DEEP_SOIL_TOPSOIL_DEPTH_CM,
+        initial_solution_p_um=1.0,
+    )
+    policy = StaticPolicy(0.25, 1.0, 0.0, 0.0)
+    result = run_deep_soil_qualification(
+        config=config,
+        species=qualification_species(coupled=True),
+        plant_policy=policy,
+        fungus_policy=policy,
+        duration_days=duration_days,
+        seed=0,
+        software_revision="standard-qualification",
+    )
+    maximum_density = result.max_fungal_density_outside_colony
+    maximum_request = result.max_fungal_uptake_request_outside_colony_micromol
+    passes = (
+        maximum_density <= 1e-12
+        and maximum_request <= 1e-12
+        and result.relative_extended_p_balance_error <= MAXIMUM_RELATIVE_P_BALANCE_ERROR
+    )
+    return {
+        "interval_cm": interval_cm,
+        "dt_days": dt_days,
+        "duration_days": duration_days,
+        "max_fungal_density_outside_colony": maximum_density,
+        "max_fungal_uptake_request_outside_colony_micromol": maximum_request,
+        "depth_band_losses": [
+            {
+                "start_depth_cm": loss.start_depth_cm,
+                "end_depth_cm": loss.end_depth_cm,
+                "initial_micromol": loss.initial_micromol,
+                "final_micromol": loss.final_micromol,
+                "loss_percent": loss.loss_percent,
+            }
+            for loss in result.depth_band_losses
+        ],
+        "relative_extended_p_balance_error": result.relative_extended_p_balance_error,
+        "passes": passes,
+    }
+
+
 def _comparison(candidate: dict, reference: dict, metrics: tuple[str, ...]) -> dict:
     """Compare selected scalar metrics using the declared near-zero guard."""
     changes = {
@@ -615,6 +677,7 @@ def run_studies(include_target_benchmark: bool) -> dict:
     selected_dt = select_solver_timestep(timestep_comparisons)
     selected_grid = max(passing_grid) if passing_grid else min(GRID_INTERVALS_CM)
     reduced_benchmark = benchmark_environment(qualification_config(selected_grid, selected_dt, 1.0))
+    deep_soil = run_deep_soil_scenario(selected_grid, selected_dt)
     target_benchmark = None
     if include_target_benchmark:
         annual_steps = annual_runtime_projection(selected_dt, 0.0)["steps_per_year"]
@@ -666,7 +729,8 @@ def run_studies(include_target_benchmark: bool) -> dict:
         "grid_comparisons": grid_comparisons,
         "coupled_grid_comparisons": coupled_comparisons,
         "coupled_timestep_comparisons": coupled_timestep_comparisons,
-        "selection": {"grid_interval_cm": selected_grid, "dt_days": selected_dt, "grid_had_passing_candidate": bool(passing_grid), "dt_had_passing_candidate": selected_dt > min(TIMESTEPS_DAYS), "timestep_basis": "fixed_geometry_soil_solver"},
+        "deep_soil": deep_soil,
+        "selection": {"grid_interval_cm": selected_grid, "dt_days": selected_dt, "grid_had_passing_candidate": bool(passing_grid), "dt_had_passing_candidate": selected_dt > min(TIMESTEPS_DAYS), "deep_soil_passes": deep_soil["passes"], "timestep_basis": "fixed_geometry_soil_solver"},
         "benchmarks": {"reduced": reduced_benchmark, "target": target_benchmark},
     }
 
@@ -682,6 +746,7 @@ def render_markdown(results: dict) -> str:
         "",
         f"Selected interval: `{selection['grid_interval_cm']} cm`; selected fixed-geometry soil-solver timestep: `{selection['dt_days']} day`.",
         f"Grid had a passing coarser candidate: `{selection['grid_had_passing_candidate']}`; timestep had a passing larger candidate: `{selection['dt_had_passing_candidate']}`.",
+        f"Deep-soil confinement and extended-P balance pass: `{selection['deep_soil_passes']}`.",
         "",
         "The numerical timestep selection uses a 5% next-smaller comparison on fixed-geometry soil uptake, final inventory, and consumer shares. Coupled fixed-action trajectories are reported separately as action-frequency sensitivity diagnostics and do not select the numerical timestep because `dt` is also the policy decision interval until issue #24 is implemented. Grid convergence continues to include coupled endpoint pools. This is numerical qualification, not empirical validation.",
         "",
@@ -729,6 +794,16 @@ def render_markdown(results: dict) -> str:
         coupled_row = next(row for row in results["coupled_grid_comparisons"] if row["candidate_interval_cm"] == interval)
         passed = all(row["passes_5_percent"] for row in fixed_rows) and coupled_row["passes_5_percent"]
         lines.append(f"| {interval:g} | {fixed_rows[0]['reference_interval_cm']:g} | {max(row['maximum_change'] for row in fixed_rows):.3%} | {coupled_row['maximum_change']:.3%} | {'yes' if passed else 'no'} |")
+    deep_soil = results["deep_soil"]
+    lines.extend([
+        "",
+        "## Deep-soil integration check",
+        "",
+        f"- Confinement and extended-P balance pass: `{deep_soil['passes']}`.",
+        f"- Maximum fungal density wholly outside the colony: `{deep_soil['max_fungal_density_outside_colony']:.3g}` cm cm^-3.",
+        f"- Maximum fungal uptake request wholly outside the colony: `{deep_soil['max_fungal_uptake_request_outside_colony_micromol']:.3g}` micromol P per cell.",
+        f"- Maximum relative extended-P balance error: `{deep_soil['relative_extended_p_balance_error']:.3e}`.",
+    ])
     lines.extend([
         "",
         "## Transition sensitivity (mixed mode)",

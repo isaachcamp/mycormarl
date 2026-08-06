@@ -37,11 +37,26 @@ assert _SCRIPT_SPEC.loader is not None
 _SCRIPT_SPEC.loader.exec_module(_SCRIPT_MODULE)
 run_fixed_soil_scenario = _SCRIPT_MODULE.run_fixed_soil_scenario
 run_coupled_scenario = _SCRIPT_MODULE.run_coupled_scenario
+run_deep_soil_scenario = _SCRIPT_MODULE.run_deep_soil_scenario
 qualification_species = _SCRIPT_MODULE.qualification_species
 compare_coupled_action_frequency_sensitivity = (
     _SCRIPT_MODULE.compare_coupled_action_frequency_sensitivity
 )
 select_solver_timestep = _SCRIPT_MODULE.select_solver_timestep
+
+
+def test_standard_qualification_exposes_deep_soil_confinement_gate():
+    """The canonical runner includes the production deep-soil invariant."""
+    result = run_deep_soil_scenario(
+        interval_cm=1.0,
+        dt_days=0.5,
+        duration_days=1.0,
+    )
+
+    assert result["passes"] is True
+    assert result["max_fungal_density_outside_colony"] <= 1e-12
+    assert result["max_fungal_uptake_request_outside_colony_micromol"] <= 1e-12
+    assert len(result["depth_band_losses"]) == 5
 
 
 def _diagnostic_environment():

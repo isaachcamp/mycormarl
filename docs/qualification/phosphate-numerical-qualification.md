@@ -4,6 +4,7 @@
 
 Selected interval: `0.1 cm`; selected fixed-geometry soil-solver timestep: `0.05 day`.
 Grid had a passing coarser candidate: `True`; timestep had a passing larger candidate: `True`.
+Deep-soil confinement and extended-P balance pass: `True`.
 
 The numerical timestep selection uses a 5% next-smaller comparison on fixed-geometry soil uptake, final inventory, and consumer shares. Coupled fixed-action trajectories are reported separately as action-frequency sensitivity diagnostics and do not select the numerical timestep because `dt` is also the policy decision interval until issue #24 is implemented. Grid convergence continues to include coupled endpoint pools. This is numerical qualification, not empirical validation.
 
@@ -42,6 +43,13 @@ The numerical timestep selection uses a 5% next-smaller comparison on fixed-geom
 | 0.05 | 0.025 | 1.212% | 0.589% | yes |
 | 0.1 | 0.05 | 1.345% | 2.564% | yes |
 
+## Deep-soil integration check
+
+- Confinement and extended-P balance pass: `True`.
+- Maximum fungal density wholly outside the colony: `0` cm cm^-3.
+- Maximum fungal uptake request wholly outside the colony: `0` micromol P per cell.
+- Maximum relative extended-P balance error: `2.683e-08`.
+
 ## Transition sensitivity (mixed mode)
 
 | T_ref (day) | p | Mean w_cont | Total uptake (µmol) |
@@ -54,12 +62,12 @@ The numerical timestep selection uses a 5% next-smaller comparison on fixed-geom
 
 ## Performance
 
-- Reduced grid: `400` cells, compile+first step `0.227 s`, warmed step `0.000038 s`.
+- Reduced grid: `400` cells, compile+first step `0.254 s`, warmed step `0.000041 s`.
 - Target grid: `500 x 1000` = `500000` cells.
-- Target soil compile+first step: `0.259 s`; warmed soil step: `0.003285 s`.
-- Target full-step incremental compile+first step, measured after the soil benchmark: `0.375 s`; warmed full step: `0.003563 s`.
+- Target soil compile+first step: `0.257 s`; warmed soil step: `0.003381 s`.
+- Target full-step incremental compile+first step, measured after the soil benchmark: `0.388 s`; warmed full step: `0.003945 s`.
 - Estimated core working arrays: `49.6 MiB`, comprising concrete state/cached arrays plus `18` float32 cell-array equivalents. This is a formula-based estimate, not peak process RSS; XLA fusion may reduce actual temporary storage.
-- Projected year: `7300` steps, `23.98 s` soil-only and `26.01 s` for the deterministic full step, excluding compilation, learned-policy inference, training, and output.
+- Projected year: `7300` steps, `24.68 s` soil-only and `28.80 s` for the deterministic full step, excluding compilation, learned-policy inference, training, and output.
 - The target environment is configured with `max_steps=7300` so the projected year is not truncated by the episode limit.
 
 ## Interpretation and limitations

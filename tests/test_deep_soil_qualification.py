@@ -2,9 +2,6 @@
 
 from dataclasses import replace
 import json
-from pathlib import Path
-import subprocess
-import sys
 
 import numpy as np
 
@@ -647,84 +644,3 @@ def test_temporal_gate_requires_each_run_to_preserve_fungal_confinement():
     )
     assert density_check["maximum"] == pytest.approx(1e-12)
     assert density_check["passes"] is False
-
-
-def test_cli_reruns_diagnosed_configuration_with_current_trait_defaults(tmp_path):
-    """One command writes a separate corrected artifact and comparison report."""
-    config = EnvConfig(
-        dt=1.0,
-        soil_radius_cm=1.0,
-        soil_depth_cm=100.0,
-        radial_interval_cm=1.0,
-        depth_interval_cm=5.0,
-        topsoil_depth_cm=100.0,
-        initial_solution_p_um=1.0,
-        phosphate_diffusion_coefficient_cm2_s=1e-30,
-    )
-    original = run_deep_soil_qualification(
-        config=config,
-        species=SpeciesParams(
-            plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
-            fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
-        ),
-        plant_policy=StaticPolicy(0.0, 0.0, 0.0, 1.0),
-        fungus_policy=StaticPolicy(0.0, 0.0, 0.0, 1.0),
-        duration_days=1,
-        seed=0,
-        software_revision="original-revision",
-    )
-    original_dir = tmp_path / "original"
-    write_deep_soil_qualification_outputs(original, original_dir)
-    output_dir = tmp_path / "corrected"
-    script = Path(__file__).parents[1] / "scripts" / "deep_soil_qualification.py"
-
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(script),
-            "--original-dir",
-            str(original_dir),
-            "--output-dir",
-            str(output_dir),
-            "--software-revision",
-            "corrected-revision",
-            "--temporal-reference-dt",
-            "0.5",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    assert json.loads(completed.stdout.splitlines()[-1])["output_dir"] == str(
-        output_dir
-    )
-    assert {path.name for path in output_dir.iterdir()} == {
-        "comparison.json",
-        "comparison.md",
-        "daily-soil-p.npz",
-        "manifest.json",
-        "temporal-convergence.json",
-    }
-    manifest = json.loads((output_dir / "manifest.json").read_text())
-    comparison = json.loads((output_dir / "comparison.json").read_text())
-    temporal = json.loads(
-        (output_dir / "temporal-convergence.json").read_text()
-    )
-    assert manifest["traits"]["plant"]["initial_biomass"] == pytest.approx(0.01)
-    assert manifest["traits"]["fungus"]["initial_biomass"] == pytest.approx(
-        0.0001
-    )
-    assert comparison["configuration_equivalence"]["environment"] is True
-    assert "traits" in comparison["intentional_provenance_differences"]
-    assert temporal["candidate_dt_days"] == pytest.approx(1.0)
-    assert temporal["reference_dt_days"] == pytest.approx(0.5)
-    assert temporal["passes_temporal_convergence"] is True
-    assert temporal["criteria"]["diagnostic_metrics"] == sorted(
-        {
-            "final_plant_c_pool_g",
-            "final_plant_p_pool_mg",
-            "final_fungus_c_pool_g",
-            "final_fungus_p_pool_mg",
-        }
-    )

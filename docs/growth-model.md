@@ -246,11 +246,11 @@ construction-time validation immediately below those definitions.
   age-dependent uptake activity is represented.
 - **Accounting limitation:** Paid irreversible-loss P has no represented
   destination, while mortality P and reproduction P are explicit exports.
-- **Qualification gap:** The `2,000 cm cm⁻³` fungal-density default changes
-  colony extent and the sparse/continuous uptake blend. The numerical
-  qualification artifacts predate this change and will be regenerated with
-  the deep-soil rerun tracked by
-  [issue #18](https://github.com/isaachcamp/mycormarl/issues/18).
+- **Qualification scope:** The `2,000 cm cm⁻³` fungal-density default changes
+  colony extent and the sparse/continuous uptake blend. The canonical
+  numerical qualification now includes a deep-soil confinement and extended-P
+  balance check; issue #18 remains the tracking point for future parameter
+  requalification.
 
 ## References
 
