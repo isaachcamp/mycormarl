@@ -64,3 +64,40 @@ Maintenance-induced biomass loss therefore changes uptake geometry through the
 same biomass-to-geometry conversion as any other biomass change. The model does
 not retain thinning, damage, abandoned territory, or a historical growth front
 once biomass is restored.
+
+### Construction-carbon efficiency diagnostic
+
+A figure-level diagnostic that divides plant phosphate uptake by the
+structural carbon required to construct the absorbing length represented in a
+cell. For target absorber length `L = lambda * V_i`, plant-side construction
+carbon is computed analytically from the existing biomass-to-root-length
+relation and plant `gamma_c`; above-ground growth is not included.
+
+The diagnostic distinguishes fixed-bulk-concentration uptake (an intrinsic
+transport comparison) from finite-inventory uptake (realised depletion of a
+cell's phosphate pool). Absolute uptake is reported separately from uptake per
+construction carbon.
+
+Under plant economics, construction carbon is a constant multiple of absorber
+length. Uptake per construction carbon and uptake per unit absorber length
+therefore have the same structure across a geometry sweep and differ only by a
+constant scale factor.
+
+### Reference depletion timescale
+
+The finite-inventory time `t_1%` at which surface concentration first falls
+below one percent of its initial value. It is measured for a reference
+absorber, rather than used as the horizon for the construction-carbon
+efficiency surfaces. The configured uptake reference time `T_ref` remains the
+common horizon for those surfaces.
+
+### Time-dependent depletion-gradient diagnostic
+
+A fixed-reservoir, fixed-absorber experiment in which global experiment time
+controls the travel distance of the unresolved radial phosphate depletion
+gradient around an absorbing cylinder. The absorber radius, represented
+length, and length density do not grow or otherwise change.
+
+The diagnostic's global time coordinate is not colony propagation, organism
+age, or a production-model approximation for the ages of roots and hyphae.
+Using cohort age in the full model is a separate modelling problem.
