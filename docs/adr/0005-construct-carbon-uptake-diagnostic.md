@@ -1,6 +1,6 @@
 # ADR-0005: Separate construction-carbon efficiency from uptake scale
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0007
 
 ## Context
 

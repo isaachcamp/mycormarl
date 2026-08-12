@@ -69,27 +69,46 @@ once biomass is restored.
 
 A figure-level diagnostic that divides plant phosphate uptake by the
 structural carbon required to construct the absorbing length represented in a
-cell. For target absorber length `L = lambda * V_i`, plant-side construction
-carbon is computed analytically from the existing biomass-to-root-length
-relation and plant `gamma_c`; above-ground growth is not included.
+cell. Root-tissue structural-carbon density is inferred from the supplied
+plant `gamma_c`, specific root length, and reference root radius. For target
+absorber length `L = lambda * V_i`, construction carbon is
+`L * pi * r_a^2 * rho_C,root`. Root allocation fraction, above-ground growth,
+maintenance, reproduction, and whole-organism carbon budgets are excluded.
 
 The diagnostic distinguishes fixed-bulk-concentration uptake (an intrinsic
 transport comparison) from finite-inventory uptake (realised depletion of a
 cell's phosphate pool). Absolute uptake is reported separately from uptake per
 construction carbon.
 
-Under plant economics, construction carbon is a constant multiple of absorber
-length. Uptake per construction carbon and uptake per unit absorber length
-therefore have the same structure across a geometry sweep and differ only by a
-constant scale factor.
+Cells with `r_a >= R_terr`, where
+`R_terr = 1 / sqrt(pi * lambda)`, are touching or overlapping absorber
+geometries. They are retained and flagged in tabular output but masked from
+scientific surfaces.
+
+### Fungus-equivalent plant geometry
+
+A panel-specific reference on a construction-carbon efficiency surface. At
+native fungal length density, its plant absorber radius is solved continuously
+so that plant-economics P uptake per construction C equals the native fungal
+P-per-C value for the displayed metric. It is not the nearest sampled grid
+cell and can differ between integrated-uptake and instantaneous-rate panels.
+
+Efficiency panels also show actual fungal geometry evaluated with plant uptake
+and root-tissue construction economics. This counterfactual remains at the
+fungal coordinates, whereas the fungus-equivalent plant geometry is an
+on-surface, panel-specific plant geometry.
+
+Absolute-uptake and depletion-timescale panels instead use actual
+fungus-native geometry because they do not display construction economics.
 
 ### Reference depletion timescale
 
-The finite-inventory time `t_1%` at which surface concentration first falls
-below one percent of its initial value. It is measured for a reference
-absorber, rather than used as the horizon for the construction-carbon
-efficiency surfaces. The configured uptake reference time `T_ref` remains the
-common horizon for those surfaces.
+The finite-inventory time `t_1%` at which surface concentration reaches one
+percent of its initial value. It is obtained from a semi-analytical event-time
+calculation with uptake resistance and blending frozen at configured `T_ref`,
+rather than by stopping a fixed-duration timestep simulation. The configured
+`T_ref` remains the common horizon for the construction-efficiency and
+absolute-uptake surfaces.
 
 ### Time-dependent depletion-gradient diagnostic
 
