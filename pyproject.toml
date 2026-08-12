@@ -8,6 +8,8 @@ dependencies = [
     "jax>=0.9.0",
     "jax-dataclasses>=1.6.3",
     "jaxmarl>=0.0.2",
+    "matplotlib>=3.10.0",
+    "numpy>=2.0.0",
     "pytest>=9.0.2",
 ]
 
