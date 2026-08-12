@@ -99,6 +99,136 @@ and
 The density-derived cap, fixed reference time, and later sparse/continuous
 blend have no counterpart in Roose et al. (2001).
 
+## Where the effective uptake resistance comes from
+
+The resistance is the exact steady diffusive resistance of a cylindrical
+annulus, combined with the scale of the surface uptake kinetics. Consider one
+straight absorber of length $L$. In the temporary sub-grid problem there is no
+production or consumption between its surface $r=r_a$ and an outer matching
+radius $r=R$, so steady radial conservation gives
+
+$$
+\frac{1}{r}\frac{d}{dr}\left(r\frac{dC}{dr}\right)=0.
+$$
+
+Integrating twice and applying $C(r_a)=C_s$ and $C(R)=C_b$ gives the
+logarithmic cylindrical profile
+
+$$
+C(r)=C_s+(C_b-C_s)
+\frac{\ln(r/r_a)}{\ln(R/r_a)}.
+$$
+
+The inward diffusive supply through the absorber surface is therefore
+
+$$
+Q_{\mathrm{diff}}
+=2\pi r_aL D_{\mathrm{flux}}
+\left.\frac{dC}{dr}\right|_{r=r_a}
+=\frac{2\pi L D_{\mathrm{flux}}}
+{\ln(R/r_a)}(C_b-C_s).
+$$
+
+Equivalently, the purely transport part is a resistance per unit length,
+
+$$
+\mathcal R_{\mathrm{diff}}
+=\frac{\ln(R/r_a)}{2\pi D_{\mathrm{flux}}},
+\qquad
+\frac{Q_{\mathrm{diff}}}{L}
+=\frac{C_b-C_s}{\mathcal R_{\mathrm{diff}}}.
+$$
+
+Surface uptake over the same length is
+
+$$
+Q_{\mathrm{uptake}}
+=2\pi r_aLJ_{\max}\frac{C_s}{K_m+C_s}.
+$$
+
+Equating supply and uptake cancels $2\pi L$ and yields
+
+$$
+C_b-C_s
+=\underbrace{\frac{r_aJ_{\max}}{D_{\mathrm{flux}}}
+\ln\left(\frac{R}{r_a}\right)}_{k}
+\frac{C_s}{K_m+C_s}.
+$$
+
+Thus the code's `resistance` $k$ is not the bare transport resistance
+$\mathcal R_{\mathrm{diff}}$. It is that resistance multiplied by the maximum
+uptake capacity per unit length, $2\pi r_aJ_{\max}$, and consequently has
+units of concentration. It measures the concentration drop that diffusion
+would have to sustain at the kinetic scale $J_{\max}$. Increasing absorber
+radius, maximum influx, or the logarithmic travel distance increases $k$ and
+lowers $C_s$; increasing $D_{\mathrm{flux}}$ decreases $k$ and brings $C_s$
+closer to $C_b$. Absorber length does not appear in $k$ because both diffusive
+supply and absorbing area scale linearly with $L$.
+
+### Why the closure needs an effective outer radius
+
+A nonzero steady flux to an isolated cylinder cannot be matched to a finite
+constant concentration at radial infinity: the cylindrical solution varies as
+$\ln r$. The steady annular closure therefore needs a finite outer location
+where its unresolved local profile is joined to the resolved cell value
+$C_b$. $R_{\mathrm{eff}}$ is this **matching scale**. It is not a larger
+physical absorber radius, and it is not an explicitly tracked sharp depletion
+front.
+
+The repository bounds that scale in two different ways:
+
+1. Over the proxy exposure time $T_{\mathrm{ref}}$, a concentration
+   disturbance can propagate only a distance of order
+   $\sqrt{D_{\mathrm{app}}T_{\mathrm{ref}}}$. The apparent diffusivity
+   $D_{\mathrm{app}}=D_{\mathrm{flux}}/(\theta+b_p)$ is used here because
+   dissolved diffusion must also change the instantaneously buffered pool as
+   the profile advances. Measured outward from the absorber surface, this
+   gives the candidate radius
+   $r_a+\sqrt{D_{\mathrm{app}}T_{\mathrm{ref}}}$.
+2. Absorbers at length density $\lambda_{\mathrm{length}}$ cannot each be
+   assigned an unlimited independent soil volume. One unit of absorber length
+   has soil volume $1/\lambda_{\mathrm{length}}$ and hence cross-sectional
+   area $1/\lambda_{\mathrm{length}}$. Replacing that area by an equivalent
+   circle gives
+
+   $$
+   \pi R_{\mathrm{soil}}^2
+   =\frac{1}{\lambda_{\mathrm{length}}},
+   \qquad
+   R_{\mathrm{soil}}
+   =(\pi\lambda_{\mathrm{length}})^{-1/2}.
+   $$
+
+   Capping the matching radius at $R_{\mathrm{soil}}$ prevents neighbouring
+   absorbers from each claiming the same surrounding soil as an independent
+   sparse territory.
+
+Together these arguments give the implemented rule
+
+$$
+R_{\mathrm{eff}}
+=r_a+\min\left[
+\sqrt{D_{\mathrm{app}}T_{\mathrm{ref}}},
+\max(R_{\mathrm{soil}}-r_a,0)
+\right].
+$$
+
+The two bounds have different status. The diffusion length is a dimensional
+propagation estimate, while the territory radius is an area-partitioning
+construction. Imposing $C_b$ at their minimum is the closure assumption; a
+real territory boundary in an interacting array would generally require a
+symmetry or coupled-neighbour condition, not necessarily $C=C_b$. When the
+territory cap is reached, depletion zones are beginning to interact and the
+isolated sparse-annulus picture is least secure. The repository handles that
+regime separately through its sparse/continuous blend.
+
+Finally, $T_{\mathrm{ref}}$ is a fixed proxy rather than the age of a local
+root or hypha. The effective radius is therefore reconstructed from current
+geometry on every step; it does not carry a depletion front through time. The
+Roose matched radius below supplies a more precise transient matching rule for
+an isolated root, and makes clear which part of the implemented radius is a
+project-specific approximation.
+
 ## Exact algebraic relationship
 
 Let $C_s$ denote concentration at the absorber and define the repository
