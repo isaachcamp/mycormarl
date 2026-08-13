@@ -20,11 +20,13 @@ experiment time controls the diffusion travel distance in `R_eff(t)` and hence
 `k(t)`. Keep absorber radius, length density, represented length, reservoir
 concentration, and all uptake traits fixed.
 
-Plot instantaneous uptake rate per unit absorber length in one panel for each
-representative absorber radius. Annotate those panels with the 30-day
-cumulative total uptake for each density and closure. Do not add cumulative
-uptake trajectories: under a fixed reservoir they are direct integrals of the
-rate curves and do not expose an additional mechanism.
+Plot cumulative blended uptake by the represented cell in one panel for each
+representative absorber radius. The diagnostic applies the existing blend with
+elapsed experiment time in place of `T_ref`, so
+`w_cont(t_sim) = 1 / (1 + (t_diff / t_sim)^p)` and the request moves from its
+zero-time sparse/continuous identity toward the continuous closure. Mark each
+trajectory at its density- and radius-specific `t_diff` when that point lies
+within the plotted time range.
 
 Do not change the production closure or add a production switch as part of the
 diagnostic. A future production implementation must model absorber cohort age
@@ -34,8 +36,8 @@ rather than substitute global simulation time.
 
 - The diagnostic cleanly exposes depletion-gradient development without
   confounding growth or finite-inventory depletion.
-- The compact two-panel figure retains both the time-dependent mechanism and
-  its 30-day cell-scale outcome without a redundant cumulative-curve column.
+- The compact two-panel figure shows the accumulated cell-scale consequence of
+  the time-dependent blended closure.
 - Its global clock is valid because all diagnostic absorbers have the same
   known age.
 - The diagnostic cannot be reused unchanged as a production-model time switch.
