@@ -363,8 +363,10 @@ would give
 
 That full-day conversion is the accepted mapping under the apparent-gross
 carbon-input boundary adopted in Section 7. For comparison, the earlier net
-mapping used the repository fractions `kleaf = 0.30`, `kroot = 0.62`, and
-hence nonphotosynthetic shoot fraction `1 - kleaf - kroot = 0.08`:
+mapping used the then-current repository fractions `kleaf = 0.30`,
+`kroot = 0.62`, and hence nonphotosynthetic shoot fraction
+`1 - kleaf - kroot = 0.08`. It is historical and superseded for uptake
+geometry by the direct whole-plant `kfroot` trait:
 
 `kappa_c = 0.402 * [0.62*0.015*(16/24 + 0.5*8/24) + 0.08*0.021*(16/24 + 0.5*8/24) + 0.30*0.021*(0.5*8/24)] = 0.00410 g C g⁻¹ DM d⁻¹`.
 
