@@ -36,7 +36,7 @@ C_construction = L pi r_a^2 rho_C,root
 ```
 
 The defaults imply `rho_C,root ~= 0.05031 g C cm^-3`. This is absorbing root
-tissue only. `kroot`, shoots, maintenance, reproduction, reserves, and
+tissue only. `kfroot`, shoots, maintenance, reproduction, reserves, and
 whole-organism budgets are excluded. Custom plant traits redefine the inferred
 density.
 

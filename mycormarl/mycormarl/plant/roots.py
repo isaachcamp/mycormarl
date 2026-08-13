@@ -83,7 +83,7 @@ def root_disc_radii_from_biomass(
     total_root_length = jnp.squeeze(
         root_length_from_plant_biomass(
             biomass,
-            traits.kroot,
+            traits.kfroot,
             traits.specific_root_length,
         )
     )

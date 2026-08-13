@@ -22,7 +22,7 @@ from mycormarl.soil.absorber_diagnostic import (
 def test_root_tissue_carbon_density_is_inferred_from_supplied_traits():
     """A worked cylindrical-root fixture has density 2 g C cm^-3."""
     traits = PlantTraits(
-        kroot=0.01,
+        kfroot=0.01,
         root_radius=0.1,
         specific_root_length=20.0 / math.pi,
         gamma_c=0.4,
@@ -34,7 +34,7 @@ def test_root_tissue_carbon_density_is_inferred_from_supplied_traits():
 def test_plant_construction_carbon_scales_with_length_and_radius_squared():
     """Candidate cylinders are priced using the inferred root-tissue density."""
     traits = PlantTraits(
-        kroot=0.01,
+        kfroot=0.01,
         root_radius=0.1,
         specific_root_length=20.0 / math.pi,
         gamma_c=0.4,
@@ -61,7 +61,7 @@ def test_plant_construction_carbon_rejects_invalid_lengths(length_cm):
 def test_construction_normalisation_excludes_whole_organism_accounting_traits():
     """Only root tissue geometry and structural carbon define construction cost."""
     traits = PlantTraits(
-        kroot=0.5,
+        kfroot=0.5,
         specific_root_length=20.0,
         gamma_c=0.4,
         kleaf=0.99,
@@ -91,7 +91,7 @@ def test_construction_normalisation_excludes_whole_organism_accounting_traits():
 
 def test_initial_instantaneous_rate_is_per_second_and_timestep_independent():
     """Maximum rate is the uncapped initial closure rate, not accepted uptake/dt."""
-    traits = PlantTraits(kroot=0.5, specific_root_length=20.0, gamma_c=0.4)
+    traits = PlantTraits(kfroot=0.5, specific_root_length=20.0, gamma_c=0.4)
 
     rows = [
         run_absorber_geometry_sweep(

@@ -206,7 +206,7 @@ justification.
 | Fungal initial biomass and free pools | `0.0001 g`; `0.00005 g C`; `0.0002 mg P` | Living external mycelium in an early-established fixture, deliberately below the approximately `3–17 mg` mature external-mycelium measurements in *R. irregularis* root-organ microcosms ([Sun et al. (2024)](https://doi.org/10.1007/s00572-024-01154-8)). This is not inoculum, colonized-root mass, or a spore mass. Each free pool contains one structural-biomass equivalent. |
 | Plant $\gamma_C$ | `0.402 g C g⁻¹` | Carrot-root elemental analysis from [Kaur et al. (2022)](https://doi.org/10.1038/s41598-022-20971-5); a root-dominated proxy, not whole-plant calibration. |
 | Plant $\gamma_P$ | `1.92 mg P g⁻¹` | Derived dry-mass-weighted carrot value from [Kováčik et al. (2022)](https://doi.org/10.3390/agronomy12112770), an MDPI *Agronomy* paper; independent validation remains required. |
-| $k_{root}$, $SRL$ | `0.62`, `25,434.3 cm g⁻¹` | Separate *Daucus carota* medians from the [GRooT database](https://doi.org/10.1111/geb.13179); not matched observations from one specimen. |
+| $k_{froot}$, $SRL$, $r_{root}$ | `0.18`, `25,434.3 cm g⁻¹`, `0.01 cm` | `k_froot` is a representative value inside the directly observed `0.119–0.244` interval for six-month carrots in deep silica-sand greenhouse columns ([Westerveld 2005](https://bradford-crops.uoguelph.ca/sites/default/files/Sean%20Westerveld%20Thesis.pdf)); the SRL and effective radius are compatible but separately aggregated fine-root traits from [GRooT](https://doi.org/10.1111/geb.13179). This is not a field or wild-carrot default. |
 | $\beta$, $D_{root}$ | `0.96`, `150 cm` | Provisional depth profile and near-infinite rooting horizon. A shallower simulated domain retains only $F(D_{soil})/F(D_{root})$ of total roots. |
 | Fungal $\gamma_C$, $M_C$ | `0.5`, `0.1155 g C cm⁻³` | Provisional values from [Bisot et al. (2026)](https://doi.org/10.1073/pnas.2512182123). |
 | Fungal $\gamma_P$ | `2 mg P g⁻¹` | Approximate ordinary P concentration measured inside *Glomus intraradices* spores, a lineage now assigned to *Rhizophagus irregularis*, by [Olsson et al. (2008)](https://doi.org/10.1128/AEM.00376-08). This is a spore measurement used as fixed structural stoichiometry, not a maintenance measurement. |
@@ -237,9 +237,14 @@ construction-time validation immediately below those definitions.
   model does not simulate dormancy or germination.
 - **Assumption:** Mycelial density remains constant independent of soil
   P concentration.
-- **Limitation:** Plant root fraction covers fine- and taproots yet the length
-  density specified is fine-root-specific. This likely overestimates absorptive
-  surface.
+- **Assumption:** Represented absorbing length is $k_{froot} \times SRL$.
+  Its `0.119–0.244` uncertainty range is observed only in six-month deep-sand
+  greenhouse carrots. The GRooT SRL and effective radius
+  are species-level fine-root aggregates rather than values for one branch order.
+  The entire `k_froot` fraction is the only represented active plant absorber:
+  all of its reconstructed fine-root length is uptake-active, with no separate
+  inactive, coarse-root, or active-absorber fraction. This is not a default for
+  field or wild carrot.
 - **Limitation:** Both geometries are spatial closures, not explicit branching
   networks, and their saturation/density parameters require calibration.
 - **Limitation:** No maximum tissue age, turnover, dormancy, remobilisation, or

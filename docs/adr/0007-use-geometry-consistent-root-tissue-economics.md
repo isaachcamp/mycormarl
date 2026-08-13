@@ -29,7 +29,7 @@ the diagnostic:
     rho_C,root = gamma_C,plant / (SRL * pi * r_root,ref^2)
 
 The default traits give approximately `0.05031 g C cm^-3`. The root allocation
-fraction `kroot` is excluded because this diagnostic prices absorbing root
+fraction `kfroot` is excluded because this diagnostic prices absorbing root
 tissue only. For represented length `L = lambda V_i`, every plant-economics
 surface cell uses
 

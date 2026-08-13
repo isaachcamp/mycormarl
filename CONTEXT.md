@@ -60,6 +60,11 @@ organism's current biomass before soil uptake. These fields represent current
 living uptake infrastructure, not a persistent record of previously occupied
 soil.
 
+For the plant, the represented infrastructure is exactly its fine-root biomass:
+`kfroot` is the whole-plant mass fraction converted to absorbing length, and
+all of that represented fine-root length is uptake-active. The model has no
+separate inactive, coarse-root, or active-absorber fraction within `kfroot`.
+
 Maintenance-induced biomass loss therefore changes uptake geometry through the
 same biomass-to-geometry conversion as any other biomass change. The model does
 not retain thinning, damage, abandoned territory, or a historical growth front

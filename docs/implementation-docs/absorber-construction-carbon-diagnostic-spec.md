@@ -22,7 +22,7 @@ rho_C,root = gamma_C,plant / (SRL pi r_root,ref^2)
 C_construction = (lambda V_i) pi r_a^2 rho_C,root
 ```
 
-The default is approximately `0.05031 g C cm^-3`. Exclude `kroot`, above-ground
+The default is approximately `0.05031 g C cm^-3`. Exclude `kfroot`, above-ground
 growth, maintenance, reproduction, reserves, and whole-organism budgets.
 Custom plant traits redefine the inferred density.
 
@@ -139,7 +139,7 @@ depletion-gradient model.
 ## Testing Decisions
 
 - Recover inferred root carbon density from supplied `gamma_c`, SRL, and
-  reference root radius; verify `kroot` and unrelated organism economics do not
+  reference root radius; verify `kfroot` and unrelated organism economics do not
   enter it.
 - Verify construction C scales linearly with length and quadratically with
   candidate radius.

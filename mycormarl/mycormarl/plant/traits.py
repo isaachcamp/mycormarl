@@ -7,9 +7,10 @@ from flax import struct
 class PlantTraits:
     """Static functional traits for the plant partner.
 
-    Biomass is in grams dry mass. ``gamma_c`` is g C per g dry biomass,
+    Biomass is in grams dry mass. ``kfroot`` is represented fine-root mass
+    divided by whole-plant mass. ``gamma_c`` is g C per g dry biomass,
     ``gamma_p`` is mg P per g dry biomass, root radius is in cm, and specific
-    root length is cm root per g root dry mass. ``root_length_density`` is the
+    root length is cm root per g fine-root dry mass. ``root_length_density`` is the
     uniform within-disc ``lambda_root`` in cm root per cm³ bulk soil.
     ``amass`` is apparent-gross g C fixed per g leaf dry biomass for one
     reference day, spread uniformly through time by the current model.
@@ -27,7 +28,7 @@ class PlantTraits:
     initial_c_pool: float = 0.00402
     initial_p_pool: float = 0.0192
     kleaf: float = 0.30  # biomass fraction dedicated to photosynthesis
-    kroot: float = 0.62  # dry-biomass fraction assigned to roots
+    kfroot: float = 0.18  # fine-root dry-mass fraction of whole-plant dry mass
     amass: float = 0.05
     jmax: float = 3.26e-6  # µmol P cm^-2 s^-1
     km: float = 5.8e-3  # µmol P cm^-3
@@ -43,7 +44,6 @@ class PlantTraits:
     death_fraction: float = 0.20
     biomass_cap: float = 100.0
 
-
 def validate_plant_growth_geometry_traits(traits: PlantTraits) -> None:
     """Validate every plant trait that forms state or controls a rate."""
     for name in (
@@ -57,8 +57,8 @@ def validate_plant_growth_geometry_traits(traits: PlantTraits) -> None:
         value = getattr(traits, name)
         if not math.isfinite(value) or value <= 0.0:
             raise ValueError(f"plant {name} must be finite and greater than zero")
-    if not math.isfinite(traits.kroot) or not 0.0 <= traits.kroot <= 1.0:
-        raise ValueError("plant kroot must be finite and within [0, 1]")
+    if not math.isfinite(traits.kfroot) or not 0.0 <= traits.kfroot <= 1.0:
+        raise ValueError("plant kfroot must be finite and within [0, 1]")
     if not math.isfinite(traits.beta_root_distribution) or not (
         0.0 < traits.beta_root_distribution < 1.0
     ):

@@ -42,7 +42,7 @@ def test_accepted_growth_geometry_trait_defaults():
     assert plant.kappa_c == pytest.approx(0.007)
     assert plant.kappa_p == pytest.approx(0.001)
     assert plant.kleaf * plant.amass - plant.kappa_c == pytest.approx(0.008)
-    assert plant.kroot == pytest.approx(0.62)
+    assert plant.kfroot == pytest.approx(0.18)
     assert plant.specific_root_length == pytest.approx(25_434.3)
     assert plant.root_radius == pytest.approx(0.01)
     assert plant.root_length_density == pytest.approx(1.0)
@@ -147,7 +147,7 @@ def test_length_conversions_are_jittable():
 def test_root_density_conserves_length_on_nonuniform_input_cells():
     """Integrates the stacked-disc field on explicitly nonuniform input edges."""
     traits = PlantTraits(
-        kroot=0.25,
+        kfroot=0.25,
         specific_root_length=100.0,
         root_length_density=100.0,
         beta_root_distribution=0.5,
@@ -171,7 +171,7 @@ def test_root_density_conserves_length_on_nonuniform_input_cells():
 def test_root_disc_radii_decrease_with_beta_weighted_depth():
     """Uses one uniform density while deeper beta-weighted discs grow slower."""
     traits = PlantTraits(
-        kroot=1.0,
+        kfroot=1.0,
         specific_root_length=10.0,
         root_length_density=2.0,
         beta_root_distribution=0.5,
@@ -194,7 +194,7 @@ def test_root_disc_radii_decrease_with_beta_weighted_depth():
 def test_root_density_is_uniform_inside_depth_specific_discs():
     """Keeps occupied cell density at lambda_root across all depth layers."""
     traits = PlantTraits(
-        kroot=1.0,
+        kfroot=1.0,
         specific_root_length=1.0,
         root_length_density=1.0,
         beta_root_distribution=0.5,
@@ -219,7 +219,7 @@ def test_root_density_is_uniform_inside_depth_specific_discs():
 def test_root_geometry_clips_each_layer_at_radial_domain_boundary():
     """Represents the analytical disc-domain intersection at lambda_root."""
     traits = PlantTraits(
-        kroot=0.25,
+        kfroot=0.25,
         specific_root_length=100.0,
         root_length_density=1.0,
         beta_root_distribution=0.5,
@@ -255,7 +255,7 @@ def test_root_geometry_clips_each_layer_at_radial_domain_boundary():
 def test_truncated_soil_retains_only_analytical_root_fraction():
     """Keeps below-domain roots implicit while retaining their biomass cost."""
     traits = PlantTraits(
-        kroot=1.0,
+        kfroot=1.0,
         specific_root_length=100.0,
         root_length_density=1.0,
         beta_root_distribution=0.96,
@@ -266,7 +266,7 @@ def test_truncated_soil_retains_only_analytical_root_fraction():
     volumes = axisymmetric_cylindrical_cell_volumes(r_edges, z_edges)
     total_root_length = root_length_from_plant_biomass(
         biomass_g=jnp.array([1.0]),
-        root_mass_fraction=traits.kroot,
+        root_mass_fraction=traits.kfroot,
         specific_root_length_cm_g=traits.specific_root_length,
     )
 
@@ -288,7 +288,7 @@ def test_truncated_soil_retains_only_analytical_root_fraction():
 def test_root_distribution_is_zero_below_maximum_rooting_depth():
     """Prevents a soil domain deeper than the rooting horizon creating roots."""
     traits = PlantTraits(
-        kroot=1.0,
+        kfroot=1.0,
         specific_root_length=10.0,
         root_length_density=10.0,
         beta_root_distribution=0.5,
@@ -489,7 +489,7 @@ def test_reset_initialises_geometry_from_initial_structural_biomass():
     hyphal_length = jnp.sum(state.hyphae_length_density * env.cell_volumes)
     expected_root = root_length_from_plant_biomass(
         species.plant.initial_biomass,
-        species.plant.kroot,
+        species.plant.kfroot,
         species.plant.specific_root_length,
     )
     expected_hypha = hyphal_length_from_fungal_biomass(
@@ -579,7 +579,7 @@ def test_maintenance_biomass_loss_contracts_geometry(monkeypatch):
     [
         ("plant", "gamma_c", 0.0),
         ("plant", "gamma_p", -1.0),
-        ("plant", "kroot", 1.1),
+        ("plant", "kfroot", 1.1),
         ("plant", "specific_root_length", -1.0),
         ("plant", "root_length_density", 0.0),
         ("plant", "max_rooting_depth_cm", 0.0),

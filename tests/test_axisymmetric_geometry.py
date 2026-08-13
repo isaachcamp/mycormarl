@@ -209,7 +209,7 @@ def test_colony_radius_from_length_axisymmetric_inverts_hemisphere_volume():
 def test_axisymmetric_stacked_disc_root_density_conserves_total_length():
     """Checks the provisional root field integrates to represented length."""
     traits = PlantTraits(
-        kroot=0.25,
+        kfroot=0.25,
         specific_root_length=100.0,
         root_length_density=100.0,
         beta_root_distribution=0.5,
