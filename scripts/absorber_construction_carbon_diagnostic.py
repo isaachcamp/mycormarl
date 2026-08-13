@@ -283,6 +283,166 @@ def _plot_depletion_timescale(rows, output_dir: Path, reference_time_days: float
     _save_figure(fig, output_dir, "depletion_timescale")
 
 
+def _plot_synthesis(rows, output_dir: Path) -> None:
+    """Summarise finite-inventory efficiency, scale, depletion, and capture speed."""
+    mode = "finite_inventory"
+    efficiency_metric = "integrated_uptake_per_construction_carbon_micromol_g_c"
+    uptake_metric = "integrated_uptake_micromol"
+    rate_metric = "maximum_instantaneous_uptake_rate_micromol_s"
+    time_metric = "t_1_percent_days"
+    fig, axes = plt.subplots(2, 2, figsize=(8.4, 7.2), constrained_layout=True)
+
+    surface_panels = (
+        (
+            axes[0, 0],
+            efficiency_metric,
+            "P acquired per construction C",
+            "µmol P g C⁻¹",
+            "viridis",
+            True,
+        ),
+        (
+            axes[0, 1],
+            uptake_metric,
+            "P acquired over one day",
+            "µmol P",
+            "viridis",
+            False,
+        ),
+        (
+            axes[1, 0],
+            time_metric,
+            "Surface-P depletion timescale",
+            "t₁% (day)",
+            "cividis",
+            False,
+        ),
+    )
+    for ax, metric, title, colour_label, cmap_name, efficiency in surface_panels:
+        radii, densities, values = _surface_matrix(rows, mode, metric)
+        cmap = matplotlib.colormaps[cmap_name].copy()
+        cmap.set_bad("#d9d9d9")
+        mesh = ax.pcolormesh(
+            _log_edges(radii),
+            _log_edges(densities),
+            np.ma.masked_invalid(values),
+            shading="flat",
+            cmap=cmap,
+            norm=_positive_norm(values),
+            rasterized=True,
+        )
+        _add_invalid_geometry_boundary(ax, radii, densities)
+        _add_reference_markers(ax, rows, mode, metric, efficiency=efficiency)
+        _format_geometry_axes(ax)
+        ax.set_title(title)
+        fig.colorbar(mesh, ax=ax, label=colour_label, shrink=0.82)
+
+    frontier = axes[1, 1]
+    surface_rows = [
+        row
+        for row in rows
+        if row["record_type"] == "surface"
+        and row["experiment_mode"] == mode
+        and row["geometry_valid"]
+        and row[efficiency_metric] > 0.0
+        and row[rate_metric] > 0.0
+    ]
+    all_radii = np.array([row["absorber_radius_cm"] for row in surface_rows])
+    all_densities = np.array(
+        [row["length_density_cm_cm3"] for row in surface_rows]
+    )
+    unique_radii = np.unique(all_radii)
+    unique_densities = np.unique(all_densities)
+    sampled_radii = set(unique_radii[::max(len(unique_radii) // 10, 1)])
+    sampled_densities = set(
+        unique_densities[::max(len(unique_densities) // 10, 1)]
+    )
+    sampled_rows = [
+        row
+        for row in surface_rows
+        if row["absorber_radius_cm"] in sampled_radii
+        and row["length_density_cm_cm3"] in sampled_densities
+    ]
+    radii = np.array([row["absorber_radius_cm"] for row in sampled_rows])
+    densities = np.array([row["length_density_cm_cm3"] for row in sampled_rows])
+    efficiency = np.array([row[efficiency_metric] for row in sampled_rows])
+    rates = np.array([row[rate_metric] for row in sampled_rows])
+    density_log = np.log10(densities)
+    density_log_min = np.log10(all_densities.min())
+    density_log_span = np.log10(all_densities.max()) - density_log_min
+    sizes = 12.0 + 70.0 * (density_log - density_log_min) / density_log_span
+    scatter = frontier.scatter(
+        efficiency,
+        rates,
+        c=radii,
+        s=sizes,
+        cmap="plasma_r",
+        norm=LogNorm(vmin=float(radii.min()), vmax=float(radii.max())),
+        alpha=0.3,
+        edgecolors="none",
+        rasterized=True,
+    )
+    colourbar_mappable = matplotlib.cm.ScalarMappable(
+        norm=scatter.norm, cmap=scatter.cmap
+    )
+    colourbar_mappable.set_array(radii)
+    for row in rows:
+        if (
+            row["record_type"] != "marker"
+            or row["experiment_mode"] != mode
+            or row["marker_label"] not in {"plant_native", "fungus_native"}
+        ):
+            continue
+        native_density = row["length_density_cm_cm3"]
+        native_size = 12.0 + 70.0 * (
+            np.log10(native_density) - density_log_min
+        ) / density_log_span
+        frontier.scatter(
+            row[efficiency_metric],
+            row[rate_metric],
+            c=[row["absorber_radius_cm"]],
+            s=native_size,
+            cmap="plasma_r",
+            norm=LogNorm(vmin=float(radii.min()), vmax=float(radii.max())),
+            alpha=1.0,
+            edgecolors="none",
+            zorder=4,
+        )
+        label = "P" if row["marker_label"] == "plant_native" else "F"
+        frontier.annotate(
+            label,
+            (row[efficiency_metric], row[rate_metric]),
+            xytext=(4, -5),
+            textcoords="offset points",
+            ha="left",
+            va="top",
+            fontsize=8,
+            fontweight="bold",
+            zorder=5,
+        )
+    frontier.set_xscale("log")
+    frontier.set_yscale("log")
+    frontier.set_xlabel("P acquired / construction C (µmol P g C⁻¹)")
+    frontier.set_ylabel("Initial P capture rate (µmol P s⁻¹)")
+    frontier.set_title("P-foraging advantage frontier")
+    fig.colorbar(
+        colourbar_mappable,
+        ax=frontier,
+        label="Absorber radius (cm)",
+        shrink=0.82,
+    )
+    _marker_legend(
+        [
+            Line2D([0], [0], marker="o", color="none", markerfacecolor="white", markeredgecolor="black", label="Plant-native"),
+            Line2D([0], [0], marker="s", color="none", markerfacecolor="white", markeredgecolor="black", label="Fungal geometry, plant economics"),
+            Line2D([0], [0], marker="^", color="none", markerfacecolor="white", markeredgecolor="black", label="Fungus-equivalent plant geometry"),
+            Line2D([0], [0], marker="*", color="none", markerfacecolor="white", markeredgecolor="black", label="Fungus-native"),
+        ],
+        fig,
+    )
+    _save_figure(fig, output_dir, "finite_inventory_foraging_synthesis")
+
+
 def write_diagnostic_artifacts(
     rows: list[dict[str, object]],
     output_dir: Path,
@@ -298,6 +458,7 @@ def write_diagnostic_artifacts(
     _plot_metric_pair(rows, output_dir, efficiency=True)
     _plot_metric_pair(rows, output_dir, efficiency=False)
     _plot_depletion_timescale(rows, output_dir, reference_time_days)
+    _plot_synthesis(rows, output_dir)
 
 
 def main(argv: list[str] | None = None) -> None:

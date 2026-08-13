@@ -479,7 +479,12 @@ def test_cli_writes_tabular_data_and_publication_figure_formats(tmp_path):
         if row["record_type"] == "surface" and row["geometry_valid"] == "False"
     )
 
-    for stem in ("construction_carbon_efficiency", "uptake_scale", "depletion_timescale"):
+    for stem in (
+        "construction_carbon_efficiency",
+        "uptake_scale",
+        "depletion_timescale",
+        "finite_inventory_foraging_synthesis",
+    ):
         svg = tmp_path / f"{stem}.svg"
         png = tmp_path / f"{stem}.png"
         assert svg.stat().st_size > 1_000
@@ -501,3 +506,15 @@ def test_cli_writes_tabular_data_and_publication_figure_formats(tmp_path):
     assert "Plant-native" in timescale_svg
     assert "Fungus-native" in timescale_svg
     assert "t₁% (day)" in timescale_svg
+    synthesis_svg = (tmp_path / "finite_inventory_foraging_synthesis.svg").read_text()
+    assert "P-foraging advantage frontier" in synthesis_svg
+    assert "Initial P capture rate" in synthesis_svg
+    assert "P acquired / construction C" in synthesis_svg
+    assert ">P<" in synthesis_svg
+    assert ">F<" in synthesis_svg
+    assert synthesis_svg.count("Plant-native") == 1
+    assert synthesis_svg.count("Fungus-native") == 1
+    assert synthesis_svg.count("Fungal geometry, plant economics") == 1
+    assert synthesis_svg.count("Fungus-equivalent plant geometry") == 1
+    assert "low density" not in synthesis_svg
+    assert "high density" not in synthesis_svg
