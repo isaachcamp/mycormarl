@@ -106,21 +106,23 @@ def test_state_observations_use_agreed_feature_equations_and_order():
 
 
 def test_plant_biomass_observation_reference_is_independent_of_growth_cap():
-    env = _environment(
-        plant=PlantTraits(
-            initial_biomass=25.0,
-            initial_c_pool=0.0,
-            initial_p_pool=0.0,
-            biomass_cap=50.0,
-            biomass_observation_reference=50.0,
-            kappa_c=0.0,
-            kappa_p=0.0,
+    observations = []
+    for biomass_cap in (50.0, 100.0):
+        env = _environment(
+            plant=PlantTraits(
+                initial_biomass=25.0,
+                initial_c_pool=0.0,
+                initial_p_pool=0.0,
+                biomass_cap=biomass_cap,
+                biomass_observation_reference=50.0,
+                kappa_c=0.0,
+                kappa_p=0.0,
+            )
         )
-    )
+        observation, _ = env.reset(jax.random.PRNGKey(0))
+        observations.append(observation[PLANT][0])
 
-    observations, _ = env.reset(jax.random.PRNGKey(0))
-
-    assert observations[PLANT][0] == pytest.approx(1.0 / 3.0)
+    np.testing.assert_allclose(observations, [1.0 / 3.0, 1.0 / 3.0])
 
 
 def test_received_trade_is_reconstructed_from_state_against_maintenance_need():
