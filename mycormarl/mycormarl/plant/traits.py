@@ -21,7 +21,9 @@ class PlantTraits:
     Structural P is represented only by ``gamma_p``. ``jmax`` is µmol P
     cm^-2 s^-1 and ``km`` is µmol P cm^-3. Initial free C and P pools each
     contain one structural-biomass equivalent at the configured initial
-    biomass.
+    biomass. ``biomass_cap`` is a numerical growth guard in g dry mass;
+    ``biomass_observation_reference`` is the independent g dry mass scale used
+    by the bounded actor observation.
     """
 
     initial_biomass: float = 0.01
@@ -42,7 +44,8 @@ class PlantTraits:
     kappa_c: float = 0.007
     kappa_p: float = 0.001
     death_fraction: float = 0.20
-    biomass_cap: float = 100.0
+    biomass_cap: float = 50.0
+    biomass_observation_reference: float = 50.0
 
 def validate_plant_growth_geometry_traits(traits: PlantTraits) -> None:
     """Validate every plant trait that forms state or controls a rate."""
@@ -79,6 +82,13 @@ def validate_plant_growth_geometry_traits(traits: PlantTraits) -> None:
         raise ValueError("plant death_fraction must be finite and within [0, 1]")
     if not math.isfinite(traits.biomass_cap) or traits.biomass_cap <= 0.0:
         raise ValueError("plant biomass_cap must be finite and greater than zero")
+    if (
+        not math.isfinite(traits.biomass_observation_reference)
+        or traits.biomass_observation_reference <= 0.0
+    ):
+        raise ValueError(
+            "plant biomass_observation_reference must be finite and greater than zero"
+        )
     if not math.isfinite(traits.jmax) or traits.jmax < 0.0:
         raise ValueError("plant jmax must be finite and non-negative")
     if not math.isfinite(traits.km) or traits.km <= 0.0:

@@ -133,7 +133,7 @@ o_B = B / (B + s_B)
 For the plant:
 
 ```text
-s_B,plant = 0.5 * plant.biomass_cap
+s_B,plant = plant.biomass_observation_reference
 ```
 
 For the fungus, first calculate the biomass whose existing saturated

@@ -147,9 +147,10 @@ class BaseMycorMarl(MultiAgentEnv):
 
     def get_obs(self, state: State) -> Dict[str, chex.Array]:
         """Reconstruct bounded actor observations entirely from environment state."""
-        # Calculate reference biomasses for normalization.
-        # Use 0.5 * maximum so that normed obs is also half-maximum.
-        plant_biomass_reference = 0.5 * self.species.plant.biomass_cap
+        # Keep policy-input scaling independent of the numerical growth guard.
+        plant_biomass_reference = (
+            self.species.plant.biomass_observation_reference
+        )
 
         # Calculate ref biomass based on maximum radius possible constrained by
         # grid boundaries.

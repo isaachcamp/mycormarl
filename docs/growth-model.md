@@ -54,6 +54,13 @@ Start-pool timing and the biomass cap are protected by
 [`test_newly_fixed_carbon_is_not_available_for_same_step_growth`](../tests/test_base_mycor_refactor.py#L114-L128)
 and [`test_plant_growth_at_biomass_cap_charges_only_realised_structure`](../tests/test_base_mycor_refactor.py#L129-L155).
 
+The default plant guard is `50 g DM`, selected as headroom above a
+`25--35 g DM` favourable carrot trajectory rather than as a carrying-capacity
+estimate. Contact invalidates a qualification trajectory. Actor scaling is
+independent: `biomass_observation_reference=50 g DM` preserves the previous
+policy-input scale without coupling it to growth truncation. See
+[ADR-0011](adr/0011-separate-the-plant-biomass-guard-from-policy-observation-scaling.md).
+
 ## Plant carbon input
 
 The plant receives apparent-gross carbon according to

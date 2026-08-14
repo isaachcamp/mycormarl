@@ -47,6 +47,8 @@ def test_accepted_growth_geometry_trait_defaults():
     assert plant.root_radius == pytest.approx(0.01)
     assert plant.root_length_density == pytest.approx(1.0)
     assert plant.max_rooting_depth_cm == pytest.approx(150.0)
+    assert plant.biomass_cap == pytest.approx(50.0)
+    assert plant.biomass_observation_reference == pytest.approx(50.0)
 
     assert fungus.gamma_c == pytest.approx(0.5)
     assert fungus.gamma_p == pytest.approx(2.0)

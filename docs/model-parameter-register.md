@@ -23,11 +23,21 @@ transport and uptake values are inherited provisionally from Schnepf and Roose's
 phosphate model.
 
 The most important unsupported or explicitly abstract defaults are plant and fungal
-death thresholds, plant biomass cap, fungal carbon maintenance, plant leaf fraction,
+death thresholds, fungal carbon maintenance, plant leaf fraction,
 root absorbing radius, root spatial-density and depth-profile parameters, the uptake
 transition timescale and exponent, and the reproductive reward exponent. Plant and
 fungal `kappa_p` are not measured maintenance costs: both are modelled irreversible
 free-P losses. Structural or “frozen” phosphorus belongs only to `gamma_p`.
+
+For the planned 120-day cultivated-carrot study, the effective carbon-input
+scale requires qualification before policy training. A favourable `Forto`
+field trajectory reached `23.26 g` shoot-plus-storage-root dry mass at 120 days
+after sowing, with successive 20-day RGRs declining from approximately `0.066`
+to `0.042 d^-1`. The current carbon-only sustained ceiling is about
+`0.0199 d^-1`. The leaf-level `amass=0.05` remains defensible for its named
+reference light regime; the larger mismatch is the fixed `kleaf=0.30`, because
+the same trajectory's leaf fraction declined from about `0.81` to `0.23`. See
+the [growth-scale research note](research/carrot-growth-biomass-cap-and-carbon-fixation.md).
 
 There is also one current configuration defect. `EnvConfig.topsoil_depth_cm` is declared
 as `None`, although validation requires a finite number and the scientific documents
@@ -122,9 +132,9 @@ continuous closures are blended using `uptake_reference_time_days` and
 | `initial_biomass` | `0.01 g DM` | Plant dry biomass at reset; immediately determines starting root length, photosynthetic input, maintenance demand, and death reference. | Early-established seedling fixture chosen above the `0.7–3.3 mg` *Daucus carota* propagule means ([Vandelook et al. 2024](https://doi.org/10.1017/S0960258524000230)) and below later resource-exchange harvests. **Qualification-informed modelling choice.** |
 | `initial_c_pool` | `0.00402 g C` | Free, allocatable carbon at reset; this is additional to structural C implicit in biomass. | One structural-biomass equivalent: `0.01 × 0.402`. **Derived model initial condition.** |
 | `initial_p_pool` | `0.0192 mg P` | Free, allocatable phosphorus at reset; additional to structural P implicit in biomass. | One structural-biomass equivalent: `0.01 × 1.92`. **Derived model initial condition.** |
-| `kleaf` | `0.30` | Fraction of whole-plant dry biomass contributing to photosynthesis; carbon input is directly proportional to it. | No quantitative source is currently recorded. It is not a partition complement to `kfroot`; the remaining mass is an implicit non-root, non-photosynthetic component. **Unsupported.** |
+| `kleaf` | `0.30` | Fraction of whole-plant dry biomass contributing to photosynthesis; carbon input is directly proportional to it. | `Forto` fitted shoot and storage-root curves imply a leaf fraction declining from `0.812` at 40 DAS to `0.234` at 120 DAS ([Cecilio Filho & Peixoto 2013](https://repositorio.unesp.br/bitstream/11449/75622/1/2-s2.0-84878476833.pdf)); fine roots were excluded from that denominator. The default is therefore mature-stage scale and understates early and middle source mass. It is not a partition complement to `kfroot`. Test fixed `0.30/0.45/0.60` before the pilot, treating `0.60` only as an age-averaged sensitivity; an ontogenetic leaf-mass or leaf-area state is preferred for final inference. **Stage-informed model choice; unsupported as a constant whole-episode fraction.** |
 | `kfroot` | `0.18` | Fine/fibrous-root dry mass divided by whole-plant dry mass. It is the only represented active plant-absorber fraction: the model converts all `kfroot × specific_root_length` to uptake-active fine-root length, with no inactive, coarse-root, or secondary active-fraction correction. | Representative value inside the directly observed `0.119–0.244` interval for six-month `Idaho` and `Fontana` carrots grown in 150-cm, 98%-silica-sand greenhouse columns ([Westerveld 2005](https://bradford-crops.uoguelph.ca/sites/default/files/Sean%20Westerveld%20Thesis.pdf), Table 2.18 and Appendix A2.16). Treat those endpoints as the uncertainty range for this late deep-sand regime. Mature field `Nantes Duke` observations have a different denominator—fibrous root / total root `0.0177–0.0329`—so they cannot be converted to `kfroot` without matched shoot and storage-root mass. Neither range is a field or wild-carrot default. **Derived; cultivation-regime scoped.** |
-| `amass` | `0.05 g C g⁻¹ leaf DM reference-day⁻¹` | Apparent-gross daily leaf-mass carbon input. Higher values raise free C linearly; the current implementation spreads the reference-day budget uniformly. | Carrot net light-response curves were evaluated at `450 µmol photons m⁻² s⁻¹`, their fitted respiration intercept was added, and the result was integrated over a 16 h photoperiod ([Kyei-Boahen et al. 2003](https://ps.ueb.cas.cz/pdfs/phs/2003/02/30.pdf)). Conversion used independent carrot SLA `66–94 cm² g⁻¹` ([Acosta-Motos et al. 2021](https://doi.org/10.3390/agronomy11122460)), producing `0.036–0.073` with midpoint `0.051`, rounded to `0.05`. Photorespiration remains embedded. **Derived from two studies.** |
+| `amass` | `0.05 g C g⁻¹ leaf DM reference-day⁻¹` | Apparent-gross daily leaf-mass carbon input. Higher values raise free C linearly; the current implementation spreads the reference-day budget uniformly. | Carrot net light-response curves were evaluated at `450 µmol photons m⁻² s⁻¹`, their fitted respiration intercept was added, and the result was integrated over a 16 h photoperiod ([Kyei-Boahen et al. 2003](https://ps.ueb.cas.cz/pdfs/phs/2003/02/30.pdf)). Conversion used independent carrot SLA `66–94 cm² g⁻¹` ([Acosta-Motos et al. 2021](https://doi.org/10.3390/agronomy11122460)), producing `0.036–0.073` with midpoint `0.051`, rounded to `0.05`. Approximate `0.06–0.07` sensitivities correspond to brighter `700–1000 µmol m⁻² s⁻¹` reference conditions; they are not corrections for missing ontogenetic leaf allocation. Photorespiration remains embedded. **Derived from two studies.** |
 | `jmax` | `3.26e-6 µmol P cm⁻² s⁻¹` | Maximum root-surface P influx in both sparse and continuous uptake closures. Higher values increase kinetic demand but may intensify local diffusion limitation or inventory capping. | Tinker and Nye uptake value reported and used by [Schnepf & Roose (2006)](https://doi.org/10.1111/j.1469-8137.2006.01771.x), not a carrot measurement. **Transferred.** |
 | `km` | `5.8e-3 µmol P cm⁻³` (`5.8 µM`) | Half-saturation concentration for root P uptake; lower values maintain a larger fraction of `jmax` at low solution P. | Same source and transfer as `jmax`; not carrot-specific. **Transferred.** |
 | `root_radius` | `0.01 cm` (`100 µm`) | Effective fine-root radius; converts represented fine-root length to absorbing lateral area and enters cylindrical sparse-uptake resistance. | Half the GRooT *D. carota* fine-root diameter median (`0.2036 mm`, 12 study-site entries) is `0.01018 cm`, rounded to `0.01 cm` ([Guerrero-Ramírez et al. 2021](https://doi.org/10.1111/geb.13179)). A cultivated-field fibrous-root study found length-dominant roots about `0.15 mm` diameter; use `0.0075–0.0114 cm` as a sensitivity range. Diameter, SRL, and mass pair are not a matched plant-level observation. **Derived effective fine-root trait.** |
@@ -137,7 +147,8 @@ continuous closures are blended using `uptake_reference_time_days` and
 | `kappa_c` | `0.007 g C g⁻¹ whole-plant DM d⁻¹` | Unavoidable standing-biomass C maintenance paid before action; deficits remove biomass. It intentionally excludes a future construction-efficiency term. | `0.402 × (0.38×0.021 + 0.62×0.015) = 0.00694`, rounded to `0.007`, using carrot shoot/root maintenance coefficients at 20 °C ([Reid 2019](https://doi.org/10.1080/01140671.2019.1588134)). **Derived.** |
 | `kappa_p` | `0.001 mg P g⁻¹ whole-plant DM d⁻¹` | Lumped irreversible free-P loss paid before action. It represents omitted herbivory, leakage, and unrecovered turnover, not biochemical P maintenance or structural immobilisation. | No carrot study directly estimates the coefficient. Carrot time courses show continued P accumulation and redistribution ([Fernández-Pérez et al. 2023](https://doi.org/10.17584/rcch.2023v17i3.16508); [Cecílio Filho et al. 2013](https://acervodigital.unesp.br/handle/11449/75622)). The positive value is an explicit small-loss abstraction; zero is the conservation sensitivity case. **Model choice, not literature-backed.** |
 | `death_fraction` | `0.20` | The plant dies when post-maintenance biomass falls below 20% of its historical maximum. It is a deterministic termination threshold, not daily mortality. | No empirical derivation is recorded. **Unsupported.** |
-| `biomass_cap` | `100 g DM` | Hard cap on plant biomass and realised structural growth; also supplies the plant biomass observation scale. | No pot, cultivar, age, or harvest-stage source is recorded. **Unsupported scenario choice.** |
+| `biomass_cap` | `50 g DM` | Hard numerical guard on plant biomass and realised structural growth. Contact invalidates a qualification trajectory; it is not a physiological plateau. | Comparable field endpoints are approximately `22--25 g DM`; `Forto` reached `23.26 g` at 120 DAS and its unobserved fitted shoot-plus-storage-root asymptote is `35.05 g` ([Cecilio Filho & Peixoto 2013](https://repositorio.unesp.br/bitstream/11449/75622/1/2-s2.0-84878476833.pdf); [Gomes et al. 2021](https://doi.org/10.4025/actasciagron.v43i1.51831)). `50 g` leaves about 43% headroom over the fitted asymptote and roughly twofold headroom over the largest independent cultivar mean, while replacing the unsupported `100 g` scale. **Evidence-bounded numerical/model guard; not a biological maximum.** |
+| `biomass_observation_reference` | `50 g DM` | Independent reference in the bounded actor feature `B / (B + reference)`. It changes policy-input scaling but does not constrain growth. | Preserves the previous observation scale, which was implicitly `0.5 * biomass_cap = 50 g` under the old `100 g` cap. It is now decoupled so cap changes do not confound model dynamics with policy inputs. **Policy-interface model choice.** |
 
 ## Fungal parameters
 
@@ -183,9 +194,11 @@ continuous closures are blended using `uptake_reference_time_days` and
 
 The following defaults should not be presented as measurements:
 
-- **Unsupported organism values:** plant `kleaf`, `root_radius`,
+- **Unsupported organism values:** plant constant whole-episode `kleaf`, `root_radius`,
   `root_length_density`, `beta_root_distribution`, `max_rooting_depth_cm`,
-  `death_fraction`, and `biomass_cap`; fungal `kappa_c` and `death_fraction`.
+  `death_fraction`, and any interpretation of `biomass_cap` as a biological
+  maximum; fungal `kappa_c`
+  and `death_fraction`.
 - **Explicit biological abstractions:** plant and fungal `kappa_p`. Literature
   informs their scale and interpretation, but not the selected irreversible fraction.
 - **Explicit uptake/reward choices:** `uptake_reference_time_days`,
@@ -196,29 +209,36 @@ The following defaults should not be presented as measurements:
   `consumer_mode`, both grid intervals, and `diffusion_cfl_safety`.
 
 Several literature-linked parameters also remain weakly transferred: root and fungal
-uptake kinetics are not species-specific; root radius is wholly unsourced; fungal tissue
-C density is acknowledged as uncertain; root fraction and SRL are unmatched GRooT
+uptake kinetics are not species-specific; root radius is derived from unmatched
+species-level and cultivated-field evidence; fungal tissue C density is acknowledged
+as uncertain; root fraction and SRL are unmatched GRooT
 aggregates; plant `gamma_c` is root-dominated; plant `gamma_p` needs independent
 corroboration; and spore-derived fungal `gamma_p` is used as fixed whole-fungus
 stoichiometry.
 
 ## Known gaps and recommended parameter work
 
-1. Fix the `topsoil_depth_cm` declaration/documentation mismatch before calling the
+1. Qualify the 120-day plant carbon and growth scale before the P-response
+   pilot. Test `kleaf=0.30/0.45/0.60`, retain `amass=0.05` for the named
+   450-PAR reference day, and compare windowed RGR and biomass against the
+   `Forto` trajectory. Use the independent `50 g` numerical guard and reject
+   any guard-contacting trajectory. Prefer an explicit ontogenetic leaf-mass
+   or leaf-area state before final inference.
+2. Fix the `topsoil_depth_cm` declaration/documentation mismatch before calling the
    complete `EnvConfig()` set a runnable default.
-2. Obtain a direct mean seed-mass estimate for the intended *D. carota* population;
+3. Obtain a direct mean seed-mass estimate for the intended *D. carota* population;
    the current `1 mg` value is only bounded by a multi-population range.
-3. Prioritise fungal `kappa_c`, because it is a large direct standing sink with no
+4. Prioritise fungal `kappa_c`, because it is a large direct standing sink with no
    recorded evidence and controls fungal dependence on traded plant C.
-4. Replace the plant root radius and spatial-density/depth parameters with matched
+5. Replace the plant root radius and spatial-density/depth parameters with matched
    *D. carota* fine-root measurements; these directly determine absorbing area and
    overlap geometry.
-5. Calibrate soil geometry, `theta_water`, `b_p`, diffusion, impedance, and uptake
+6. Calibrate soil geometry, `theta_water`, `b_p`, diffusion, impedance, and uptake
    kinetics to a named experiment rather than treating the Schnepf–Roose set as generic.
-6. Obtain a direct *R. irregularis* dry mass per spore and whole-mycelium C:P data.
-7. Retain zero-loss sensitivity cases for both `kappa_p` values and replace the lumped
+7. Obtain a direct *R. irregularis* dry mass per spore and whole-mycelium C:P data.
+8. Retain zero-loss sensitivity cases for both `kappa_p` values and replace the lumped
    sinks if explicit turnover, resorption, necromass, or recycling is implemented.
-8. Rerun phosphate qualification after the fungal saturation-density change and resolve
+9. Rerun phosphate qualification after the fungal saturation-density change and resolve
    the existing timestep-convergence gap before interpreting long-horizon outputs.
 
 ## Verification and traceability

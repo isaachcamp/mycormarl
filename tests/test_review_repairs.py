@@ -171,6 +171,7 @@ def test_ppo_stack_accepts_current_agent_identifiers():
         (PlantTraits, "kappa_p", float("inf")),
         (PlantTraits, "death_fraction", 1.1),
         (PlantTraits, "biomass_cap", 0.0),
+        (PlantTraits, "biomass_observation_reference", 0.0),
         (PlantTraits, "kleaf", -0.1),
         (PlantTraits, "amass", float("nan")),
         (FungusTraits, "initial_c_pool", -1.0),
