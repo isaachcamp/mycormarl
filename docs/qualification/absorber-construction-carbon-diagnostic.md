@@ -87,10 +87,140 @@ uptake.
 
 `t_1_percent_days` is the finite-inventory time at which surface concentration
 reaches one percent of its initial value. It is not truncated at the one-day
-surface horizon. The implementation obtains the corresponding bulk threshold
-algebraically and evaluates the autonomous uptake-rate integral with
-deterministic numerical quadrature. It does not run millions of explicit
-timesteps.
+surface horizon.
+
+### Quantities held fixed
+
+This is an event-time calculation for one isolated cell, not an additional run
+of the full model. The absorber radius $r$, length density $\lambda$, cell
+volume $V$, Michaelis--Menten traits $J_{max}$ and $K_m$, sparse resistance
+$k$, and sparse-to-continuous weight $w$ are all held fixed. In particular,
+$k$ and $w$ are calculated once using the configured $T_{ref}$. They are not
+recalculated using the potentially much longer depletion time.
+
+The represented absorber length and lateral absorbing area are therefore
+
+$$
+L=\lambda V,\qquad A=2\pi rL.
+$$
+
+Let $C_b$ be bulk solution-P concentration and $C_s(C_b)$ the concentration at
+the absorber surface predicted by the sparse closure. Both concentrations are
+in $\mathrm{\mu mol\,cm^{-3}}$. The closure satisfies
+
+$$
+C_b=C_s+k\frac{C_s}{K_m+C_s}.
+$$
+
+The implementation normally evaluates the equivalent quadratic for $C_s$ in
+a numerically stable form; see
+[`sparse_surface_concentration`](../../mycormarl/soil/phosphate_uptake.py#L162-L187).
+
+### Converting the surface threshold to a bulk threshold
+
+First, the diagnostic evaluates the initial surface concentration
+
+$$
+C_{s,0}=C_s(C_{b,0}).
+$$
+
+The event is defined by $C_{s,*}=0.01C_{s,0}$. Substituting that value into the
+closure above gives the associated bulk concentration directly:
+
+$$
+C_{b,*}=C_{s,*}+k\frac{C_{s,*}}{K_m+C_{s,*}}.
+$$
+
+Thus the code does not search through simulated timesteps to discover when the
+surface crosses one percent. It first converts the desired surface value into
+the exact corresponding bulk value. This conversion is implemented in
+[`_depletion_event_times_days`](../../mycormarl/soil/absorber_diagnostic.py#L151-L158).
+
+The threshold always refers to the sparse-closure surface concentration, which
+is also the surface concentration reported in the CSV. The rate used to reach
+that threshold is nevertheless the configured blend of sparse and continuous
+uptake.
+
+### Deriving elapsed time from inventory conservation
+
+The cell's labile-P amount is
+
+$$
+M=B C_b,\qquad B=V(\theta+b_p),
+$$
+
+where $\theta$ is volumetric water content, $b_p$ is linear buffer power, and
+$B$ is the cell's concentration-to-inventory capacity. The uptake rate at a
+given bulk concentration is
+
+$$
+Q(C_b)=A\left[
+(1-w)J_{max}\frac{C_s(C_b)}{K_m+C_s(C_b)}
++wJ_{max}\frac{C_b}{K_m+C_b}
+\right],
+$$
+
+in $\mathrm{\mu mol\,s^{-1}}$. The first term is sparse uptake evaluated at
+the absorber surface; the second is the continuous approximation, which uses
+bulk concentration. The two alternatives are blended rather than added.
+
+With no replenishment, inventory conservation gives
+
+$$
+\frac{dM}{dt}=B\frac{dC_b}{dt}=-Q(C_b).
+$$
+
+All parameters in $Q$ are fixed, so the rate depends only on the current
+concentration and not explicitly on time. This is what **autonomous uptake
+rate** means here. Separating variables and integrating from the initial bulk
+concentration to the threshold gives
+
+$$
+t_{1\%}=B\int_{C_{b,*}}^{C_{b,0}}\frac{1}{Q(C_b)}\,dC_b.
+$$
+
+In plain language, the interval is divided conceptually into small
+concentration losses. Each loss takes longer when uptake is slow and less time
+when uptake is fast; the integral adds those durations. The result is in
+seconds and is divided by $86{,}400$ for `t_1_percent_days`.
+
+### What deterministic numerical quadrature means
+
+The final integral is one-dimensional but does not have a convenient closed
+form because $Q$ contains both the sparse surface-concentration root and the
+blended Michaelis--Menten rate. The code therefore approximates the integral
+directly with a fixed 64-point Gauss--Legendre rule. If $x_i$ and $q_i$ are its
+predefined nodes and weights on $[-1,1]$, and
+
+$$
+m=\frac{C_{b,0}+C_{b,*}}{2},\qquad
+h=\frac{C_{b,0}-C_{b,*}}{2},
+$$
+
+then
+
+$$
+t_{1\%}\approx B h\sum_{i=1}^{64}
+\frac{q_i}{Q(m+h x_i)}.
+$$
+
+"Numerical quadrature" simply means approximating a definite integral with a
+weighted sum of function evaluations. "Deterministic" means every geometry
+uses the same fixed rule and therefore the same concentration sampling pattern:
+there is no random sampling, adaptive timestep choice, or event-search
+tolerance. NumPy supplies the nodes and weights through
+[`leggauss(64)`](https://numpy.org/doc/stable/reference/generated/numpy.polynomial.legendre.leggauss.html),
+and the mapping and weighted sum are implemented at
+[`absorber_diagnostic.py:160-183`](../../mycormarl/soil/absorber_diagnostic.py#L160-L183).
+The method is described as semi-analytical because the threshold conversion
+and separation of the conservation equation are algebraic, while only this
+single definite integral is evaluated numerically.
+
+An absorber-free cell, a zero initial surface concentration, or a non-finite
+integral has no reported event time. Regression tests verify that the event
+time is independent of the one-day integration timestep and preserve reference
+values for slow canonical cells; see
+[`test_absorber_diagnostic.py:133-172`](../../tests/test_absorber_diagnostic.py#L133-L172).
 
 The timescale plot uses logarithmic colour scaling in days. Long event times
 describe a fixed-geometry, fixed-closure qualification and must not be read as
