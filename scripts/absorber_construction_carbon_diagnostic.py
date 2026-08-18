@@ -288,7 +288,6 @@ def _plot_synthesis(rows, output_dir: Path) -> None:
     mode = "finite_inventory"
     efficiency_metric = "integrated_uptake_per_construction_carbon_micromol_g_c"
     uptake_metric = "integrated_uptake_micromol"
-    rate_metric = "maximum_instantaneous_uptake_rate_micromol_s"
     time_metric = "t_1_percent_days"
     fig, axes = plt.subplots(2, 2, figsize=(8.4, 7.2), constrained_layout=True)
 
@@ -345,7 +344,7 @@ def _plot_synthesis(rows, output_dir: Path) -> None:
         and row["experiment_mode"] == mode
         and row["geometry_valid"]
         and row[efficiency_metric] > 0.0
-        and row[rate_metric] > 0.0
+        and row[uptake_metric] > 0.0
     ]
     all_radii = np.array([row["absorber_radius_cm"] for row in surface_rows])
     all_densities = np.array(
@@ -366,14 +365,14 @@ def _plot_synthesis(rows, output_dir: Path) -> None:
     radii = np.array([row["absorber_radius_cm"] for row in sampled_rows])
     densities = np.array([row["length_density_cm_cm3"] for row in sampled_rows])
     efficiency = np.array([row[efficiency_metric] for row in sampled_rows])
-    rates = np.array([row[rate_metric] for row in sampled_rows])
+    uptake = np.array([row[uptake_metric] for row in sampled_rows])
     density_log = np.log10(densities)
     density_log_min = np.log10(all_densities.min())
     density_log_span = np.log10(all_densities.max()) - density_log_min
     sizes = 12.0 + 70.0 * (density_log - density_log_min) / density_log_span
     scatter = frontier.scatter(
         efficiency,
-        rates,
+        uptake,
         c=radii,
         s=sizes,
         cmap="plasma_r",
@@ -399,7 +398,7 @@ def _plot_synthesis(rows, output_dir: Path) -> None:
         ) / density_log_span
         frontier.scatter(
             row[efficiency_metric],
-            row[rate_metric],
+            row[uptake_metric],
             c=[row["absorber_radius_cm"]],
             s=native_size,
             cmap="plasma_r",
@@ -411,7 +410,7 @@ def _plot_synthesis(rows, output_dir: Path) -> None:
         label = "P" if row["marker_label"] == "plant_native" else "F"
         frontier.annotate(
             label,
-            (row[efficiency_metric], row[rate_metric]),
+            (row[efficiency_metric], row[uptake_metric]),
             xytext=(4, -5),
             textcoords="offset points",
             ha="left",
@@ -423,7 +422,7 @@ def _plot_synthesis(rows, output_dir: Path) -> None:
     frontier.set_xscale("log")
     frontier.set_yscale("log")
     frontier.set_xlabel("P acquired / construction C (µmol P g C⁻¹)")
-    frontier.set_ylabel("Initial P capture rate (µmol P s⁻¹)")
+    frontier.set_ylabel("P acquired over one day (µmol P)")
     frontier.set_title("P-foraging advantage frontier")
     fig.colorbar(
         colourbar_mappable,

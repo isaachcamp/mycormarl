@@ -508,7 +508,8 @@ def test_cli_writes_tabular_data_and_publication_figure_formats(tmp_path):
     assert "t₁% (day)" in timescale_svg
     synthesis_svg = (tmp_path / "finite_inventory_foraging_synthesis.svg").read_text()
     assert "P-foraging advantage frontier" in synthesis_svg
-    assert "Initial P capture rate" in synthesis_svg
+    assert "P acquired over one day" in synthesis_svg
+    assert "Initial P capture rate" not in synthesis_svg
     assert "P acquired / construction C" in synthesis_svg
     assert ">P<" in synthesis_svg
     assert ">F<" in synthesis_svg
