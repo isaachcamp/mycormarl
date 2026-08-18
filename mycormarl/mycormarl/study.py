@@ -18,6 +18,11 @@ from mycormarl.policy_artifacts import (
     ACTOR_INTERFACE_VERSION,
     ENVIRONMENT_STATE_SCHEMA_VERSION,
 )
+from mycormarl.random_streams import (
+    RANDOM_STREAM_DERIVATION_VERSION,
+    RANDOM_STREAM_NAMES,
+    derive_random_streams,
+)
 
 
 STUDY_RESULT_FORMAT = "mycormarl-study-result"
@@ -394,6 +399,7 @@ def run_study(manifest_path: str | Path) -> StudyResult:
                 "initial_p_micromolar": initial_p,
                 "seed": seed,
                 "status": "completed",
+                "random_streams": derive_random_streams(seed).to_dict(),
             },
         )
         for mode, initial_p, seed in requested_conditions
@@ -405,6 +411,10 @@ def run_study(manifest_path: str | Path) -> StudyResult:
         "execution_identity": execution_identity,
         "manifest": manifest,
         "provenance": provenance,
+        "random_streams": {
+            "derivation_version": RANDOM_STREAM_DERIVATION_VERSION,
+            "stream_names": list(RANDOM_STREAM_NAMES),
+        },
         "entries": entries,
         "completion": {"completed": len(entries), "requested": len(entries)},
         "status": "complete",

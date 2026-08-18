@@ -77,6 +77,11 @@ def test_valid_manifest_emits_versioned_bundle_and_derived_summary(tmp_path):
         for entry in bundle["entries"]
     } == {("mixed", 0.3, 7), ("plant-only", 0.3, 7)}
     assert all(entry["status"] == "completed" for entry in bundle["entries"])
+    assert all(
+        entry["random_streams"]["master_seed"] == 7
+        for entry in bundle["entries"]
+    )
+    assert bundle["random_streams"]["derivation_version"] == "named-prng-v1"
     assert result.summary_path.read_text(encoding="utf-8") == (
         "# MycorMARL study: tiny-fixture\n\n"
         "- Stage: walking-skeleton\n"

@@ -9,6 +9,7 @@ import jax.numpy as jnp
 from flax import serialization
 import pytest
 
+from mycormarl.random_streams import derive_random_streams
 from mycormarl.policy_artifacts import (
     ACTOR_INTERFACE_VERSION,
     ENVIRONMENT_STATE_SCHEMA_VERSION,
@@ -38,12 +39,28 @@ def test_policy_artifact_round_trip_identifies_current_interfaces(tmp_path):
         == ENVIRONMENT_STATE_SCHEMA_VERSION
     )
     assert artifact.consumer_mode == "mixed"
+    assert artifact.random_streams is None
     assert jnp.array_equal(
         artifact.parameters["plant"]["head"], jnp.array([1.0, 2.0])
     )
     assert jnp.array_equal(
         artifact.parameters["fungus"]["head"], jnp.array([3.0, 4.0])
     )
+
+
+def test_policy_artifact_can_record_named_random_streams(tmp_path):
+    """A checkpoint preserves the stream identities used to create policies."""
+    output = tmp_path / "policies.msgpack"
+    streams = derive_random_streams(17)
+
+    save_policy_artifact(
+        output,
+        {"plant": {}, "fungus": {}},
+        consumer_mode="mixed",
+        random_streams=streams,
+    )
+
+    assert load_policy_artifact(output).random_streams == streams.to_dict()
 
 
 def test_loader_rejects_unversioned_legacy_parameter_tree(tmp_path):
