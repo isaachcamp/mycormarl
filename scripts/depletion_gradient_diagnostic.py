@@ -101,7 +101,13 @@ def _plot_cumulative_uptake(
         axis.set_xlabel("Experiment time (day)")
         axis.set_yscale("log")
         axis.grid(alpha=0.25)
-    axes[0].set_ylabel("Cumulative P uptake by represented cell (µmol P)")
+    fig.supylabel(
+        "Cumulative P uptake by represented cell (µmol P)",
+        x=0.02,
+        y=0.5,
+        fontsize=8,
+        va="center",
+    )
     densities = sorted({float(row["length_density_cm_cm3"]) for row in rows})
     handles = [
         Line2D(
@@ -115,9 +121,18 @@ def _plot_cumulative_uptake(
         for colour, density in zip(_DENSITY_COLOURS, densities)
     ]
     fig.legend(handles=handles, loc="lower center", ncol=1, frameon=False)
-    fig.tight_layout(rect=(0.0, 0.11, 1.0, 1.0))
-    fig.savefig(output_dir / "depletion_gradient_cumulative_uptake.svg", bbox_inches="tight")
-    fig.savefig(output_dir / "depletion_gradient_cumulative_uptake.png", dpi=300, bbox_inches="tight")
+    fig.subplots_adjust(left=0.14, right=0.99, bottom=0.25, top=0.88, wspace=0.06)
+    fig.savefig(
+        output_dir / "depletion_gradient_cumulative_uptake.svg",
+        bbox_inches="tight",
+        pad_inches=0.08,
+    )
+    fig.savefig(
+        output_dir / "depletion_gradient_cumulative_uptake.png",
+        dpi=300,
+        bbox_inches="tight",
+        pad_inches=0.08,
+    )
     plt.close(fig)
 
 

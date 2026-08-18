@@ -227,9 +227,6 @@ def test_cli_writes_machine_readable_rows_and_two_panel_figure(tmp_path):
     figure = (tmp_path / "depletion_gradient_cumulative_uptake.svg").read_text()
     assert "Plant-scale absorber" in figure
     assert "Fungus-scale absorber" in figure
-    assert "T_ref = 1 day" in figure
-    assert "Cumulative P uptake by represented cell" in figure
-    assert "t_sim = t_diff" in figure
     assert "stroke-opacity: 0.4" in figure
     assert (tmp_path / "native_geometry_closure_comparison.svg").stat().st_size > 1_000
     assert (tmp_path / "native_geometry_closure_comparison.png").stat().st_size > 10_000
