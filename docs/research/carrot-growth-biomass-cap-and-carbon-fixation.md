@@ -299,9 +299,13 @@ threshold. A practical hierarchy is:
    ceiling is low.** Preserve it as the 450-PAR, 16-hour reference-day value.
    Add `0.06` and `0.07` as irradiance sensitivities if the intended reference
    day is closer to 700--1000 PAR.
-2. **Treat `kleaf = 0.30` as mature-stage, not whole-episode, evidence.** Run a
-   pre-pilot plant-only, high-P growth qualification at `kleaf = 0.30`, `0.45`,
-   and `0.60`. The `0.60` case is the evidence-informed age-averaged diagnostic.
+2. **Use `kleaf = 0.50` as the provisional static reference calibration.** The
+   completed plant-only, high-P sweep retained `0.30`, `0.45`, `0.475`, `0.50`,
+   `0.525`, `0.55`, `0.575`, and `0.60`. `0.50` reached `34.60 g DM` at day
+   120 without contacting the `50 g` guard; `0.475` reached `23.84 g`, just
+   below the favourable `25--35 g` range, while `0.525` and higher contacted
+   the guard. This is a static calibration reference, not an ontogenetic claim.
+   The runtime default remains `0.30` until deliberately migrated.
 3. **Prefer an ontogenetic leaf-mass or leaf-area state before final inference.**
    A constant `kleaf` cannot reproduce both rapid early growth and late
    deceleration without conflating partitioning with leaf physiology.
