@@ -7,11 +7,26 @@ This guide describes how to prepare and run a study through the public
 GitHub issue #33. It covers the current manifest schema, output identity,
 resume rules, and completed-bundle immutability.
 
-The current runner supports only the `walking-skeleton` stage. That stage is a
-non-scientific contract fixture: it exercises manifest validation, condition
-enumeration, persistence, provenance, resume, and reporting, but it does not
-train policies or emit biological endpoints. Later study stages should extend
-this same path rather than introduce separate orchestration contracts.
+The runner supports the `walking-skeleton` contract fixture and the
+`single-condition-training` stage. The fixture exercises orchestration without
+training policies. The training stage executes one declared mode, initial P
+level, and master seed through the real independent-PPO trainer and persists
+resumable checkpoints.
+
+## Single-condition training
+
+Set `stage` to `single-condition-training` and declare one value on each of
+`modes`, `initial_p_micromolar`, and `seeds`. The optional training fields
+`num_steps`, `num_envs`, `update_epochs`, and `num_minibatches` default to `1`
+for small fixtures. Checkpoint intervals must contain whole PPO updates.
+
+The public runner accepts `stop_after_timesteps=N` for an intentional
+interruption. It writes `checkpoints/checkpoint-XXXXXXXX.msgpack` artifacts
+containing policy and optimizer state, environment state, RNG continuation
+state, condition metadata, transition count, model configuration, and current
+interface versions. Calling `run_study` again with the unchanged manifest
+resumes the pending condition. Manifest, source, dependency, runtime, or
+interface drift is rejected before checkpoint state is loaded.
 
 ## Manifest validity and execution completion are different concepts
 

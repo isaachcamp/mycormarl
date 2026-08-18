@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import platform
 
+from flax import serialization
 import pytest
 
 import mycormarl.study as study_module
@@ -523,3 +524,48 @@ def test_existing_complete_bundle_with_missing_condition_is_rejected(tmp_path):
 
     with pytest.raises(ValueError, match="condition inventory"):
         run_study(manifest_path)
+
+
+def test_single_condition_training_can_stop_and_resume_from_checkpoint(tmp_path):
+    """A stopped training condition resumes to the uninterrupted endpoint."""
+    manifest = _manifest(tmp_path, identity="training-resume")
+    manifest["stage"] = "single-condition-training"
+    manifest["modes"] = ["plant-only"]
+    manifest["training"].update(
+        {"num_steps": 1, "num_envs": 1, "update_epochs": 1, "num_minibatches": 1}
+    )
+    manifest_path = _write_manifest(tmp_path, manifest)
+
+    stopped = run_study(manifest_path, stop_after_timesteps=1)
+    stopped_bundle = json.loads(stopped.bundle_path.read_text(encoding="utf-8"))
+    assert stopped_bundle["status"] == "incomplete"
+    assert stopped_bundle["entries"][0]["status"] == "pending"
+    checkpoint = tmp_path / "outputs" / "training-resume" / "checkpoints" / "checkpoint-00000001.msgpack"
+    assert checkpoint.exists()
+    checkpoint_payload = serialization.msgpack_restore(checkpoint.read_bytes())
+    assert checkpoint_payload["format"] == "mycormarl-ppo-checkpoint"
+    assert checkpoint_payload["metadata"]["mode"] == "plant-only"
+    assert checkpoint_payload["metadata"]["initial_p_micromolar"] == 0.3
+    assert checkpoint_payload["metadata"]["seed"] == 7
+    assert checkpoint_payload["metadata"]["transitions"] == 1
+    assert set(checkpoint_payload["runner_state"]) == {"0", "1", "2", "3"}
+    assert set(checkpoint_payload["runner_state"]["0"]) == {"plant", "fungus"}
+    assert "opt_state" in checkpoint_payload["runner_state"]["0"]["plant"]
+
+    resumed = run_study(manifest_path)
+    resumed_bundle = json.loads(resumed.bundle_path.read_text(encoding="utf-8"))
+    assert resumed_bundle["status"] == "complete"
+    assert resumed_bundle["entries"][0]["status"] == "completed"
+    assert resumed_bundle["entries"][0]["transitions"] == 2
+
+    uninterrupted_manifest = _manifest(tmp_path / "uninterrupted", identity="training-full")
+    uninterrupted_manifest["stage"] = "single-condition-training"
+    uninterrupted_manifest["modes"] = ["plant-only"]
+    uninterrupted_manifest["training"].update(
+        {"num_steps": 1, "num_envs": 1, "update_epochs": 1, "num_minibatches": 1}
+    )
+    full = run_study(
+        _write_manifest(tmp_path / "uninterrupted", uninterrupted_manifest)
+    )
+    full_bundle = json.loads(full.bundle_path.read_text(encoding="utf-8"))
+    assert resumed_bundle["entries"][0]["evaluation"] == full_bundle["entries"][0]["evaluation"]

@@ -285,7 +285,10 @@ def unbatchify(
     return {a: x[i] for i, a in enumerate(agent_list)}
 
 def make_train(
-    env, config, random_streams: RandomStreamContract | None = None
+    env,
+    config,
+    random_streams: RandomStreamContract | None = None,
+    initial_runner_state=None,
 ):
     """Build a JIT-compatible independent-PPO trainer for the fixed agent API.
 
@@ -350,44 +353,45 @@ def make_train(
         
         Plant and fungal policies consume their own vectorised observations.
         """
-        # Initialize independent plant and fungus networks
+        # Initialize independent plant and fungus networks.  The optional
+        # runner state is used by the study checkpoint seam to continue the
+        # same optimizer, environment, and named-RNG state.
         plant_policy = ActorCritic(activation=config.ACTIVATION)
         fungus_policy = ActorCritic(activation=config.ACTIVATION)
 
-        if random_streams is None:
-            rng, plant_rng, fungus_rng = jax.random.split(rng, 3)
-            action_rng = rng
-            environment_rng = rng
-            minibatch_rng = rng
+        if initial_runner_state is None:
+            if random_streams is None:
+                rng, plant_rng, fungus_rng = jax.random.split(rng, 3)
+                action_rng = rng
+                environment_rng = rng
+                minibatch_rng = rng
+            else:
+                plant_rng = random_streams.key("plant_initialization")
+                fungus_rng = random_streams.key("fungal_initialization")
+                action_rng = random_streams.key("policy_action_sampling")
+                environment_rng = random_streams.key("environment_variation")
+                minibatch_rng = random_streams.key("minibatch_ordering")
+            init_x = jnp.zeros((1, env.observation_spaces[PLANT].shape[0]))
+            plant_tx = optax.adam(learning_rate=config.LR)
+            fungus_tx = optax.adam(learning_rate=config.LR)
+            plant_train_state = TrainState.create(
+                apply_fn=plant_policy.apply,
+                params=plant_policy.init(plant_rng, init_x),
+                tx=plant_tx,
+            )
+            fungus_train_state = TrainState.create(
+                apply_fn=fungus_policy.apply,
+                params=fungus_policy.init(fungus_rng, init_x),
+                tx=fungus_tx
+            )
+            train_state = {PLANT: plant_train_state, FUNGUS: fungus_train_state}
+            environment_rng, _rng = jax.random.split(environment_rng)
+            reset_rng = jax.random.split(_rng, config.NUM_ENVS)
+            obs, env_state = jax.vmap(env.reset, in_axes=(0,))(reset_rng)
+            runner_rngs = (action_rng, environment_rng, minibatch_rng)
         else:
-            plant_rng = random_streams.key("plant_initialization")
-            fungus_rng = random_streams.key("fungal_initialization")
-            action_rng = random_streams.key("policy_action_sampling")
-            environment_rng = random_streams.key("environment_variation")
-            minibatch_rng = random_streams.key("minibatch_ordering")
-        init_x = jnp.zeros((1, env.observation_spaces[PLANT].shape[0]))
-
-        plant_tx = optax.adam(learning_rate=config.LR)
-        fungus_tx = optax.adam(learning_rate=config.LR)
-
-        # Initialize training states
-        plant_train_state = TrainState.create(
-            apply_fn=plant_policy.apply,
-            params=plant_policy.init(plant_rng, init_x),
-            tx=plant_tx,
-        )
-        fungus_train_state = TrainState.create(
-            apply_fn=fungus_policy.apply,
-            params=fungus_policy.init(fungus_rng, init_x),
-            tx=fungus_tx
-        )
-
-        train_state = {PLANT: plant_train_state, FUNGUS: fungus_train_state}
-
-        # Initialize parallel environments
-        environment_rng, _rng = jax.random.split(environment_rng)
-        reset_rng = jax.random.split(_rng, config.NUM_ENVS)
-        obs, env_state = jax.vmap(env.reset, in_axes=(0,))(reset_rng)
+            train_state, env_state, obs, runner_rngs = initial_runner_state
+            action_rng, environment_rng, minibatch_rng = runner_rngs
 
         def _update_step(runner_state, x):
             """
@@ -786,7 +790,8 @@ def make_train(
             )
 
         # Scan over update steps. Each stochastic subsystem retains its own key.
-        runner_rngs = (action_rng, environment_rng, minibatch_rng)
+        if initial_runner_state is None:
+            runner_rngs = (action_rng, environment_rng, minibatch_rng)
         runner_state = (train_state, env_state, obs, runner_rngs)
         runner_state, (
             (plant_traj, fungus_traj),

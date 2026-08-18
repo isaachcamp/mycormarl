@@ -14,6 +14,9 @@ import re
 import subprocess
 from typing import Any
 
+import jax
+from flax import serialization
+
 from mycormarl.policy_artifacts import (
     ACTOR_INTERFACE_VERSION,
     ENVIRONMENT_STATE_SCHEMA_VERSION,
@@ -23,11 +26,19 @@ from mycormarl.random_streams import (
     RANDOM_STREAM_NAMES,
     derive_random_streams,
 )
+from mycormarl.algos.ppo import PPOConfig, make_train
+from mycormarl.environments.base_mycor import BaseMycorMarl
+from mycormarl.fungus.traits import FungusTraits
+from mycormarl.params import EnvConfig, SpeciesParams
+from mycormarl.plant.traits import PlantTraits
 
 
 STUDY_RESULT_FORMAT = "mycormarl-study-result"
 STUDY_RESULT_VERSION = 2
 _STUDY_MODES = frozenset({"mixed", "plant-only"})
+_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training"})
+TRAINING_CHECKPOINT_FORMAT = "mycormarl-ppo-checkpoint"
+TRAINING_CHECKPOINT_VERSION = 1
 _REQUIRED_MANIFEST_FIELDS = (
     "schema_version",
     "stage",
@@ -151,7 +162,7 @@ def _validate_required_declarations(manifest: Any) -> None:
         raise ValueError(
             "incompatible manifest schema_version; use schema_version 1"
         )
-    if manifest["stage"] != "walking-skeleton":
+    if manifest["stage"] not in _STUDY_STAGES:
         raise ValueError(
             f"unsupported study stage {manifest['stage']!r}; no executor is registered"
         )
@@ -236,6 +247,16 @@ def _validate_required_declarations(manifest: Any) -> None:
         raise ValueError("training timestep budgets must be positive integers")
     if training["checkpoint_interval_timesteps"] > training["total_timesteps"]:
         raise ValueError("training checkpoint interval cannot exceed total_timesteps")
+    if manifest["stage"] == "single-condition-training":
+        if len(manifest["modes"]) != 1 or len(manifest["initial_p_micromolar"]) != 1 or len(manifest["seeds"]) != 1:
+            raise ValueError("single-condition-training requires one mode, one initial_p_micromolar value, and one seed")
+        for field in ("num_steps", "num_envs", "update_epochs", "num_minibatches"):
+            value = training.get(field, 1)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"training {field} must be a positive integer")
+        update_size = training.get("num_steps", 1) * training.get("num_envs", 1)
+        if training["checkpoint_interval_timesteps"] % update_size != 0:
+            raise ValueError("training checkpoint interval must contain whole PPO updates")
     evaluation = manifest["evaluation"]
     if not isinstance(evaluation, dict) or not {
         "protocol",
@@ -315,7 +336,174 @@ def _write_summary(bundle: dict[str, Any], summary_path: Path) -> None:
     )
 
 
-def run_study(manifest_path: str | Path) -> StudyResult:
+def _training_environment(manifest: dict[str, Any], mode: str, p_level: float) -> BaseMycorMarl:
+    model_environment = manifest["model"]["environment"]
+    horizon = manifest["horizon"]
+    config = EnvConfig(
+        max_steps=round(horizon["days"] / horizon["timestep_days"]),
+        dt=horizon["timestep_days"],
+        consumer_mode=mode,
+        soil_radius_cm=model_environment.get("soil_radius_cm", 1.0),
+        soil_depth_cm=model_environment.get("soil_depth_cm", 1.0),
+        radial_interval_cm=model_environment.get("radial_interval_cm", 0.1),
+        depth_interval_cm=model_environment.get("depth_interval_cm", 0.1),
+        topsoil_depth_cm=model_environment.get("topsoil_depth_cm", model_environment.get("soil_depth_cm", 1.0)),
+        initial_solution_p_um=p_level,
+    )
+    return BaseMycorMarl(config, SpeciesParams(PlantTraits(), FungusTraits()))
+
+
+def _training_config(manifest: dict[str, Any], timesteps: int) -> PPOConfig:
+    training = manifest["training"]
+    return PPOConfig(
+        TOTAL_TIMESTEPS=timesteps,
+        NUM_STEPS=training.get("num_steps", 1),
+        NUM_ENVS=training.get("num_envs", 1),
+        UPDATE_EPOCHS=training.get("update_epochs", 1),
+        NUM_MINIBATCHES=training.get("num_minibatches", 1),
+    )
+
+
+def _checkpoint_bytes(metadata: dict[str, Any], runner_state: Any) -> bytes:
+    return serialization.msgpack_serialize({
+        "format": TRAINING_CHECKPOINT_FORMAT,
+        "format_version": TRAINING_CHECKPOINT_VERSION,
+        "metadata": metadata,
+        "runner_state": serialization.to_state_dict(runner_state),
+    })
+
+
+def _run_single_condition_training(
+    manifest: dict[str, Any],
+    provenance: dict[str, Any],
+    study_identity: str,
+    execution_identity: str,
+    output_dir: Path,
+    *,
+    stop_after_timesteps: int | None,
+) -> StudyResult:
+    """Run one condition in checkpoint-sized PPO chunks and resume it."""
+    bundle_path = output_dir / "result-bundle.json"
+    summary_path = output_dir / "summary.md"
+    mode, p_level, seed = manifest["modes"][0], manifest["initial_p_micromolar"][0], manifest["seeds"][0]
+    total = manifest["training"]["total_timesteps"]
+    streams = derive_random_streams(seed)
+    existing = None
+    if bundle_path.exists():
+        try:
+            existing = json.loads(bundle_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError("existing training bundle is unreadable") from error
+        if any(existing.get(field) != value for field, value in (("format", TRAINING_CHECKPOINT_FORMAT), ("format_version", TRAINING_CHECKPOINT_VERSION), ("study_identity", study_identity), ("execution_identity", execution_identity), ("provenance", provenance))):
+            raise ValueError("existing training checkpoint provenance is incompatible")
+        if existing.get("status") == "complete":
+            if not summary_path.exists():
+                _write_summary(existing, summary_path)
+            return StudyResult(bundle_path, summary_path)
+    elif output_dir.exists() and any(output_dir.iterdir()):
+        raise ValueError("existing outputs have no compatible execution identity")
+
+    env = _training_environment(manifest, mode, p_level)
+    update_size = manifest["training"].get("num_steps", 1) * manifest["training"].get("num_envs", 1)
+    completed = 0 if existing is None else existing["entries"][0].get("transitions", 0)
+    initial_state = None
+    if completed:
+        checkpoint_path = output_dir / existing["entries"][0]["checkpoint"]
+        try:
+            payload = serialization.msgpack_restore(checkpoint_path.read_bytes())
+        except (OSError, ValueError) as error:
+            raise ValueError("training checkpoint is unreadable") from error
+        metadata = payload.get("metadata", {})
+        if payload.get("format") != TRAINING_CHECKPOINT_FORMAT or payload.get("format_version") != TRAINING_CHECKPOINT_VERSION or metadata.get("mode") != mode or metadata.get("initial_p_micromolar") != p_level or metadata.get("seed") != seed or metadata.get("transitions") != completed:
+            raise ValueError("training checkpoint condition is incompatible")
+        template_config = _training_config(manifest, update_size)
+        template = jax.jit(make_train(env, template_config, streams))(jax.random.PRNGKey(seed))
+        initial_state = serialization.from_state_dict(template["runner_state"], payload["runner_state"])
+
+    remaining = total - completed
+    requested = remaining if stop_after_timesteps is None else min(remaining, stop_after_timesteps - completed)
+    if requested <= 0 or requested % update_size:
+        raise ValueError("training stop boundary must advance by whole PPO updates")
+    # Execute one checkpoint-sized PPO update at a time.  Keeping the same
+    # chunking for fresh and resumed runs makes the deterministic continuation
+    # boundary explicit and ensures every declared interval is materialized.
+    trained = None
+    state = initial_state
+    transitions = completed
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for _ in range(requested // update_size):
+        config = _training_config(manifest, update_size)
+        trained = jax.jit(make_train(env, config, streams, state))(jax.random.PRNGKey(seed))
+        state = trained["runner_state"]
+        transitions += update_size
+        intermediate_metadata = {
+            "mode": mode,
+            "initial_p_micromolar": p_level,
+            "seed": seed,
+            "transitions": transitions,
+            "named_random_streams": streams.to_dict(),
+            "manifest": manifest,
+            "actor_interface_version": ACTOR_INTERFACE_VERSION,
+            "environment_state_schema_version": ENVIRONMENT_STATE_SCHEMA_VERSION,
+        }
+        intermediate_path = output_dir / f"checkpoints/checkpoint-{transitions:08d}.msgpack"
+        intermediate_path.parent.mkdir(parents=True, exist_ok=True)
+        intermediate_path.write_bytes(_checkpoint_bytes(intermediate_metadata, state))
+    checkpoint_name = f"checkpoints/checkpoint-{transitions:08d}.msgpack"
+    checkpoint_path = output_dir / checkpoint_name
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata = {
+        "mode": mode,
+        "initial_p_micromolar": p_level,
+        "seed": seed,
+        "transitions": transitions,
+        "named_random_streams": streams.to_dict(),
+        "manifest": manifest,
+        "actor_interface_version": ACTOR_INTERFACE_VERSION,
+        "environment_state_schema_version": ENVIRONMENT_STATE_SCHEMA_VERSION,
+    }
+    checkpoint_content = _checkpoint_bytes(metadata, trained["runner_state"])
+    checkpoint_path.write_bytes(checkpoint_content)
+    state_digest = hashlib.sha256(
+        serialization.msgpack_serialize(
+            serialization.to_state_dict(trained["runner_state"])
+        )
+    ).hexdigest()
+    entry = {
+        "mode": mode,
+        "initial_p_micromolar": p_level,
+        "seed": seed,
+        "status": "completed" if transitions >= total else "pending",
+        "transitions": transitions,
+        "checkpoint": checkpoint_name,
+        "random_streams": streams.to_dict(),
+        "evaluation": {
+            "protocol": manifest["evaluation"]["protocol"],
+            "episodes": manifest["evaluation"]["episodes"],
+            "state_sha256": state_digest,
+        },
+    }
+    bundle = {
+        "format": TRAINING_CHECKPOINT_FORMAT,
+        "format_version": TRAINING_CHECKPOINT_VERSION,
+        "study_identity": study_identity,
+        "execution_identity": execution_identity,
+        "manifest": manifest,
+        "provenance": provenance,
+        "entries": [entry],
+        "completion": {"completed": int(transitions >= total), "requested": 1},
+        "status": "complete" if transitions >= total else "incomplete",
+    }
+    bundle_path.write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _write_summary(bundle, summary_path)
+    return StudyResult(bundle_path, summary_path)
+
+
+def run_study(
+    manifest_path: str | Path,
+    *,
+    stop_after_timesteps: int | None = None,
+) -> StudyResult:
     """Run a declared study manifest and persist its versioned result bundle."""
     manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     _validate_required_declarations(manifest)
@@ -333,6 +521,21 @@ def run_study(manifest_path: str | Path) -> StudyResult:
         Path(manifest["output"]["directory"])
         / manifest["output"]["identity"]
     )
+    if manifest["stage"] == "single-condition-training":
+        if stop_after_timesteps is not None and (
+            isinstance(stop_after_timesteps, bool)
+            or not isinstance(stop_after_timesteps, int)
+            or stop_after_timesteps <= 0
+        ):
+            raise ValueError("stop_after_timesteps must be a positive integer")
+        return _run_single_condition_training(
+            manifest,
+            provenance,
+            study_identity,
+            execution_identity,
+            output_dir,
+            stop_after_timesteps=stop_after_timesteps,
+        )
     bundle_path = output_dir / "result-bundle.json"
     summary_path = output_dir / "summary.md"
     existing_bundle = None
