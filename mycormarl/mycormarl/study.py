@@ -31,12 +31,13 @@ from mycormarl.environments.base_mycor import BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
+from mycormarl.static_controls import run_static_controls
 
 
 STUDY_RESULT_FORMAT = "mycormarl-study-result"
 STUDY_RESULT_VERSION = 2
 _STUDY_MODES = frozenset({"mixed", "plant-only"})
-_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training"})
+_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training", "static-controls"})
 TRAINING_CHECKPOINT_FORMAT = "mycormarl-ppo-checkpoint"
 TRAINING_CHECKPOINT_VERSION = 1
 _REQUIRED_MANIFEST_FIELDS = (
@@ -336,6 +337,60 @@ def _write_summary(bundle: dict[str, Any], summary_path: Path) -> None:
     )
 
 
+def _run_static_controls_study(
+    manifest: dict[str, Any],
+    provenance: dict[str, Any],
+    study_identity: str,
+    execution_identity: str,
+    output_dir: Path,
+) -> StudyResult:
+    """Execute deterministic controls and persist them as a study bundle."""
+    bundle_path = output_dir / "result-bundle.json"
+    summary_path = output_dir / "summary.md"
+    if bundle_path.exists():
+        try:
+            existing = json.loads(bundle_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError("existing result bundle is unreadable") from error
+        if any(existing.get(field) != value for field, value in (
+            ("format", STUDY_RESULT_FORMAT),
+            ("format_version", STUDY_RESULT_VERSION),
+            ("study_identity", study_identity),
+            ("execution_identity", execution_identity),
+            ("provenance", provenance),
+        )):
+            raise ValueError("existing static-control result provenance is incompatible")
+        if existing.get("status") == "complete":
+            if not summary_path.exists():
+                _write_summary(existing, summary_path)
+            return StudyResult(bundle_path, summary_path)
+    elif output_dir.exists() and any(output_dir.iterdir()):
+        raise ValueError("existing outputs have no compatible execution identity")
+
+    controls = run_static_controls(manifest)
+    bundle = {
+        "format": STUDY_RESULT_FORMAT,
+        "format_version": STUDY_RESULT_VERSION,
+        "study_identity": study_identity,
+        "execution_identity": execution_identity,
+        "manifest": manifest,
+        "provenance": provenance,
+        "random_streams": {
+            "derivation_version": RANDOM_STREAM_DERIVATION_VERSION,
+            "stream_names": list(RANDOM_STREAM_NAMES),
+        },
+        "entries": controls["entries"],
+        "completion": controls["completion"],
+        "status": controls["status"],
+        "control_format": controls["format"],
+        "control_format_version": controls["format_version"],
+    }
+    output_dir.mkdir(parents=True, exist_ok=True)
+    bundle_path.write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _write_summary(bundle, summary_path)
+    return StudyResult(bundle_path, summary_path)
+
+
 def _training_environment(manifest: dict[str, Any], mode: str, p_level: float) -> BaseMycorMarl:
     model_environment = manifest["model"]["environment"]
     horizon = manifest["horizon"]
@@ -535,6 +590,18 @@ def run_study(
             execution_identity,
             output_dir,
             stop_after_timesteps=stop_after_timesteps,
+        )
+    if manifest["stage"] == "static-controls":
+        if "static_policy" not in manifest:
+            raise ValueError("static-controls stage requires static_policy")
+        if stop_after_timesteps is not None:
+            raise ValueError("static-controls stage does not support stop_after_timesteps")
+        return _run_static_controls_study(
+            manifest,
+            provenance,
+            study_identity,
+            execution_identity,
+            output_dir,
         )
     bundle_path = output_dir / "result-bundle.json"
     summary_path = output_dir / "summary.md"
