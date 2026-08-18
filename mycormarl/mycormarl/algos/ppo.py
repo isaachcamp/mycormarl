@@ -11,6 +11,7 @@ from flax.training.train_state import TrainState
 import optax
 
 from mycormarl.environments.base_mycor import FUNGUS, PLANT
+from mycormarl.random_streams import RandomStreamContract
 from mycormarl.transition import Transition
 
 
@@ -283,7 +284,9 @@ def unbatchify(
     x = x.reshape((num_actors, num_envs, -1))
     return {a: x[i] for i, a in enumerate(agent_list)}
 
-def make_train(env, config):
+def make_train(
+    env, config, random_streams: RandomStreamContract | None = None
+):
     """Build a JIT-compatible independent-PPO trainer for the fixed agent API.
 
     Each policy consumes its own bounded observation and learns only from the
@@ -351,7 +354,17 @@ def make_train(env, config):
         plant_policy = ActorCritic(activation=config.ACTIVATION)
         fungus_policy = ActorCritic(activation=config.ACTIVATION)
 
-        rng, plant_rng, fungus_rng = jax.random.split(rng, 3)
+        if random_streams is None:
+            rng, plant_rng, fungus_rng = jax.random.split(rng, 3)
+            action_rng = rng
+            environment_rng = rng
+            minibatch_rng = rng
+        else:
+            plant_rng = random_streams.key("plant_initialization")
+            fungus_rng = random_streams.key("fungal_initialization")
+            action_rng = random_streams.key("policy_action_sampling")
+            environment_rng = random_streams.key("environment_variation")
+            minibatch_rng = random_streams.key("minibatch_ordering")
         init_x = jnp.zeros((1, env.observation_spaces[PLANT].shape[0]))
 
         plant_tx = optax.adam(learning_rate=config.LR)
@@ -372,7 +385,7 @@ def make_train(env, config):
         train_state = {PLANT: plant_train_state, FUNGUS: fungus_train_state}
 
         # Initialize parallel environments
-        rng, _rng = jax.random.split(rng)
+        environment_rng, _rng = jax.random.split(environment_rng)
         reset_rng = jax.random.split(_rng, config.NUM_ENVS)
         obs, env_state = jax.vmap(env.reset, in_axes=(0,))(reset_rng)
 
@@ -389,8 +402,11 @@ def make_train(env, config):
                 2. Step the environment with the sampled actions.
                 3. Collect Transition for the trajectory.
                 """
-                train_state, env_state, last_obs, rng = runner_state
-                rng, plant_act_rng, fungus_act_rng = jax.random.split(rng, 3)
+                train_state, env_state, last_obs, rngs = runner_state
+                action_rng, environment_rng, minibatch_rng = rngs
+                action_rng, plant_act_rng, fungus_act_rng = jax.random.split(
+                    action_rng, 3
+                )
                 plant_trade_rng, plant_allocation_rng = jax.random.split(
                     plant_act_rng
                 )
@@ -477,7 +493,7 @@ def make_train(env, config):
                     env.agents, config.NUM_ENVS, config.NUM_ACTORS
                 )
 
-                rng, _rng = jax.random.split(rng)
+                environment_rng, _rng = jax.random.split(environment_rng)
                 rng_step = jax.random.split(_rng, config.NUM_ENVS)
                 obs, env_state, reward, _, info = jax.vmap(env.step, in_axes=(0,0,0))(
                     rng_step, env_state, env_act
@@ -529,7 +545,12 @@ def make_train(env, config):
                     bootstrap_observation=fungus_fields.bootstrap_observation,
                 )
 
-                runner_state = (train_state, env_state, obs, rng)
+                runner_state = (
+                    train_state,
+                    env_state,
+                    obs,
+                    (action_rng, environment_rng, minibatch_rng),
+                )
 
                 return runner_state, (plant_trajectory, fungus_trajectory)
 
@@ -538,7 +559,7 @@ def make_train(env, config):
                 _env_step, runner_state, None, config.NUM_STEPS
             )
 
-            train_state, env_state, last_obs, rng = runner_state
+            train_state, env_state, last_obs, rngs = runner_state
             _, plant_bootstrap_values = plant_policy.apply(
                 train_state[PLANT].params, plant_traj.bootstrap_observation
             )
@@ -709,7 +730,7 @@ def make_train(env, config):
                 plant_traj,
                 plant_advantages,
                 plant_targets,
-                rng,
+                rngs[2],
             )
             update_plant_state, plant_loss_info = jax.lax.scan(
                 _update_epoch, update_plant_state, None, config.UPDATE_EPOCHS
@@ -729,7 +750,7 @@ def make_train(env, config):
                 PLANT: update_plant_state[0],
                 FUNGUS: update_fungus_state[0],
             }
-            rng = update_fungus_state[-1]
+            rngs = (rngs[0], rngs[1], update_fungus_state[-1])
 
             def _metrics(trajectory, loss_info):
                 total_loss, value_loss, actor_loss = loss_info
@@ -756,7 +777,7 @@ def make_train(env, config):
             plant_metrics = _metrics(plant_traj, plant_loss_info)
             fungus_metrics = _metrics(fungus_traj, fungus_loss_info)
 
-            runner_state = (train_state, env_state, last_obs, rng)
+            runner_state = (train_state, env_state, last_obs, rngs)
             return runner_state, (
                 (plant_traj, fungus_traj),
                 (plant_metrics, fungus_metrics),
@@ -764,9 +785,9 @@ def make_train(env, config):
                 (plant_targets, fungus_targets),
             )
 
-        # Scan over update steps.
-        rng, _rng = jax.random.split(rng)
-        runner_state = (train_state, env_state, obs, _rng)
+        # Scan over update steps. Each stochastic subsystem retains its own key.
+        runner_rngs = (action_rng, environment_rng, minibatch_rng)
+        runner_state = (train_state, env_state, obs, runner_rngs)
         runner_state, (
             (plant_traj, fungus_traj),
             (plant_metrics, fungus_metrics),
