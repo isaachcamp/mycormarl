@@ -33,15 +33,16 @@ For the planned 120-day cultivated-carrot study, the effective carbon-input
 scale requires qualification before policy training. A favourable `Forto`
 field trajectory reached `23.26 g` shoot-plus-storage-root dry mass at 120 days
 after sowing, with successive 20-day RGRs declining from approximately `0.066`
-to `0.042 d^-1`. The current carbon-only sustained ceiling is about
-`0.0199 d^-1`. The leaf-level `amass=0.05` remains defensible for its named
-reference light regime; the larger mismatch is the fixed `kleaf=0.30`, because
-the same trajectory's leaf fraction declined from about `0.81` to `0.23`. See
+to `0.042 d^-1`. Before the `kleaf` calibration, the carbon-only sustained
+ceiling was about `0.0199 d^-1`. The leaf-level `amass=0.05` remains defensible
+for its named reference light regime; the larger mismatch was the fixed
+`kleaf=0.30`, because the same trajectory's leaf fraction declined from about
+`0.81` to `0.23`. See
 the [growth-scale research note](research/carrot-growth-biomass-cap-and-carbon-fixation.md).
-The completed static-allocation qualification provisionally selects `kleaf=0.50`
-for the reference calibration. This is a qualification choice, not an
-ontogenetic claim; the runtime default remains `0.30` until deliberately
-migrated.
+The completed static-allocation qualification selects `kleaf=0.50` for the
+reference calibration, and this is now the runtime default. This is a
+qualification choice, not an ontogenetic claim; the constant whole-episode
+value remains a calibration limitation.
 
 Initial solution Pi is configured either as a uniform field across the represented
 domain or as an explicit depth profile. The old finite-topsoil initialization has
@@ -135,7 +136,7 @@ continuous closures are blended using `uptake_reference_time_days` and
 | `initial_biomass` | `0.01 g DM` | Plant dry biomass at reset; immediately determines starting root length, photosynthetic input, maintenance demand, and death reference. | Early-established seedling fixture chosen above the `0.7–3.3 mg` *Daucus carota* propagule means ([Vandelook et al. 2024](https://doi.org/10.1017/S0960258524000230)) and below later resource-exchange harvests. **Qualification-informed modelling choice.** |
 | `initial_c_pool` | `0.00402 g C` | Free, allocatable carbon at reset; this is additional to structural C implicit in biomass. | One structural-biomass equivalent: `0.01 × 0.402`. **Derived model initial condition.** |
 | `initial_p_pool` | `0.0192 mg P` | Free, allocatable phosphorus at reset; additional to structural P implicit in biomass. | One structural-biomass equivalent: `0.01 × 1.92`. **Derived model initial condition.** |
-| `kleaf` | `0.30` runtime; `0.50` selected qualification reference | Fraction of whole-plant dry biomass contributing to photosynthesis; carbon input is directly proportional to it. | `Forto` fitted shoot and storage-root curves imply a leaf fraction declining from `0.812` at 40 DAS to `0.234` at 120 DAS ([Cecilio Filho & Peixoto 2013](https://repositorio.unesp.br/bitstream/11449/75622/1/2-s2.0-84878476833.pdf)); fine roots were excluded from that denominator. The static high-P sweep retained `0.30`, `0.45`, `0.475`, `0.50`, `0.525`, `0.55`, `0.575`, and `0.60`. `0.50` was selected provisionally because it reached `34.60 g DM` at day 120 without contacting the `50 g` guard; `0.525` and higher contacted the guard. This is a calibration reference, not an ontogenetic claim or a partition complement to `kfroot`. **Qualification-informed provisional choice; constant whole-episode fraction remains a model limitation.** |
+| `kleaf` | `0.50` | Fraction of whole-plant dry biomass contributing to photosynthesis; carbon input is directly proportional to it. | `Forto` fitted shoot and storage-root curves imply a leaf fraction declining from `0.812` at 40 DAS to `0.234` at 120 DAS ([Cecilio Filho & Peixoto 2013](https://repositorio.unesp.br/bitstream/11449/75622/1/2-s2.0-84878476833.pdf)); fine roots were excluded from that denominator. The static high-P sweep retained `0.30`, `0.45`, `0.475`, `0.50`, `0.525`, `0.55`, `0.575`, and `0.60`. `0.50` was selected because it reached `34.60 g DM` at day 120 without contacting the `50 g` guard; `0.525` and higher contacted the guard. This is a calibration default, not an ontogenetic claim or a partition complement to `kfroot`. **Qualification-informed choice; constant whole-episode fraction remains a model limitation.** |
 | `kfroot` | `0.18` | Fine/fibrous-root dry mass divided by whole-plant dry mass. It is the only represented active plant-absorber fraction: the model converts all `kfroot × specific_root_length` to uptake-active fine-root length, with no inactive, coarse-root, or secondary active-fraction correction. | Representative value inside the directly observed `0.119–0.244` interval for six-month `Idaho` and `Fontana` carrots grown in 150-cm, 98%-silica-sand greenhouse columns ([Westerveld 2005](https://bradford-crops.uoguelph.ca/sites/default/files/Sean%20Westerveld%20Thesis.pdf), Table 2.18 and Appendix A2.16). Treat those endpoints as the uncertainty range for this late deep-sand regime. Mature field `Nantes Duke` observations have a different denominator—fibrous root / total root `0.0177–0.0329`—so they cannot be converted to `kfroot` without matched shoot and storage-root mass. Neither range is a field or wild-carrot default. **Derived; cultivation-regime scoped.** |
 | `amass` | `0.05 g C g⁻¹ leaf DM reference-day⁻¹` | Apparent-gross daily leaf-mass carbon input. Higher values raise free C linearly; the current implementation spreads the reference-day budget uniformly. | Carrot net light-response curves were evaluated at `450 µmol photons m⁻² s⁻¹`, their fitted respiration intercept was added, and the result was integrated over a 16 h photoperiod ([Kyei-Boahen et al. 2003](https://ps.ueb.cas.cz/pdfs/phs/2003/02/30.pdf)). Conversion used independent carrot SLA `66–94 cm² g⁻¹` ([Acosta-Motos et al. 2021](https://doi.org/10.3390/agronomy11122460)), producing `0.036–0.073` with midpoint `0.051`, rounded to `0.05`. Approximate `0.06–0.07` sensitivities correspond to brighter `700–1000 µmol m⁻² s⁻¹` reference conditions; they are not corrections for missing ontogenetic leaf allocation. Photorespiration remains embedded. **Derived from two studies.** |
 | `jmax` | `3.26e-6 µmol P cm⁻² s⁻¹` | Maximum root-surface P influx in both sparse and continuous uptake closures. Higher values increase kinetic demand but may intensify local diffusion limitation or inventory capping. | Tinker and Nye uptake value reported and used by [Schnepf & Roose (2006)](https://doi.org/10.1111/j.1469-8137.2006.01771.x), not a carrot measurement. **Transferred.** |
@@ -221,12 +222,11 @@ stoichiometry.
 
 ## Known gaps and recommended parameter work
 
-1. Qualify the 120-day plant carbon and growth scale before the P-response
-   pilot. Test `kleaf=0.30/0.45/0.60`, retain `amass=0.05` for the named
-   450-PAR reference day, and compare windowed RGR and biomass against the
-   `Forto` trajectory. Use the independent `50 g` numerical guard and reject
-   any guard-contacting trajectory. Prefer an explicit ontogenetic leaf-mass
-   or leaf-area state before final inference.
+1. Requalify the 120-day plant carbon and growth scale if `kleaf=0.50`,
+   `amass=0.05`, or the reference light regime changes. Compare windowed RGR
+   and biomass against the `Forto` trajectory, use the independent `50 g`
+   numerical guard, and reject any guard-contacting trajectory. Prefer an
+   explicit ontogenetic leaf-mass or leaf-area state before final inference.
 2. Obtain a direct mean seed-mass estimate for the intended *D. carota* population;
    the current `1 mg` value is only bounded by a multi-population range.
 4. Prioritise fungal `kappa_c`, because it is a large direct standing sink with no

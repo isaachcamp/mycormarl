@@ -29,7 +29,7 @@ class PlantTraits:
     initial_biomass: float = 0.01
     initial_c_pool: float = 0.00402
     initial_p_pool: float = 0.0192
-    kleaf: float = 0.30  # biomass fraction dedicated to photosynthesis
+    kleaf: float = 0.50  # biomass fraction dedicated to photosynthesis
     kfroot: float = 0.18  # fine-root dry-mass fraction of whole-plant dry mass
     amass: float = 0.05
     jmax: float = 3.26e-6  # µmol P cm^-2 s^-1
