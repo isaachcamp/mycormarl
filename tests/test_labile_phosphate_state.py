@@ -12,6 +12,7 @@ from mycormarl.soil.phosphate_grid import (
     labile_amount_to_solution_concentration,
     solution_concentration_to_labile_amount,
 )
+from mycormarl.soil.phosphate_units import MICROMOL_P_TO_MG_P
 
 
 def test_relative_depth_profile_is_linearly_interpolated_and_clamped_above_anchor():
@@ -275,3 +276,23 @@ def test_soil_step_updates_canonical_amount_without_storing_concentration(
     assert not hasattr(next_state, "soil_p")
     assert jnp.all(next_state.soil_labile_p >= 0.0)
     assert jnp.sum(next_state.soil_labile_p) <= jnp.sum(state.soil_labile_p)
+
+
+def test_soil_step_records_exact_cumulative_direct_plant_p_uptake(
+    species, small_config,
+):
+    """The qualification counter is the accepted root-to-plant flux in µmol."""
+    env = BaseMycorMarl(config=small_config, species=species)
+    _, state = env.reset(jax.random.PRNGKey(0))
+
+    next_state = env.step_phosphorus_field(state)
+
+    direct_uptake = next_state.cumulative_direct_plant_p_uptake_micromol[0]
+    plant_pool_gain = next_state.plant_p_pool[0] - state.plant_p_pool[0]
+    assert state.cumulative_direct_plant_p_uptake_micromol[0] == pytest.approx(0.0)
+    assert direct_uptake > 0.0
+    # The state stores a ~1e-4 mg increment beside a 4 mg float32 pool; the
+    # absolute tolerance covers that addition's rounding, not flux ambiguity.
+    assert plant_pool_gain == pytest.approx(
+        direct_uptake * MICROMOL_P_TO_MG_P, rel=0.0, abs=2e-8
+    )

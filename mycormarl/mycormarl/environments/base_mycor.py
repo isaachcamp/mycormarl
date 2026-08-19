@@ -267,6 +267,7 @@ class BaseMycorMarl(MultiAgentEnv):
             soil_labile_p=soil_labile_p,
             root_length_density=root_length_density,
             hyphae_length_density=hyphae_length_density,
+            cumulative_direct_plant_p_uptake_micromol=jnp.array([0.0]),
             cumulative_plant_p_mortality_loss_mg=jnp.array([0.0]),
             cumulative_fungus_p_mortality_loss_mg=jnp.array([0.0]),
             cumulative_plant_p_maintenance_loss_mg=jnp.array([0.0]),

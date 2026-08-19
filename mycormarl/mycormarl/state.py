@@ -27,6 +27,7 @@ class State:
     soil_labile_p: chex.Array  # µmol P per cell; shape (n_r, n_z)
     root_length_density: chex.Array  # cm cm^-3; shape (n_r, n_z)
     hyphae_length_density: chex.Array  # cm cm^-3; shape (n_r, n_z)
+    cumulative_direct_plant_p_uptake_micromol: chex.Array  # shape (n_plant_agents,)
     cumulative_plant_p_mortality_loss_mg: chex.Array  # shape (n_plant_agents,)
     cumulative_fungus_p_mortality_loss_mg: chex.Array  # shape (n_fungus_agents,)
     cumulative_plant_p_maintenance_loss_mg: chex.Array  # shape (n_plant_agents,)
