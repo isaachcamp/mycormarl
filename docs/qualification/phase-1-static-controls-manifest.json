@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "stage": "static-controls",
+  "model": {
+    "environment": {
+      "soil_radius_cm": 20.0,
+      "soil_depth_cm": 60.0,
+      "radial_interval_cm": 0.1,
+      "depth_interval_cm": 0.1,
+      "initial_solution_p_depth_profile": [
+        [0.0, 1.0],
+        [5.0, 1.0],
+        [15.0, 0.345],
+        [30.0, 0.170],
+        [60.0, 0.103],
+        [100.0, 0.069]
+      ]
+    },
+    "species": {
+      "plant": {},
+      "fungus": {}
+    }
+  },
+  "horizon": {
+    "days": 120.0,
+    "timestep_days": 0.025
+  },
+  "modes": ["mixed", "plant-only"],
+  "initial_p_micromolar": [0.1, 0.3, 1.0, 3.0],
+  "seeds": [0, 1, 2, 3, 4],
+  "training": {
+    "total_timesteps": 1,
+    "checkpoint_interval_timesteps": 1
+  },
+  "evaluation": {
+    "protocol": "latent-location",
+    "episodes": 1
+  },
+  "static_policy": {
+    "plant": [0.2, 1.0, 0.0, 0.0],
+    "fungus": [0.2, 1.0, 0.0, 0.0]
+  },
+  "output": {
+    "directory": "outputs/phase-1-static-controls",
+    "identity": "phase-1-static-controls"
+  }
+}
