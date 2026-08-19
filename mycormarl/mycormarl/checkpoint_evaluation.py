@@ -194,6 +194,34 @@ def _actions(
     return actions, key
 
 
+def _scan_episode(
+    environment: BaseMycorMarl,
+    actor: ActorCritic,
+    parameters: Mapping[str, Any],
+    *,
+    protocol: EvaluationProtocol,
+    key: jax.Array,
+) -> tuple[dict[str, Any], tuple[Any, ...], jax.Array]:
+    """Run one evaluation horizon in one compiled scan."""
+    key, reset_key = jax.random.split(key)
+    observations, state = environment.reset(reset_key)
+    initial_state = _state_snapshot(state)
+
+    def step(carry: tuple[Any, Any, Any], _: None):
+        key, observations, state = carry
+        actions, key = _actions(actor, parameters, observations, protocol, key)
+        key, step_key = jax.random.split(key)
+        observations, state, rewards, dones, infos = environment.step_env(
+            step_key, state, actions
+        )
+        return (key, observations, state), (actions, rewards, infos, state, dones)
+
+    final_carry, trajectory = jax.lax.scan(
+        step, (key, observations, state), None, length=environment.max_episode_steps
+    )
+    return initial_state, trajectory, final_carry[0]
+
+
 def evaluate_policy_parameters(
     environment: BaseMycorMarl,
     parameters: Mapping[str, Any],
@@ -214,15 +242,22 @@ def evaluate_policy_parameters(
     key = jax.random.PRNGKey(seed)
     result_episodes = []
     for _ in range(episodes):
-        key, reset_key = jax.random.split(key)
-        observations, state = environment.reset(reset_key)
-        initial_state = _state_snapshot(state)
+        initial_state, trajectory, key = _scan_episode(
+            environment, actor, parameters, protocol=protocol, key=key
+        )
+        actions_history, rewards_history, infos_history, states_history, dones_history = trajectory
+        done_values = _plain(dones_history["__all__"])
+        episode_length = next(
+            (index + 1 for index, done in enumerate(done_values) if bool(done)),
+            environment.max_episode_steps,
+        )
         previous_state = initial_state
         trace = []
-        for _ in range(environment.max_episode_steps):
-            actions, key = _actions(actor, parameters, observations, protocol, key)
-            key, step_key = jax.random.split(key)
-            observations, state, rewards, dones, infos = environment.step_env(step_key, state, actions)
+        for index in range(episode_length):
+            actions = jax.tree_util.tree_map(lambda value: value[index], actions_history)
+            rewards = jax.tree_util.tree_map(lambda value: value[index], rewards_history)
+            infos = jax.tree_util.tree_map(lambda value: value[index], infos_history)
+            state = jax.tree_util.tree_map(lambda value: value[index], states_history)
             transitions = infos["transitions"]
             state_snapshot = _state_snapshot(state)
             trace.append({
@@ -267,8 +302,6 @@ def evaluate_policy_parameters(
                 "state": state_snapshot,
             })
             previous_state = state_snapshot
-            if bool(dones["__all__"]):
-                break
         result_episodes.append(EvaluationEpisode(
             initial_state,
             tuple(trace),
