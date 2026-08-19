@@ -30,13 +30,13 @@
   "initial_p_micromolar": [0.1, 0.3, 1.0, 3.0],
   "seeds": [0, 1, 2, 3, 4],
   "training": {
-    "minimum_transition_budget": 48000,
-    "maximum_transition_budget": 192000,
-    "checkpoint_interval_timesteps": 12000,
-    "num_steps": 1,
-    "num_envs": 1,
-    "update_epochs": 1,
-    "num_minibatches": 1,
+    "minimum_transition_budget": 49152,
+    "maximum_transition_budget": 196608,
+    "checkpoint_interval_timesteps": 12288,
+    "num_steps": 128,
+    "num_envs": 16,
+    "update_epochs": 4,
+    "num_minibatches": 8,
     "stopping": {
       "evaluation_window_checkpoints": 3,
       "plateau_tolerances": {
