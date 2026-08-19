@@ -42,7 +42,7 @@ from mycormarl.domain_qualification import run_domain_qualification
 STUDY_RESULT_FORMAT = "mycormarl-study-result"
 STUDY_RESULT_VERSION = 2
 _STUDY_MODES = frozenset({"mixed", "plant-only"})
-_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training", "static-controls", "domain-qualification"})
+_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training", "comparison-block-training", "static-controls", "domain-qualification"})
 TRAINING_CHECKPOINT_FORMAT = "mycormarl-ppo-checkpoint"
 TRAINING_CHECKPOINT_VERSION = 1
 _REQUIRED_MANIFEST_FIELDS = (
@@ -239,7 +239,11 @@ def _validate_required_declarations(manifest: Any) -> None:
     if not math.isclose(transitions, round(transitions), rel_tol=0.0, abs_tol=1e-9):
         raise ValueError("horizon days must contain a whole number of timesteps")
     training = manifest["training"]
-    training_fields = ("total_timesteps", "checkpoint_interval_timesteps")
+    training_fields = (
+        ("minimum_transition_budget", "maximum_transition_budget", "checkpoint_interval_timesteps")
+        if manifest["stage"] == "comparison-block-training"
+        else ("total_timesteps", "checkpoint_interval_timesteps")
+    )
     if not isinstance(training, dict) or not set(training_fields).issubset(training):
         raise ValueError(
             "training must declare total_timesteps and checkpoint_interval_timesteps"
@@ -251,10 +255,50 @@ def _validate_required_declarations(manifest: Any) -> None:
         for field in training_fields
     ):
         raise ValueError("training timestep budgets must be positive integers")
-    if training["checkpoint_interval_timesteps"] > training["total_timesteps"]:
+    maximum_budget = training.get(
+        "maximum_transition_budget", training.get("total_timesteps")
+    )
+    if training["checkpoint_interval_timesteps"] > maximum_budget:
         raise ValueError("training checkpoint interval cannot exceed total_timesteps")
-    if manifest["stage"] == "single-condition-training":
-        if len(manifest["modes"]) != 1 or len(manifest["initial_p_micromolar"]) != 1 or len(manifest["seeds"]) != 1:
+    if manifest["stage"] == "comparison-block-training":
+        minimum_budget = training["minimum_transition_budget"]
+        if minimum_budget > maximum_budget:
+            raise ValueError("training minimum transition budget cannot exceed maximum")
+        if any(
+            budget % training["checkpoint_interval_timesteps"]
+            for budget in (minimum_budget, maximum_budget)
+        ):
+            raise ValueError("comparison-block training budgets must align with checkpoints")
+        stopping = training.get("stopping")
+        tolerance_fields = (
+            "plant_fitness_absolute",
+            "fungus_fitness_absolute",
+            "action_absolute",
+        )
+        if (
+            not isinstance(stopping, dict)
+            or not isinstance(stopping.get("evaluation_window_checkpoints"), int)
+            or isinstance(stopping.get("evaluation_window_checkpoints"), bool)
+            or stopping["evaluation_window_checkpoints"] < 2
+            or not isinstance(stopping.get("plateau_tolerances"), dict)
+            or any(field not in stopping["plateau_tolerances"] for field in tolerance_fields)
+            or any(
+                isinstance(stopping["plateau_tolerances"][field], bool)
+                or not isinstance(stopping["plateau_tolerances"][field], (int, float))
+                or not math.isfinite(stopping["plateau_tolerances"][field])
+                or stopping["plateau_tolerances"][field] < 0.0
+                for field in tolerance_fields
+            )
+        ):
+            raise ValueError(
+                "comparison-block training requires a stopping declaration with "
+                "an evaluation window and plant-fitness, fungus-fitness, and "
+                "action plateau tolerances"
+            )
+    if manifest["stage"] in {"single-condition-training", "comparison-block-training"}:
+        if manifest["stage"] == "single-condition-training" and (
+            len(manifest["modes"]) != 1 or len(manifest["initial_p_micromolar"]) != 1 or len(manifest["seeds"]) != 1
+        ):
             raise ValueError("single-condition-training requires one mode, one initial_p_micromolar value, and one seed")
         for field in ("num_steps", "num_envs", "update_epochs", "num_minibatches"):
             value = training.get(field, 1)
@@ -263,6 +307,14 @@ def _validate_required_declarations(manifest: Any) -> None:
         update_size = training.get("num_steps", 1) * training.get("num_envs", 1)
         if training["checkpoint_interval_timesteps"] % update_size != 0:
             raise ValueError("training checkpoint interval must contain whole PPO updates")
+        if manifest["stage"] == "comparison-block-training" and any(
+            budget % update_size
+            for budget in (
+                training["minimum_transition_budget"],
+                training["maximum_transition_budget"],
+            )
+        ):
+            raise ValueError("comparison-block training budgets must contain whole PPO updates")
     evaluation = manifest["evaluation"]
     if not isinstance(evaluation, dict) or not {
         "protocol",
@@ -468,6 +520,188 @@ def _checkpoint_bytes(metadata: dict[str, Any], runner_state: Any) -> bytes:
     })
 
 
+def _checkpoint_stopping_metrics(evaluation: Any, mode: str) -> dict[str, Any]:
+    """Summarise a deterministic checkpoint without forming a treatment contrast."""
+    agents = ("plant", "fungus") if mode == "mixed" else ("plant",)
+    fitness = {
+        agent: sum(
+            episode.summary["cumulative_reproductive_fitness"][agent]
+            for episode in evaluation.episodes
+        ) / len(evaluation.episodes)
+        for agent in agents
+    }
+    actions = {}
+    for agent in agents:
+        rows = [
+            row["actions"][agent]
+            for episode in evaluation.episodes
+            for row in episode.trace
+        ]
+        actions[agent] = [
+            sum(row[index] for row in rows) / len(rows)
+            for index in range(len(rows[0]))
+        ]
+    return {"fitness": fitness, "actions": actions}
+
+
+def _stopping_decision(
+    checkpoints: list[dict[str, Any]], training: dict[str, Any], mode: str
+) -> dict[str, Any]:
+    """Apply one predeclared, treatment-blind stopping rule at a checkpoint."""
+    stopping = training["stopping"]
+    tolerances = stopping["plateau_tolerances"]
+    window_size = stopping["evaluation_window_checkpoints"]
+    latest = checkpoints[-1]
+    result: dict[str, Any] = {
+        "transitions": latest["transitions"],
+        "evaluation_window_checkpoints": window_size,
+        "checkpoint_transitions": [
+            checkpoint["transitions"] for checkpoint in checkpoints[-window_size:]
+        ],
+        "plateau_tolerances": tolerances,
+        "plateau_metrics": {},
+    }
+    if latest["transitions"] < training["minimum_transition_budget"]:
+        result["outcome"] = "minimum-budget-not-reached"
+        return result
+    window = checkpoints[-window_size:]
+    if len(window) < window_size:
+        result["outcome"] = "evaluation-window-incomplete"
+        return result
+
+    def span(values: list[float]) -> float:
+        return max(values) - min(values)
+
+    plant_span = span([checkpoint["metrics"]["fitness"]["plant"] for checkpoint in window])
+    result["plateau_metrics"]["plant"] = {
+        "fitness_span": plant_span,
+        "stable": plant_span <= tolerances["plant_fitness_absolute"],
+    }
+    action_span = max(
+        span([checkpoint["metrics"]["actions"][agent][index] for checkpoint in window])
+        for agent in (("plant", "fungus") if mode == "mixed" else ("plant",))
+        for index in range(4)
+    )
+    result["plateau_metrics"]["actions"] = {
+        "maximum_component_span": action_span,
+        "stable": action_span <= tolerances["action_absolute"],
+    }
+    if mode == "mixed":
+        fungus_span = span([checkpoint["metrics"]["fitness"]["fungus"] for checkpoint in window])
+        result["plateau_metrics"]["fungus"] = {
+            "fitness_span": fungus_span,
+            "stable": fungus_span <= tolerances["fungus_fitness_absolute"],
+        }
+    stable = all(metric["stable"] for metric in result["plateau_metrics"].values())
+    if stable:
+        result["outcome"] = "plateau-complete"
+    elif latest["transitions"] >= training["maximum_transition_budget"]:
+        result["outcome"] = "maximum-budget-unconverged"
+    else:
+        result["outcome"] = "checkpoint-continued"
+    return result
+
+
+def _run_comparison_block_training(
+    manifest: dict[str, Any],
+    provenance: dict[str, Any],
+    study_identity: str,
+    execution_identity: str,
+    output_dir: Path,
+) -> StudyResult:
+    """Train every declared condition under one frozen, blind stopping protocol."""
+    bundle_path = output_dir / "result-bundle.json"
+    summary_path = output_dir / "summary.md"
+    if bundle_path.exists():
+        raise ValueError("comparison-block training cannot selectively extend an existing block")
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise ValueError("existing outputs have no compatible execution identity")
+
+    training = manifest["training"]
+    update_size = training.get("num_steps", 1) * training.get("num_envs", 1)
+    entries = []
+    for mode, p_level, seed in itertools.product(
+        manifest["modes"], manifest["initial_p_micromolar"], manifest["seeds"]
+    ):
+        env = _training_environment(manifest, mode, p_level)
+        streams = derive_random_streams(seed)
+        condition_name = f"{mode}-p{p_level:g}-seed{seed}"
+        condition_dir = output_dir / "conditions" / condition_name
+        state = None
+        transitions = 0
+        checkpoints = []
+        stopping_decision = None
+        while transitions < training["maximum_transition_budget"]:
+            config = _training_config(manifest, update_size)
+            trained = jax.jit(make_train(env, config, streams, state))(
+                jax.random.PRNGKey(seed)
+            )
+            state = trained["runner_state"]
+            transitions += update_size
+            if transitions % training["checkpoint_interval_timesteps"]:
+                continue
+            metadata = {
+                "mode": mode,
+                "initial_p_micromolar": p_level,
+                "seed": seed,
+                "transitions": transitions,
+                "named_random_streams": streams.to_dict(),
+                "manifest": manifest,
+                "actor_interface_version": ACTOR_INTERFACE_VERSION,
+                "environment_state_schema_version": ENVIRONMENT_STATE_SCHEMA_VERSION,
+            }
+            checkpoint_path = condition_dir / f"checkpoints/checkpoint-{transitions:08d}.msgpack"
+            checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            checkpoint_path.write_bytes(_checkpoint_bytes(metadata, state))
+            evaluation = evaluate_checkpoint(
+                checkpoint_path,
+                env,
+                episodes=manifest["evaluation"]["episodes"],
+                protocol=manifest["evaluation"]["protocol"],
+                seed=seed,
+            )
+            evaluation_path = condition_dir / f"evaluations/checkpoint-{transitions:08d}.json"
+            save_evaluation_artifact(evaluation_path, evaluation, checkpoint=checkpoint_path)
+            checkpoints.append({
+                "transitions": transitions,
+                "checkpoint": str(checkpoint_path.relative_to(output_dir)),
+                "evaluation": str(evaluation_path.relative_to(output_dir)),
+                "metrics": _checkpoint_stopping_metrics(evaluation, mode),
+            })
+            stopping_decision = _stopping_decision(checkpoints, training, mode)
+            if stopping_decision["outcome"] in {"plateau-complete", "maximum-budget-unconverged"}:
+                break
+        assert stopping_decision is not None
+        entries.append({
+            "mode": mode,
+            "initial_p_micromolar": p_level,
+            "seed": seed,
+            "status": "completed" if stopping_decision["outcome"] == "plateau-complete" else "unconverged",
+            "transitions": transitions,
+            "checkpoint": checkpoints[-1]["checkpoint"],
+            "random_streams": streams.to_dict(),
+            "evaluation": {"protocol": manifest["evaluation"]["protocol"], "episodes": manifest["evaluation"]["episodes"]},
+            "evaluation_artifacts": [checkpoint["evaluation"] for checkpoint in checkpoints],
+            "stopping_decision": stopping_decision,
+            "stopping_checkpoints": checkpoints,
+        })
+    bundle = {
+        "format": STUDY_RESULT_FORMAT,
+        "format_version": STUDY_RESULT_VERSION,
+        "study_identity": study_identity,
+        "execution_identity": execution_identity,
+        "manifest": manifest,
+        "provenance": provenance,
+        "entries": entries,
+        "completion": {"completed": len(entries), "requested": len(entries)},
+        "status": "complete",
+    }
+    output_dir.mkdir(parents=True, exist_ok=True)
+    bundle_path.write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _write_summary(bundle, summary_path)
+    return StudyResult(bundle_path, summary_path)
+
+
 def _run_single_condition_training(
     manifest: dict[str, Any],
     provenance: dict[str, Any],
@@ -632,6 +866,16 @@ def run_study(
         Path(manifest["output"]["directory"])
         / manifest["output"]["identity"]
     )
+    if manifest["stage"] == "comparison-block-training":
+        if stop_after_timesteps is not None:
+            raise ValueError("comparison-block-training does not support selective stop boundaries")
+        return _run_comparison_block_training(
+            manifest,
+            provenance,
+            study_identity,
+            execution_identity,
+            output_dir,
+        )
     if manifest["stage"] == "single-condition-training":
         if stop_after_timesteps is not None and (
             isinstance(stop_after_timesteps, bool)

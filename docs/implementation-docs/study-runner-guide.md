@@ -100,7 +100,7 @@ print(result.summary_path)
 | Field | Current contract |
 |---|---|
 | `schema_version` | Must be integer `1`. Other versions are incompatible. |
-| `stage` | Must currently be `walking-skeleton`. A scientific stage is rejected until its implementation exists. |
+| `stage` | `walking-skeleton`, `single-condition-training`, `comparison-block-training`, `static-controls`, or `domain-qualification`. |
 | `model.environment` | Must be a JSON object containing the complete environment configuration required by the intended stage. The walking skeleton checks the object boundary but does not interpret model parameters. |
 | `model.species` | Must be a JSON object containing the complete species configuration required by the intended stage. The walking skeleton checks the object boundary but does not interpret model parameters. |
 | `horizon.days` | Must be finite and greater than zero. |
@@ -119,6 +119,40 @@ All scientific choices that could change an execution should be written into
 the manifest rather than supplied through unrecorded runtime state. Later
 stages may add required nested declarations, such as qualification parents or
 stopping rules, while retaining these top-level boundaries.
+
+## Blind comparison-block stopping
+
+`comparison-block-training` trains every member of the declared condition
+matrix under one frozen rule. Its `training` declaration replaces
+`total_timesteps` with `minimum_transition_budget` and
+`maximum_transition_budget`, and also requires a `stopping` object:
+
+```json
+{
+  "minimum_transition_budget": 48000,
+  "maximum_transition_budget": 192000,
+  "checkpoint_interval_timesteps": 12000,
+  "stopping": {
+    "evaluation_window_checkpoints": 3,
+    "plateau_tolerances": {
+      "plant_fitness_absolute": 0.01,
+      "fungus_fitness_absolute": 0.01,
+      "action_absolute": 0.01
+    }
+  }
+}
+```
+
+Budgets and checkpoints must contain whole PPO updates. At each declared
+checkpoint the runner evaluates the deterministic latent-location policy and
+compares only that condition's checkpoint history. It never calculates an
+association-response contrast while deciding whether to stop. Plant fitness
+and all operational policy actions must be stable; `mixed` additionally
+requires fungal fitness stability. The result bundle preserves every
+checkpoint metric and the final stopping decision. A run that reaches the
+common maximum without satisfying the rule is retained with status
+`unconverged`. Existing comparison-block output cannot be selectively
+extended; changed optimizer settings are a new block declaration.
 
 ## Condition matrix
 

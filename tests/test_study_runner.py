@@ -448,6 +448,174 @@ def test_manifest_rejects_missing_training_budget_before_execution(tmp_path):
     assert not (tmp_path / "outputs").exists()
 
 
+def test_comparison_block_requires_predeclared_blind_stopping_rule(tmp_path):
+    """A comparison block cannot begin without its common stopping protocol."""
+    manifest = _manifest(tmp_path)
+    manifest["stage"] = "comparison-block-training"
+    manifest["training"] = {
+        "minimum_transition_budget": 1,
+        "maximum_transition_budget": 2,
+        "checkpoint_interval_timesteps": 1,
+    }
+
+    with pytest.raises(ValueError, match="stopping"):
+        run_study(_write_manifest(tmp_path, manifest))
+
+    assert not (tmp_path / "outputs").exists()
+
+
+def test_comparison_block_retains_non_plateau_runs_as_unconverged(tmp_path, monkeypatch):
+    """Maximum-budget failures remain auditable rather than becoming endpoints."""
+    manifest = _manifest(tmp_path, identity="unconverged-block")
+    manifest["stage"] = "comparison-block-training"
+    manifest["modes"] = ["plant-only"]
+    manifest["training"] = {
+        "minimum_transition_budget": 1,
+        "maximum_transition_budget": 2,
+        "checkpoint_interval_timesteps": 1,
+        "num_steps": 1,
+        "num_envs": 1,
+        "update_epochs": 1,
+        "num_minibatches": 1,
+        "stopping": {
+            "evaluation_window_checkpoints": 2,
+            "plateau_tolerances": {
+                "plant_fitness_absolute": 0.0,
+                "fungus_fitness_absolute": 0.0,
+                "action_absolute": 0.0,
+            },
+        },
+    }
+    calls = {"plant-only": 0}
+
+    def metrics(_evaluation, mode):
+        calls[mode] += 1
+        actions = {"plant": [float(calls[mode])] * 4}
+        fitness = {"plant": 1.0}
+        return {"fitness": fitness, "actions": actions}
+
+    monkeypatch.setattr(study_module, "_checkpoint_stopping_metrics", metrics)
+
+    result = run_study(_write_manifest(tmp_path, manifest))
+    bundle = json.loads(result.bundle_path.read_text(encoding="utf-8"))
+
+    assert bundle["status"] == "complete"
+    assert {entry["status"] for entry in bundle["entries"]} == {"unconverged"}
+    assert {entry["transitions"] for entry in bundle["entries"]} == {2}
+    for entry in bundle["entries"]:
+        decision = entry["stopping_decision"]
+        assert decision["outcome"] == "maximum-budget-unconverged"
+        assert decision["evaluation_window_checkpoints"] == 2
+        assert set(decision["plateau_metrics"]) == {"plant", "actions"} | (
+            {"fungus"} if entry["mode"] == "mixed" else set()
+        )
+
+
+def test_comparison_block_never_stops_before_minimum_and_records_plateau(tmp_path):
+    """A stable checkpoint only completes after the shared minimum budget."""
+    manifest = _manifest(tmp_path, identity="plateau-block")
+    manifest["stage"] = "comparison-block-training"
+    manifest["training"] = {
+        "minimum_transition_budget": 2,
+        "maximum_transition_budget": 3,
+        "checkpoint_interval_timesteps": 1,
+        "num_steps": 1,
+        "num_envs": 1,
+        "update_epochs": 1,
+        "num_minibatches": 1,
+        "stopping": {
+            "evaluation_window_checkpoints": 2,
+            "plateau_tolerances": {
+                "plant_fitness_absolute": 1e9,
+                "fungus_fitness_absolute": 1e9,
+                "action_absolute": 1e9,
+            },
+        },
+    }
+
+    bundle = json.loads(
+        run_study(_write_manifest(tmp_path, manifest)).bundle_path.read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert {entry["status"] for entry in bundle["entries"]} == {"completed"}
+    assert {entry["transitions"] for entry in bundle["entries"]} == {2}
+    assert all(
+        entry["stopping_decision"]["outcome"] == "plateau-complete"
+        and entry["stopping_decision"]["checkpoint_transitions"] == [1, 2]
+        for entry in bundle["entries"]
+    )
+
+
+def test_mixed_mode_requires_fungal_fitness_stability(tmp_path, monkeypatch):
+    """Fungal improvement keeps a mixed run open even when plant metrics plateau."""
+    manifest = _manifest(tmp_path, identity="fungal-gate")
+    manifest["stage"] = "comparison-block-training"
+    manifest["training"] = {
+        "minimum_transition_budget": 1,
+        "maximum_transition_budget": 2,
+        "checkpoint_interval_timesteps": 1,
+        "num_steps": 1,
+        "num_envs": 1,
+        "update_epochs": 1,
+        "num_minibatches": 1,
+        "stopping": {
+            "evaluation_window_checkpoints": 2,
+            "plateau_tolerances": {
+                "plant_fitness_absolute": 0.0,
+                "fungus_fitness_absolute": 0.1,
+                "action_absolute": 0.0,
+            },
+        },
+    }
+    calls = {"mixed": 0, "plant-only": 0}
+
+    def metrics(_evaluation, mode):
+        calls[mode] += 1
+        result = {"fitness": {"plant": 1.0}, "actions": {"plant": [0.0] * 4}}
+        if mode == "mixed":
+            result["fitness"]["fungus"] = float(calls[mode] - 1)
+            result["actions"]["fungus"] = [0.0] * 4
+        return result
+
+    monkeypatch.setattr(study_module, "_checkpoint_stopping_metrics", metrics)
+    bundle = json.loads(
+        run_study(_write_manifest(tmp_path, manifest)).bundle_path.read_text(
+            encoding="utf-8"
+        )
+    )
+    entries = {entry["mode"]: entry for entry in bundle["entries"]}
+
+    assert entries["plant-only"]["status"] == "completed"
+    assert entries["mixed"]["status"] == "unconverged"
+    assert not entries["mixed"]["stopping_decision"]["plateau_metrics"]["fungus"]["stable"]
+
+
+def test_comparison_block_rejects_selective_stop_boundary(tmp_path):
+    """A caller cannot grant one condition extra optimization effort."""
+    manifest = _manifest(tmp_path, identity="no-selective-extension")
+    manifest["stage"] = "comparison-block-training"
+    manifest["training"] = {
+        "minimum_transition_budget": 1,
+        "maximum_transition_budget": 2,
+        "checkpoint_interval_timesteps": 1,
+        "stopping": {
+            "evaluation_window_checkpoints": 2,
+            "plateau_tolerances": {
+                "plant_fitness_absolute": 0.0,
+                "fungus_fitness_absolute": 0.0,
+                "action_absolute": 0.0,
+            },
+        },
+    }
+
+    with pytest.raises(ValueError, match="selective"):
+        run_study(_write_manifest(tmp_path, manifest), stop_after_timesteps=1)
+
+    assert not (tmp_path / "outputs").exists()
+
+
 def test_manifest_rejects_incomplete_evaluation_settings(tmp_path):
     """Evaluation protocol and replication are fixed before conditions execute."""
     manifest = _manifest(tmp_path)
