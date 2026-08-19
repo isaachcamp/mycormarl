@@ -32,12 +32,13 @@ from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
 from mycormarl.static_controls import run_static_controls
+from mycormarl.domain_qualification import run_domain_qualification
 
 
 STUDY_RESULT_FORMAT = "mycormarl-study-result"
 STUDY_RESULT_VERSION = 2
 _STUDY_MODES = frozenset({"mixed", "plant-only"})
-_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training", "static-controls"})
+_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training", "static-controls", "domain-qualification"})
 TRAINING_CHECKPOINT_FORMAT = "mycormarl-ppo-checkpoint"
 TRAINING_CHECKPOINT_VERSION = 1
 _REQUIRED_MANIFEST_FIELDS = (
@@ -280,6 +281,12 @@ def _validate_required_declarations(manifest: Any) -> None:
         or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", identity) is None
     ):
         raise ValueError("output identity must be a name, not a path")
+    if manifest["stage"] == "domain-qualification":
+        declaration = manifest.get("domain_qualification")
+        if not isinstance(declaration, dict) or not declaration.get("static_controls"):
+            raise ValueError("domain-qualification requires domain_qualification.static_controls")
+        if not isinstance(declaration.get("candidates"), list) or len(declaration["candidates"]) < 2:
+            raise ValueError("domain-qualification requires at least two candidate domains")
 
 
 def _validated_existing_entries(
@@ -323,7 +330,7 @@ def _validated_existing_entries(
 
 
 def _write_summary(bundle: dict[str, Any], summary_path: Path) -> None:
-    summary_path.write_text(
+    summary = (
         f"# MycorMARL study: {bundle['manifest']['output']['identity']}\n\n"
         f"- Stage: {bundle['manifest']['stage']}\n"
         f"- Status: {bundle['status']}\n"
@@ -332,9 +339,39 @@ def _write_summary(bundle: dict[str, Any], summary_path: Path) -> None:
         f"{bundle['completion']['requested']}\n"
         f"- Git commit: {bundle['provenance']['git_commit']}\n"
         f"- Study identity: {bundle['study_identity']}\n"
-        f"- Execution identity: {bundle['execution_identity']}\n",
-        encoding="utf-8",
+        f"- Execution identity: {bundle['execution_identity']}\n"
     )
+    qualification = bundle.get("qualification")
+    if qualification is not None:
+        accepted = qualification["accepted_domain"]
+        profile = qualification["initial_solution_p_profiled"]
+        summary += (
+            "\n## Domain qualification\n\n"
+            f"- Initial-P scenario: {qualification['initial_p_scenario']}\n"
+            f"- Profiled initial Pi: {'yes' if profile else 'no'}\n"
+            f"- Accepted depth: {accepted['domain']['soil_depth_cm']} cm "
+            f"({accepted['name']})\n"
+            "- Acceptance gates: no fungal lower-boundary contact; maximum "
+            "direct-plant-Pi uptake difference to the largest depth domain "
+            f"≤ {accepted['direct_plant_uptake_behavior']['relative_tolerance']:.0%}.\n\n"
+            "| Candidate | Depth (cm) | Status | Fungal lower-boundary contact | "
+            "Largest-depth comparison | Max uptake difference | Runtime (s) |\n"
+            "|---|---:|---|---|---|---:|---:|\n"
+        )
+        for candidate in qualification["candidates"]:
+            uptake = candidate["direct_plant_uptake_behavior"]
+            difference = uptake["maximum_relative_difference"]
+            comparison = uptake["compared_to"] or "—"
+            difference_text = "—" if difference is None else f"{difference:.2%}"
+            contact = "yes" if candidate["fungal_lower_boundary_contact"] else "no"
+            if candidate["fungal_lower_boundary_first_contact_step"] is not None:
+                contact += f" (step {candidate['fungal_lower_boundary_first_contact_step']})"
+            summary += (
+                f"| {candidate['name']} | {candidate['domain']['soil_depth_cm']} | "
+                f"{candidate['status']} | {contact} | {comparison} | "
+                f"{difference_text} | {candidate['runtime_seconds']:.2f} |\n"
+            )
+    summary_path.write_text(summary, encoding="utf-8")
 
 
 def _run_static_controls_study(
@@ -402,7 +439,6 @@ def _training_environment(manifest: dict[str, Any], mode: str, p_level: float) -
         soil_depth_cm=model_environment.get("soil_depth_cm", 1.0),
         radial_interval_cm=model_environment.get("radial_interval_cm", 0.1),
         depth_interval_cm=model_environment.get("depth_interval_cm", 0.1),
-        topsoil_depth_cm=model_environment.get("topsoil_depth_cm", model_environment.get("soil_depth_cm", 1.0)),
         initial_solution_p_um=p_level,
     )
     return BaseMycorMarl(config, SpeciesParams(PlantTraits(), FungusTraits()))
@@ -603,6 +639,51 @@ def run_study(
             execution_identity,
             output_dir,
         )
+    if manifest["stage"] == "domain-qualification":
+        if stop_after_timesteps is not None:
+            raise ValueError("domain-qualification stage does not support stop_after_timesteps")
+        bundle_path = output_dir / "result-bundle.json"
+        summary_path = output_dir / "summary.md"
+        if bundle_path.exists():
+            try:
+                existing_bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as error:
+                raise ValueError("existing result bundle is unreadable") from error
+            if (
+                not isinstance(existing_bundle, dict)
+                or existing_bundle.get("format") != STUDY_RESULT_FORMAT
+                or existing_bundle.get("format_version") != STUDY_RESULT_VERSION
+            ):
+                raise ValueError("existing result format is incompatible")
+            if existing_bundle.get("study_identity") != study_identity:
+                raise ValueError("existing study identity is incompatible")
+            if existing_bundle.get("execution_identity") != execution_identity:
+                raise ValueError("existing execution identity is incompatible")
+            if existing_bundle.get("provenance") != provenance:
+                raise ValueError("existing result provenance is incompatible")
+            if existing_bundle.get("status") != "complete":
+                raise ValueError("existing domain qualification is incomplete")
+            if not summary_path.exists():
+                _write_summary(existing_bundle, summary_path)
+            return StudyResult(bundle_path, summary_path)
+        if output_dir.exists() and any(output_dir.iterdir()):
+            raise ValueError("existing outputs have no compatible execution identity")
+        qualification = run_domain_qualification(manifest)
+        bundle = {
+            "format": STUDY_RESULT_FORMAT,
+            "format_version": STUDY_RESULT_VERSION,
+            "study_identity": study_identity,
+            "execution_identity": execution_identity,
+            "manifest": manifest,
+            "provenance": provenance,
+            "qualification": qualification,
+            "completion": {"completed": 1, "requested": 1},
+            "status": "complete",
+        }
+        output_dir.mkdir(parents=True, exist_ok=True)
+        bundle_path.write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _write_summary(bundle, summary_path)
+        return StudyResult(bundle_path, summary_path)
     bundle_path = output_dir / "result-bundle.json"
     summary_path = output_dir / "summary.md"
     existing_bundle = None

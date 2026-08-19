@@ -9,6 +9,7 @@ import platform
 from flax import serialization
 import pytest
 
+import mycormarl.domain_qualification as domain_qualification_module
 import mycormarl.study as study_module
 from mycormarl.study import run_study
 
@@ -286,6 +287,166 @@ def test_runner_rejects_a_stage_without_an_executor(tmp_path):
         run_study(_write_manifest(tmp_path, manifest))
 
     assert not (tmp_path / "outputs").exists()
+
+
+def test_domain_qualification_emits_one_frozen_accepted_candidate(tmp_path):
+    """Domain qualification records evidence and freezes the smallest safe grid."""
+    static_manifest = _manifest(tmp_path / "static", identity="static-parent")
+    static_manifest["stage"] = "static-controls"
+    static_manifest["modes"] = ["plant-only"]
+    static_manifest["static_policy"] = {
+        "plant": [0.0, 1.0, 0.0, 0.0],
+        "fungus": [0.0, 1.0, 0.0, 0.0],
+    }
+    static_manifest["model"]["environment"]["initial_solution_p_depth_profile"] = [[0.0, 1.0], [2.0, 1.0]]
+    static_path = _write_manifest(tmp_path / "static", static_manifest)
+    static_result = run_study(static_path)
+
+    domain_manifest = _manifest(tmp_path / "domain", identity="domain")
+    domain_manifest["stage"] = "domain-qualification"
+    domain_manifest["modes"] = ["plant-only"]
+    domain_manifest["static_policy"] = static_manifest["static_policy"]
+    domain_manifest["model"]["species"]["plant"] = {"max_rooting_depth_cm": 0.5, "kfroot": 0.001}
+    domain_manifest["domain_qualification"] = {
+        "static_controls": str(static_result.bundle_path),
+        "depth_profile": [[0.0, 1.0], [2.0, 1.0]],
+        "candidates": [
+                {"name": "small", "soil_radius_cm": 10.0, "soil_depth_cm": 1.0},
+                {"name": "enlarged", "soil_radius_cm": 20.0, "soil_depth_cm": 2.0},
+        ],
+    }
+    result = run_study(_write_manifest(tmp_path / "domain", domain_manifest))
+
+    bundle = json.loads(result.bundle_path.read_text(encoding="utf-8"))
+    assert bundle["status"] == "complete"
+    assert bundle["qualification"]["accepted_domain"]["name"] == "small"
+    assert len(bundle["qualification"]["candidates"]) == 2
+    assert all("runtime_seconds" in candidate for candidate in bundle["qualification"]["candidates"])
+    assert all("peak_memory_bytes" in candidate for candidate in bundle["qualification"]["candidates"])
+    assert bundle["qualification"]["accepted_domain"]["direct_plant_uptake_behavior"]["stable"]
+    first_bytes = result.bundle_path.read_bytes()
+    repeated = run_study(_write_manifest(tmp_path / "domain", domain_manifest))
+    assert repeated.bundle_path.read_bytes() == first_bytes
+
+
+def test_domain_qualification_records_exact_direct_plant_uptake_comparison(tmp_path):
+    """Depth qualification compares the cumulative root-to-plant P flux."""
+    static_manifest = _manifest(tmp_path / "static", identity="static-parent")
+    static_manifest["stage"] = "static-controls"
+    static_manifest["modes"] = ["plant-only"]
+    static_manifest["static_policy"] = {
+        "plant": [0.0, 1.0, 0.0, 0.0],
+        "fungus": [0.0, 1.0, 0.0, 0.0],
+    }
+    static_manifest["model"]["environment"]["initial_solution_p_depth_profile"] = [
+        [5.0, 1.0], [15.0, 0.345], [30.0, 0.170], [60.0, 0.103], [100.0, 0.069],
+    ]
+    static_result = run_study(_write_manifest(tmp_path / "static", static_manifest))
+
+    domain_manifest = _manifest(tmp_path / "domain", identity="direct-uptake-domain")
+    domain_manifest["stage"] = "domain-qualification"
+    domain_manifest["modes"] = ["plant-only"]
+    domain_manifest["static_policy"] = static_manifest["static_policy"]
+    domain_manifest["model"]["species"]["plant"] = {"kfroot": 0.001}
+    domain_manifest["domain_qualification"] = {
+        "static_controls": str(static_result.bundle_path),
+        "direct_plant_uptake_relative_tolerance": 1.0,
+        "depth_profile": [[5.0, 1.0], [15.0, 0.345], [30.0, 0.170], [60.0, 0.103], [100.0, 0.069]],
+        "candidates": [
+            {"name": "small", "soil_radius_cm": 10.0, "soil_depth_cm": 0.5},
+            {"name": "reference", "soil_radius_cm": 10.0, "soil_depth_cm": 1.0},
+        ],
+    }
+    bundle = json.loads(run_study(_write_manifest(tmp_path / "domain", domain_manifest)).bundle_path.read_text())
+
+    record = bundle["qualification"]["accepted_domain"]["records"][0]
+    comparison = bundle["qualification"]["accepted_domain"]["direct_plant_uptake_behavior"]
+    assert record["cumulative_direct_plant_p_uptake_micromol"] >= 0.0
+    assert comparison["relative_tolerance"] == pytest.approx(1.0)
+    assert comparison["stable"]
+
+
+def test_domain_qualification_records_uniform_depth_treatment_without_a_profile(tmp_path):
+    """A qualification can request uniform P across each candidate's full depth."""
+    static_manifest = _manifest(tmp_path / "static", identity="uniform-static-parent")
+    static_manifest["stage"] = "static-controls"
+    static_manifest["static_policy"] = {
+        "plant": [0.0, 1.0, 0.0, 0.0],
+        "fungus": [0.0, 1.0, 0.0, 0.0],
+    }
+    static_result = run_study(_write_manifest(tmp_path / "static", static_manifest))
+
+    domain_manifest = _manifest(tmp_path / "domain", identity="uniform-domain")
+    domain_manifest["stage"] = "domain-qualification"
+    domain_manifest["static_policy"] = static_manifest["static_policy"]
+    domain_manifest["model"]["species"]["plant"] = {"max_rooting_depth_cm": 0.5, "kfroot": 0.001}
+    domain_manifest["domain_qualification"] = {
+        "static_controls": str(static_result.bundle_path),
+        "candidates": [
+            {"name": "small", "soil_radius_cm": 10.0, "soil_depth_cm": 1.0},
+            {"name": "reference", "soil_radius_cm": 20.0, "soil_depth_cm": 2.0},
+        ],
+    }
+
+    bundle = json.loads(run_study(_write_manifest(tmp_path / "domain", domain_manifest)).bundle_path.read_text())
+
+    assert not bundle["qualification"]["initial_solution_p_profiled"]
+
+
+def test_domain_qualification_selects_the_smallest_largest_domain_match_without_fungal_contact(
+    tmp_path, monkeypatch,
+):
+    """The selected depth passes both the fungal boundary and largest-depth gates."""
+    static_manifest = _manifest(tmp_path / "static", identity="static-parent")
+    static_manifest["stage"] = "static-controls"
+    static_manifest["static_policy"] = {
+        "plant": [0.0, 1.0, 0.0, 0.0],
+        "fungus": [0.0, 1.0, 0.0, 0.0],
+    }
+    static_result = run_study(_write_manifest(tmp_path / "static", static_manifest))
+
+    uptake = {"5-cm": 80.0, "10-cm": 90.0, "20-cm": 98.0, "30-cm": 100.0}
+
+    def trajectory(manifest, candidate, mode, p_level, seed, actions, depth_profile):
+        return {
+            "fungal_lower_boundary_contact": candidate["name"] == "5-cm",
+            "fungal_lower_boundary_first_contact_step": 1 if candidate["name"] == "5-cm" else None,
+            "initial_p_inventory_micromol": 1.0,
+            "final_plant_biomass_g": 1.0,
+            "cumulative_direct_plant_p_uptake_micromol": uptake[candidate["name"]],
+            "final_soil_inventory_micromol": 0.5,
+            "soil_inventory_trace_micromol": [1.0, 0.5],
+            "depletion_fraction": 0.5,
+        }
+
+    monkeypatch.setattr(domain_qualification_module, "_trajectory", trajectory)
+    domain_manifest = _manifest(tmp_path / "domain", identity="adjacent-depth-domain")
+    domain_manifest["stage"] = "domain-qualification"
+    domain_manifest["static_policy"] = static_manifest["static_policy"]
+    domain_manifest["domain_qualification"] = {
+        "static_controls": str(static_result.bundle_path),
+        "candidates": [
+            {"name": "5-cm", "soil_radius_cm": 1.0, "soil_depth_cm": 5.0},
+            {"name": "10-cm", "soil_radius_cm": 1.0, "soil_depth_cm": 10.0},
+            {"name": "20-cm", "soil_radius_cm": 1.0, "soil_depth_cm": 20.0},
+            {"name": "30-cm", "soil_radius_cm": 1.0, "soil_depth_cm": 30.0},
+        ],
+    }
+
+    result = run_study(_write_manifest(tmp_path / "domain", domain_manifest))
+    qualification = json.loads(result.bundle_path.read_text())["qualification"]
+
+    assert qualification["accepted_domain"]["name"] == "20-cm"
+    candidates = {candidate["name"]: candidate for candidate in qualification["candidates"]}
+    assert "fungal lower boundary contact" in candidates["5-cm"]["rejection_reasons"]
+    assert candidates["10-cm"]["direct_plant_uptake_behavior"]["compared_to"] == "30-cm"
+    assert candidates["10-cm"]["status"] == "rejected"
+    assert candidates["20-cm"]["direct_plant_uptake_behavior"]["compared_to"] == "30-cm"
+    assert candidates["30-cm"]["status"] == "comparison-reference"
+    summary = result.summary_path.read_text(encoding="utf-8")
+    assert "## Domain qualification" in summary
+    assert "20-cm" in summary
+    assert "Profiled initial Pi: no" in summary
 
 
 def test_manifest_rejects_horizon_inconsistent_with_timestep(tmp_path):

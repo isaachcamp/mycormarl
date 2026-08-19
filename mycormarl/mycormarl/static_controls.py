@@ -50,7 +50,7 @@ def _environment(manifest: dict[str, Any], mode: str, p_level: float) -> BaseMyc
         dt=horizon["timestep_days"],
         consumer_mode=mode,
         initial_solution_p_um=p_level,
-        topsoil_depth_cm=model.get("topsoil_depth_cm", model.get("soil_depth_cm", 1.0)),
+        initial_solution_p_depth_profile=model.get("initial_solution_p_depth_profile"),
         **{key: model[key] for key in (
             "soil_radius_cm", "soil_depth_cm", "radial_interval_cm",
             "depth_interval_cm", "b_p", "theta_water",
@@ -109,9 +109,10 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
     uptake = {PLANT: 0.0, FUNGUS: 0.0}
     transfers = {"plant_c_out": 0.0, "fungus_p_out": 0.0}
     biological_deaths = {PLANT: 0, FUNGUS: 0}
+    step_environment = jax.jit(env.step_env)
     while steps < env.max_episode_steps:
         previous = state
-        _, state, _, dones, info = env.step_env(jax.random.PRNGKey(seed + steps + 1), state, actions)
+        _, state, _, dones, info = step_environment(jax.random.PRNGKey(seed + steps + 1), state, actions)
         for agent, trade_out, trade_in, trade_out_key, trade_in_key in (
             (PLANT, "trade_out", "trade_in", "plant_c_out", None),
             (FUNGUS, "trade_out", "trade_in", "fungus_p_out", None),
@@ -151,7 +152,7 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
         "cumulative_plant_p_reproduction_export_mg", "cumulative_fungus_p_reproduction_export_mg",
     )))
     residual = initial_total - final_soil - final_pools - losses
-    if not uniform:
+    if not uniform and env.config.initial_solution_p_depth_profile is None:
         reasons.append("uniform initial P verification failed")
     if float(jnp.min(state.soil_labile_p)) < -_ACTION_TOLERANCE:
         reasons.append("negative soil P pool")
@@ -181,6 +182,7 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
         "status": "rejected" if reasons else "completed",
         "rejection_reasons": reasons,
         "steps": steps, "uniform_initial_p": uniform,
+        "initial_solution_p_profiled": env.config.initial_solution_p_depth_profile is not None,
         "biomass": {PLANT: float(state.plant_biomass[0]), FUNGUS: float(state.fungus_biomass[0])},
         "c_pools": {PLANT: float(state.plant_c_pool[0]), FUNGUS: float(state.fungus_c_pool[0])},
         "p_pools": {PLANT: float(state.plant_p_pool[0]), FUNGUS: float(state.fungus_p_pool[0])},
