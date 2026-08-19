@@ -563,6 +563,9 @@ def _training_environment(manifest: dict[str, Any], mode: str, p_level: float) -
         radial_interval_cm=model_environment.get("radial_interval_cm", 0.1),
         depth_interval_cm=model_environment.get("depth_interval_cm", 0.1),
         initial_solution_p_um=p_level,
+        initial_solution_p_depth_profile=model_environment.get(
+            "initial_solution_p_depth_profile"
+        ),
     )
     return BaseMycorMarl(config, SpeciesParams(PlantTraits(), FungusTraits()))
 

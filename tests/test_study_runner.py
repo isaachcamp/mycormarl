@@ -136,6 +136,24 @@ def test_scientific_phase_1_manifest_fixes_the_range_finding_design(tmp_path):
     assert not (tmp_path / "outputs").exists()
 
 
+def test_phase_1_training_environment_uses_the_declared_depth_profile(tmp_path):
+    """The qualified soil profile reaches PPO rather than only static controls."""
+    manifest = _pilot_manifest(tmp_path)
+    manifest["model"]["environment"].update({
+        "soil_radius_cm": 1.0,
+        "soil_depth_cm": 2.0,
+        "radial_interval_cm": 1.0,
+        "depth_interval_cm": 1.0,
+        "initial_solution_p_depth_profile": [[0.0, 1.0], [2.0, 0.5]],
+    })
+
+    environment = study_module._training_environment(manifest, "mixed", 0.3)
+
+    assert environment.config.initial_solution_p_depth_profile == [
+        [0.0, 1.0], [2.0, 0.5]
+    ]
+
+
 def test_phase_1_pilot_retains_growth_qualification_as_provenance(tmp_path):
     """Growth qualification is recorded but does not gate range finding."""
     manifest = _pilot_manifest(tmp_path)
