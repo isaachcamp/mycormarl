@@ -7,11 +7,29 @@ This guide describes how to prepare and run a study through the public
 GitHub issue #33. It covers the current manifest schema, output identity,
 resume rules, and completed-bundle immutability.
 
-The runner supports the `walking-skeleton` contract fixture and the
-`single-condition-training` stage. The fixture exercises orchestration without
-training policies. The training stage executes one declared mode, initial P
-level, and master seed through the real independent-PPO trainer and persists
-resumable checkpoints.
+The runner supports the `walking-skeleton` contract fixture,
+`single-condition-training`, `comparison-block-training`, and the named
+`phase-1-pilot` stage. The fixture exercises orchestration without training
+policies. The training stage executes one declared mode, initial P level, and
+master seed through the real independent-PPO trainer and persists resumable
+checkpoints.
+
+## Phase 1 range-finding pilot
+
+`phase-1-pilot` runs through the comparison-block training path but makes the
+scientific range-finding design explicit. A non-fixture manifest must declare
+exactly `mixed` and `plant-only`, P levels `0.1`, `0.3`, `1.0`, and `3.0` µM,
+five unique master seed IDs, and a 120-day horizon at `dt = 0.025 day`; this
+produces 40 conditions. `pilot_fixture: true` permits reduced automated
+fixtures while preserving the same qualification and matrix path.
+
+Before any condition starts, the manifest must name JSON artifacts for the
+plant-growth, static-control, and domain qualifications under
+`qualification_artifacts`. Static controls and domain qualification must pass;
+growth evidence is retained as provenance rather than as a full gate. Their
+paths and the frozen blind stopping rule are stored in the result bundle. A
+compatible incomplete block can resume pending conditions without rerunning
+completed, failed, or unconverged entries.
 
 ## Single-condition training
 
@@ -100,7 +118,7 @@ print(result.summary_path)
 | Field | Current contract |
 |---|---|
 | `schema_version` | Must be integer `1`. Other versions are incompatible. |
-| `stage` | `walking-skeleton`, `single-condition-training`, `comparison-block-training`, `static-controls`, or `domain-qualification`. |
+| `stage` | `walking-skeleton`, `single-condition-training`, `comparison-block-training`, `phase-1-pilot`, `static-controls`, or `domain-qualification`. |
 | `model.environment` | Must be a JSON object containing the complete environment configuration required by the intended stage. The walking skeleton checks the object boundary but does not interpret model parameters. |
 | `model.species` | Must be a JSON object containing the complete species configuration required by the intended stage. The walking skeleton checks the object boundary but does not interpret model parameters. |
 | `horizon.days` | Must be finite and greater than zero. |

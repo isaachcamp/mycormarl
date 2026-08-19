@@ -59,6 +59,126 @@ def _write_manifest(tmp_path, manifest):
     return path
 
 
+def _passed_pilot_qualifications(tmp_path):
+    """Persist the three passed prerequisite artifacts for a reduced fixture."""
+    artifacts = {
+        "plant_growth": {"status": "passed"},
+        "static_controls": {
+            "status": "complete",
+            "entries": [{"status": "completed"}],
+        },
+        "domain": {
+            "status": "complete",
+            "qualification": {"accepted_domain": {"name": "qualified"}},
+        },
+    }
+    paths = {}
+    for name, artifact in artifacts.items():
+        path = tmp_path / f"{name}.json"
+        path.write_text(json.dumps(artifact), encoding="utf-8")
+        paths[name] = str(path)
+    return paths
+
+
+def _pilot_manifest(tmp_path, *, fixture=True):
+    manifest = _manifest(tmp_path, identity="phase-1-fixture")
+    manifest["stage"] = "phase-1-pilot"
+    manifest["pilot_fixture"] = fixture
+    manifest["qualification_artifacts"] = _passed_pilot_qualifications(tmp_path)
+    manifest["training"] = {
+        "minimum_transition_budget": 1,
+        "maximum_transition_budget": 1,
+        "checkpoint_interval_timesteps": 1,
+        "num_steps": 1,
+        "num_envs": 1,
+        "update_epochs": 1,
+        "num_minibatches": 1,
+        "stopping": {
+            "evaluation_window_checkpoints": 2,
+            "plateau_tolerances": {
+                "plant_fitness_absolute": 0.0,
+                "fungus_fitness_absolute": 0.0,
+                "action_absolute": 0.0,
+            },
+        },
+    }
+    return manifest
+
+
+def test_reduced_phase_1_fixture_uses_the_pilot_matrix_path(tmp_path):
+    """A reduced fixture retains the Phase 1 qualification and matrix contract."""
+    manifest = _pilot_manifest(tmp_path)
+
+    bundle = json.loads(
+        run_study(_write_manifest(tmp_path, manifest)).bundle_path.read_text()
+    )
+
+    assert bundle["manifest"]["stage"] == "phase-1-pilot"
+    assert bundle["qualification_artifacts"] == manifest["qualification_artifacts"]
+    assert {(entry["mode"], entry["initial_p_micromolar"], entry["seed"])
+            for entry in bundle["entries"]} == {
+        ("mixed", 0.3, 7), ("plant-only", 0.3, 7),
+    }
+
+
+def test_scientific_phase_1_manifest_fixes_the_range_finding_design(tmp_path):
+    """The named pilot cannot silently drift from its predeclared 40-run design."""
+    manifest = _pilot_manifest(tmp_path, fixture=False)
+    manifest["initial_p_micromolar"] = [0.1, 0.3, 1.0, 3.0]
+    manifest["seeds"] = [11, 12, 13, 14, 15]
+    manifest["horizon"] = {"days": 120.0, "timestep_days": 0.025}
+    manifest["modes"] = ["mixed", "plant-only"]
+    manifest["initial_p_micromolar"] = [0.1, 0.3, 1.0]
+
+    with pytest.raises(ValueError, match="Phase 1 pilot"):
+        run_study(_write_manifest(tmp_path, manifest))
+
+    assert not (tmp_path / "outputs").exists()
+
+
+def test_phase_1_pilot_retains_growth_qualification_as_provenance(tmp_path):
+    """Growth qualification is recorded but does not gate range finding."""
+    manifest = _pilot_manifest(tmp_path)
+    plant_growth_path = Path(manifest["qualification_artifacts"]["plant_growth"])
+    plant_growth_path.write_text('{"status": "failed"}', encoding="utf-8")
+
+    bundle = json.loads(
+        run_study(_write_manifest(tmp_path, manifest)).bundle_path.read_text()
+    )
+
+    assert bundle["qualification_artifacts"]["plant_growth"] == str(plant_growth_path)
+
+
+def test_phase_1_fixture_resumes_only_the_missing_condition(tmp_path):
+    """A compatible interrupted pilot preserves valid completed evidence."""
+    manifest = _pilot_manifest(tmp_path)
+    manifest_path = _write_manifest(tmp_path, manifest)
+    first = run_study(manifest_path)
+    interrupted = json.loads(first.bundle_path.read_text(encoding="utf-8"))
+    completed_entry = interrupted["entries"][0]
+    completed_entry["evidence"] = {"sentinel": "preserve completed pilot run"}
+    interrupted["entries"][1] = {
+        "mode": "plant-only",
+        "initial_p_micromolar": 0.3,
+        "seed": 7,
+        "status": "pending",
+    }
+    interrupted["completion"] = {"completed": 1, "requested": 2}
+    interrupted["status"] = "incomplete"
+    first.bundle_path.write_text(
+        json.dumps(interrupted, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    resumed = run_study(manifest_path)
+    bundle = json.loads(resumed.bundle_path.read_text(encoding="utf-8"))
+
+    assert bundle["entries"][0] == completed_entry
+    assert bundle["entries"][1]["status"] in {"completed", "unconverged"}
+    assert bundle["completion"] == {"completed": 2, "requested": 2}
+    assert bundle["status"] == "complete"
+
+
 def test_valid_manifest_emits_versioned_bundle_and_derived_summary(tmp_path):
     """A declared fixture travels through the production artifact path."""
     manifest = _manifest(tmp_path, identity="tiny-fixture")
@@ -281,7 +401,7 @@ def test_manifest_rejects_nonpositive_initial_p_before_execution(tmp_path):
 def test_runner_rejects_a_stage_without_an_executor(tmp_path):
     """Unimplemented scientific stages cannot be reported as completed fixtures."""
     manifest = _manifest(tmp_path)
-    manifest["stage"] = "phase-1-pilot"
+    manifest["stage"] = "phase-1-dense-map"
 
     with pytest.raises(ValueError, match="stage"):
         run_study(_write_manifest(tmp_path, manifest))

@@ -42,7 +42,7 @@ from mycormarl.domain_qualification import run_domain_qualification
 STUDY_RESULT_FORMAT = "mycormarl-study-result"
 STUDY_RESULT_VERSION = 2
 _STUDY_MODES = frozenset({"mixed", "plant-only"})
-_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training", "comparison-block-training", "static-controls", "domain-qualification"})
+_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training", "comparison-block-training", "phase-1-pilot", "static-controls", "domain-qualification"})
 TRAINING_CHECKPOINT_FORMAT = "mycormarl-ppo-checkpoint"
 TRAINING_CHECKPOINT_VERSION = 1
 _REQUIRED_MANIFEST_FIELDS = (
@@ -241,7 +241,7 @@ def _validate_required_declarations(manifest: Any) -> None:
     training = manifest["training"]
     training_fields = (
         ("minimum_transition_budget", "maximum_transition_budget", "checkpoint_interval_timesteps")
-        if manifest["stage"] == "comparison-block-training"
+        if manifest["stage"] in {"comparison-block-training", "phase-1-pilot"}
         else ("total_timesteps", "checkpoint_interval_timesteps")
     )
     if not isinstance(training, dict) or not set(training_fields).issubset(training):
@@ -260,7 +260,7 @@ def _validate_required_declarations(manifest: Any) -> None:
     )
     if training["checkpoint_interval_timesteps"] > maximum_budget:
         raise ValueError("training checkpoint interval cannot exceed total_timesteps")
-    if manifest["stage"] == "comparison-block-training":
+    if manifest["stage"] in {"comparison-block-training", "phase-1-pilot"}:
         minimum_budget = training["minimum_transition_budget"]
         if minimum_budget > maximum_budget:
             raise ValueError("training minimum transition budget cannot exceed maximum")
@@ -295,7 +295,7 @@ def _validate_required_declarations(manifest: Any) -> None:
                 "an evaluation window and plant-fitness, fungus-fitness, and "
                 "action plateau tolerances"
             )
-    if manifest["stage"] in {"single-condition-training", "comparison-block-training"}:
+    if manifest["stage"] in {"single-condition-training", "comparison-block-training", "phase-1-pilot"}:
         if manifest["stage"] == "single-condition-training" and (
             len(manifest["modes"]) != 1 or len(manifest["initial_p_micromolar"]) != 1 or len(manifest["seeds"]) != 1
         ):
@@ -307,7 +307,7 @@ def _validate_required_declarations(manifest: Any) -> None:
         update_size = training.get("num_steps", 1) * training.get("num_envs", 1)
         if training["checkpoint_interval_timesteps"] % update_size != 0:
             raise ValueError("training checkpoint interval must contain whole PPO updates")
-        if manifest["stage"] == "comparison-block-training" and any(
+        if manifest["stage"] in {"comparison-block-training", "phase-1-pilot"} and any(
             budget % update_size
             for budget in (
                 training["minimum_transition_budget"],
@@ -315,6 +315,28 @@ def _validate_required_declarations(manifest: Any) -> None:
             )
         ):
             raise ValueError("comparison-block training budgets must contain whole PPO updates")
+    if manifest["stage"] == "phase-1-pilot":
+        fixture = manifest.get("pilot_fixture", False)
+        if not isinstance(fixture, bool):
+            raise ValueError("Phase 1 pilot_fixture must be a boolean")
+        if not fixture and (
+            manifest["modes"] != ["mixed", "plant-only"]
+            or manifest["initial_p_micromolar"] != [0.1, 0.3, 1.0, 3.0]
+            or len(manifest["seeds"]) != 5
+            or manifest["horizon"] != {"days": 120.0, "timestep_days": 0.025}
+        ):
+            raise ValueError(
+                "Phase 1 pilot requires the fixed 40-run range-finding design"
+            )
+        artifacts = manifest.get("qualification_artifacts")
+        if (
+            not isinstance(artifacts, dict)
+            or set(artifacts) != {"plant_growth", "static_controls", "domain"}
+            or any(not isinstance(path, str) or not path for path in artifacts.values())
+        ):
+            raise ValueError(
+                "Phase 1 pilot requires plant_growth, static_controls, and domain qualification artifacts"
+            )
     evaluation = manifest["evaluation"]
     if not isinstance(evaluation, dict) or not {
         "protocol",
@@ -366,10 +388,13 @@ def _validated_existing_entries(
     if (
         len(set(keys)) != len(keys)
         or any(key not in requested for key in keys)
-        or any(entry.get("status") not in {"completed", "pending"} for entry in entries)
+        or any(entry.get("status") not in {"completed", "pending", "failed", "unconverged"} for entry in entries)
     ):
         raise ValueError("existing result condition inventory is incompatible")
-    completed = sum(entry["status"] == "completed" for entry in entries)
+    completed = sum(
+        entry["status"] in {"completed", "failed", "unconverged"}
+        for entry in entries
+    )
     expected_completion = {
         "completed": completed,
         "requested": len(requested_conditions),
@@ -383,6 +408,48 @@ def _validated_existing_entries(
     elif status != "incomplete":
         raise ValueError("existing result condition inventory is incompatible")
     return entries
+
+
+def _passed_pilot_qualification_artifacts(
+    artifact_paths: dict[str, str], manifest_path: Path,
+) -> dict[str, str]:
+    """Verify the three persisted prerequisites before training a pilot matrix."""
+    artifacts: dict[str, dict[str, Any]] = {}
+    for name, raw_path in artifact_paths.items():
+        path = Path(raw_path)
+        if not path.is_absolute():
+            path = manifest_path.parent / path
+        try:
+            artifact = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(
+                f"Phase 1 pilot {name} qualification artifact is unreadable"
+            ) from error
+        if not isinstance(artifact, dict):
+            raise ValueError(f"Phase 1 pilot {name} qualification artifact is invalid")
+        artifacts[name] = artifact
+
+    # Growth-scale evidence remains required provenance, but it is not an
+    # all-or-nothing gate for the range-finding pilot: its sensitivity cases
+    # inform interpretation rather than selecting whether the matrix exists.
+    static_entries = artifacts["static_controls"].get("entries")
+    if (
+        artifacts["static_controls"].get("status") != "complete"
+        or not isinstance(static_entries, list)
+        or not static_entries
+        or any(entry.get("status") != "completed" for entry in static_entries if isinstance(entry, dict))
+        or any(not isinstance(entry, dict) for entry in static_entries)
+    ):
+        raise ValueError("Phase 1 pilot static_controls qualification did not pass")
+    domain = artifacts["domain"]
+    qualification = domain.get("qualification", domain)
+    if (
+        domain.get("status") != "complete"
+        or not isinstance(qualification, dict)
+        or not isinstance(qualification.get("accepted_domain"), dict)
+    ):
+        raise ValueError("Phase 1 pilot domain qualification did not pass")
+    return artifact_paths
 
 
 def _write_summary(bundle: dict[str, Any], summary_path: Path) -> None:
@@ -608,21 +675,55 @@ def _run_comparison_block_training(
     study_identity: str,
     execution_identity: str,
     output_dir: Path,
+    qualification_artifacts: dict[str, str] | None = None,
 ) -> StudyResult:
     """Train every declared condition under one frozen, blind stopping protocol."""
     bundle_path = output_dir / "result-bundle.json"
     summary_path = output_dir / "summary.md"
+    existing_entries: list[dict[str, Any]] = []
     if bundle_path.exists():
-        raise ValueError("comparison-block training cannot selectively extend an existing block")
+        try:
+            existing_bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError("existing comparison-block result bundle is unreadable") from error
+        if any(existing_bundle.get(field) != value for field, value in (
+            ("format", STUDY_RESULT_FORMAT),
+            ("format_version", STUDY_RESULT_VERSION),
+            ("study_identity", study_identity),
+            ("execution_identity", execution_identity),
+            ("provenance", provenance),
+        )):
+            raise ValueError("existing comparison-block result provenance is incompatible")
+        if existing_bundle.get("qualification_artifacts") != qualification_artifacts:
+            raise ValueError("existing comparison-block qualification provenance is incompatible")
+        requested_conditions = list(itertools.product(
+            manifest["modes"], manifest["initial_p_micromolar"], manifest["seeds"],
+        ))
+        existing_entries = _validated_existing_entries(
+            existing_bundle, requested_conditions,
+        )
+        if existing_bundle.get("status") == "complete":
+            if not summary_path.exists():
+                _write_summary(existing_bundle, summary_path)
+            return StudyResult(bundle_path, summary_path)
     if output_dir.exists() and any(output_dir.iterdir()):
-        raise ValueError("existing outputs have no compatible execution identity")
+        if not bundle_path.exists():
+            raise ValueError("existing outputs have no compatible execution identity")
 
     training = manifest["training"]
     update_size = training.get("num_steps", 1) * training.get("num_envs", 1)
     entries = []
+    previous_entries = {
+        (entry["mode"], entry["initial_p_micromolar"], entry["seed"]): entry
+        for entry in existing_entries
+    }
     for mode, p_level, seed in itertools.product(
         manifest["modes"], manifest["initial_p_micromolar"], manifest["seeds"]
     ):
+        existing = previous_entries.get((mode, p_level, seed))
+        if existing is not None and existing["status"] in {"completed", "failed", "unconverged"}:
+            entries.append(existing)
+            continue
         env = _training_environment(manifest, mode, p_level)
         streams = derive_random_streams(seed)
         condition_name = f"{mode}-p{p_level:g}-seed{seed}"
@@ -696,6 +797,8 @@ def _run_comparison_block_training(
         "completion": {"completed": len(entries), "requested": len(entries)},
         "status": "complete",
     }
+    if qualification_artifacts is not None:
+        bundle["qualification_artifacts"] = qualification_artifacts
     output_dir.mkdir(parents=True, exist_ok=True)
     bundle_path.write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     _write_summary(bundle, summary_path)
@@ -850,7 +953,8 @@ def run_study(
     stop_after_timesteps: int | None = None,
 ) -> StudyResult:
     """Run a declared study manifest and persist its versioned result bundle."""
-    manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    manifest_source = Path(manifest_path)
+    manifest = json.loads(manifest_source.read_text(encoding="utf-8"))
     _validate_required_declarations(manifest)
     provenance = _provenance(manifest)
     study_identity = _study_identity(manifest)
@@ -866,15 +970,21 @@ def run_study(
         Path(manifest["output"]["directory"])
         / manifest["output"]["identity"]
     )
-    if manifest["stage"] == "comparison-block-training":
+    if manifest["stage"] in {"comparison-block-training", "phase-1-pilot"}:
         if stop_after_timesteps is not None:
             raise ValueError("comparison-block-training does not support selective stop boundaries")
+        qualification_artifacts = None
+        if manifest["stage"] == "phase-1-pilot":
+            qualification_artifacts = _passed_pilot_qualification_artifacts(
+                manifest["qualification_artifacts"], manifest_source,
+            )
         return _run_comparison_block_training(
             manifest,
             provenance,
             study_identity,
             execution_identity,
             output_dir,
+            qualification_artifacts,
         )
     if manifest["stage"] == "single-condition-training":
         if stop_after_timesteps is not None and (
