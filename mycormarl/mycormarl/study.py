@@ -24,7 +24,9 @@ from mycormarl.policy_artifacts import (
 )
 from mycormarl.checkpoint_evaluation import (
     evaluate_checkpoint,
+    evaluate_checkpoint_summary,
     save_evaluation_artifact,
+    save_evaluation_summary_artifact,
 )
 from mycormarl.random_streams import (
     RANDOM_STREAM_DERIVATION_VERSION,
@@ -721,24 +723,34 @@ def _run_condition_training(
         checkpoint_path = condition_dir / f"checkpoints/checkpoint-{transitions:08d}.msgpack"
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
         checkpoint_path.write_bytes(_checkpoint_bytes(metadata, state))
-        evaluation = evaluate_checkpoint(
+        evaluation_path = condition_dir / f"evaluations/checkpoint-{transitions:08d}.json"
+        evaluation_summary = evaluate_checkpoint_summary(
             checkpoint_path,
             env,
             episodes=manifest["evaluation"]["episodes"],
             protocol=manifest["evaluation"]["protocol"],
             seed=seed,
         )
-        evaluation_path = condition_dir / f"evaluations/checkpoint-{transitions:08d}.json"
-        save_evaluation_artifact(evaluation_path, evaluation, checkpoint=checkpoint_path)
         checkpoints.append({
             "transitions": transitions,
             "checkpoint": str(checkpoint_path.relative_to(output_dir)),
             "evaluation": str(evaluation_path.relative_to(output_dir)),
-            "metrics": _checkpoint_stopping_metrics(evaluation, mode),
+            "metrics": evaluation_summary,
         })
         stopping_decision = _stopping_decision(checkpoints, training, mode)
         if stopping_decision["outcome"] in {"plateau-complete", "maximum-budget-unconverged"}:
+            evaluation = evaluate_checkpoint(
+                checkpoint_path,
+                env,
+                episodes=manifest["evaluation"]["episodes"],
+                protocol=manifest["evaluation"]["protocol"],
+                seed=seed,
+            )
+            save_evaluation_artifact(evaluation_path, evaluation, checkpoint=checkpoint_path)
             break
+        save_evaluation_summary_artifact(
+            evaluation_path, evaluation_summary, checkpoint=checkpoint_path
+        )
     assert stopping_decision is not None
     return {
         "mode": mode,

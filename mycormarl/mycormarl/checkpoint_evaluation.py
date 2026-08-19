@@ -173,6 +173,25 @@ def save_evaluation_artifact(
     output.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def save_evaluation_summary_artifact(
+    path: str | Path,
+    summary: dict[str, Any],
+    *,
+    checkpoint: str | Path,
+) -> None:
+    """Persist compact stopping metrics for a non-terminal checkpoint."""
+    artifact = {
+        "format": "mycormarl-checkpoint-evaluation-summary",
+        "format_version": 1,
+        "source_checkpoint": str(checkpoint),
+        "protocol": "latent-location",
+        "summary": summary,
+    }
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def _actions(
     actor: ActorCritic,
     parameters: Mapping[str, Any],
@@ -313,6 +332,54 @@ def evaluate_policy_parameters(
     return SampledPolicyEvaluation("sampled-policy", tuple(result_episodes))
 
 
+def evaluate_policy_summary(
+    environment: BaseMycorMarl,
+    parameters: Mapping[str, Any],
+    *,
+    episodes: int,
+    protocol: EvaluationProtocol = "latent-location",
+    seed: int = 0,
+) -> dict[str, Any]:
+    """Evaluate only stopping metrics without materialising a full trace."""
+    if protocol not in ("latent-location", "sampled-policy"):
+        raise ValueError("protocol must be 'latent-location' or 'sampled-policy'")
+    if isinstance(episodes, bool) or not isinstance(episodes, int) or episodes <= 0:
+        raise ValueError("episodes must be a positive integer")
+    if set(parameters) != {PLANT, FUNGUS}:
+        raise ValueError("parameters must contain exactly plant and fungus actors")
+
+    actor = ActorCritic()
+    key = jax.random.PRNGKey(seed)
+    episode_metrics = []
+    for _ in range(episodes):
+        _, trajectory, key = _scan_episode(
+            environment, actor, parameters, protocol=protocol, key=key
+        )
+        actions, rewards = trajectory[0], trajectory[1]
+        episode_metrics.append({
+            "fitness": {
+                agent: jnp.sum(rewards[agent]) for agent in (PLANT, FUNGUS)
+            },
+            "actions": {
+                agent: jnp.mean(actions[agent], axis=0) for agent in (PLANT, FUNGUS)
+            },
+        })
+    return {
+        "fitness": {
+            agent: float(jnp.mean(jnp.asarray([
+                item["fitness"][agent] for item in episode_metrics
+            ])))
+            for agent in (PLANT, FUNGUS)
+        },
+        "actions": {
+            agent: jnp.mean(jnp.stack([
+                item["actions"][agent] for item in episode_metrics
+            ]), axis=0).tolist()
+            for agent in (PLANT, FUNGUS)
+        },
+    }
+
+
 def evaluate_checkpoint(
     path: str | Path,
     environment: BaseMycorMarl,
@@ -340,5 +407,36 @@ def evaluate_checkpoint(
     except (KeyError, TypeError) as error:
         raise ValueError("training checkpoint does not contain actor parameters") from error
     return evaluate_policy_parameters(
+        environment, parameters, episodes=episodes, protocol=protocol, seed=seed
+    )
+
+
+def evaluate_checkpoint_summary(
+    path: str | Path,
+    environment: BaseMycorMarl,
+    *,
+    episodes: int,
+    protocol: EvaluationProtocol = "latent-location",
+    seed: int = 0,
+) -> dict[str, Any]:
+    """Evaluate checkpoint stopping metrics without building a full artifact."""
+    payload = serialization.msgpack_restore(Path(path).read_bytes())
+    metadata = payload.get("metadata", {}) if isinstance(payload, dict) else {}
+    if (
+        not isinstance(payload, dict)
+        or payload.get("format") != TRAINING_CHECKPOINT_FORMAT
+        or payload.get("format_version") != TRAINING_CHECKPOINT_VERSION
+        or metadata.get("actor_interface_version") != ACTOR_INTERFACE_VERSION
+        or metadata.get("environment_state_schema_version") != ENVIRONMENT_STATE_SCHEMA_VERSION
+    ):
+        raise ValueError("incompatible training checkpoint")
+    try:
+        parameters = {
+            PLANT: payload["runner_state"]["0"][PLANT]["params"],
+            FUNGUS: payload["runner_state"]["0"][FUNGUS]["params"],
+        }
+    except (KeyError, TypeError) as error:
+        raise ValueError("training checkpoint does not contain actor parameters") from error
+    return evaluate_policy_summary(
         environment, parameters, episodes=episodes, protocol=protocol, seed=seed
     )
