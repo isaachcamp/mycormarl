@@ -241,6 +241,42 @@ def _scan_episode(
     return initial_state, trajectory, final_carry[0]
 
 
+_SUMMARY_RUNNERS: dict[tuple[int, EvaluationProtocol], Any] = {}
+
+
+def _compiled_summary_runner(
+    environment: BaseMycorMarl, protocol: EvaluationProtocol
+) -> Any:
+    """Cache the compiled summary rollout for repeated checkpoints."""
+    cache_key = (id(environment), protocol)
+    runner = _SUMMARY_RUNNERS.get(cache_key)
+    if runner is not None:
+        return runner
+    actor = ActorCritic()
+
+    def run(parameters: Mapping[str, Any], key: jax.Array):
+        key, reset_key = jax.random.split(key)
+        observations, state = environment.reset(reset_key)
+
+        def step(carry: tuple[Any, Any, Any], _: None):
+            key, observations, state = carry
+            actions, key = _actions(actor, parameters, observations, protocol, key)
+            key, step_key = jax.random.split(key)
+            observations, state, rewards, dones, _ = environment.step_env(
+                step_key, state, actions
+            )
+            return (key, observations, state), (actions, rewards, dones["__all__"])
+
+        final_carry, trajectory = jax.lax.scan(
+            step, (key, observations, state), None, length=environment.max_episode_steps
+        )
+        return final_carry[0], trajectory
+
+    runner = jax.jit(run)
+    _SUMMARY_RUNNERS[cache_key] = runner
+    return runner
+
+
 def evaluate_policy_parameters(
     environment: BaseMycorMarl,
     parameters: Mapping[str, Any],
@@ -348,20 +384,29 @@ def evaluate_policy_summary(
     if set(parameters) != {PLANT, FUNGUS}:
         raise ValueError("parameters must contain exactly plant and fungus actors")
 
-    actor = ActorCritic()
     key = jax.random.PRNGKey(seed)
     episode_metrics = []
     for _ in range(episodes):
-        _, trajectory, key = _scan_episode(
-            environment, actor, parameters, protocol=protocol, key=key
+        runner = _compiled_summary_runner(environment, protocol)
+        key, trajectory = runner(parameters, key)
+        actions, rewards, done_flags = trajectory
+        done_flags = jnp.asarray(done_flags, dtype=bool)
+        has_termination = jnp.any(done_flags)
+        termination_index = jnp.argmax(done_flags)
+        episode_length = jnp.where(
+            has_termination, termination_index + 1, done_flags.shape[0]
         )
-        actions, rewards = trajectory[0], trajectory[1]
+        active = jnp.arange(done_flags.shape[0]) < episode_length
         episode_metrics.append({
             "fitness": {
-                agent: jnp.sum(rewards[agent]) for agent in (PLANT, FUNGUS)
+                agent: jnp.sum(jnp.where(active, rewards[agent], 0.0))
+                for agent in (PLANT, FUNGUS)
             },
             "actions": {
-                agent: jnp.mean(actions[agent], axis=0) for agent in (PLANT, FUNGUS)
+                agent: jnp.sum(
+                    jnp.where(active[:, None], actions[agent], 0.0), axis=0
+                ) / jnp.maximum(episode_length, 1)
+                for agent in (PLANT, FUNGUS)
             },
         })
     return {
