@@ -163,8 +163,8 @@ continuous closures are blended using `uptake_reference_time_days` and
 | `initial_p_pool` | `0.0002 mg P` | Free fungal P at reset, additional to structural P implicit in biomass. | One structural-biomass equivalent: `0.0001 × 2`. **Derived model initial condition.** |
 | `gamma_c` | `0.5 g C g⁻¹ DM` | Structural fungal C per unit biomass; controls C-limited growth, initial reserve, deficit mortality, and conversion of biomass to hyphal tissue volume. | Provisional fungal carbon fraction used by [Bisot et al. (2026)](https://doi.org/10.1073/pnas.2512182123). Its precise AMF value is acknowledged as uncertain. **Transferred/provisional.** |
 | `gamma_p` | `2 mg P g⁻¹ DM` | Fixed structural/frozen P per unit fungal biomass. Lower values reduce P cost of growth but increase biomass loss per unit unmet P-loss demand. It does not specify P maintenance. | Approximate ordinary P concentration inside *Glomus intraradices* spores, from the lineage now called *R. irregularis* ([Olsson et al. 2008](https://doi.org/10.1128/AEM.00376-08)). The paper measured `1.3±0.35` under low P and `8.0±1.6 mg g⁻¹` under high P; `2` is its ordinary-spore description. **Direct lineage observation used as a whole-fungus fixed stoichiometry proxy.** |
-| `kappa_c` | `0.03 g C g⁻¹ DM d⁻¹` | Unavoidable fungal carbon maintenance; reduces the free C received from the plant and can cause biomass loss when unpaid. | No source or derivation is recorded in active research or model documentation. **Unsupported.** |
-| `kappa_p` | `0.003 mg P g⁻¹ DM d⁻¹` | Lumped irreversible free-P loss, excluding P transfer to the plant and structural P in biomass. | Literature constrains fine-hyphal lifetimes to roughly `5–7 d` ([Bago et al. 1998](https://doi.org/10.1046/j.1469-8137.1998.00199.x); [Olsson & Johnson 2005](https://doi.org/10.1111/j.1461-0248.2005.00831.x)), but not the non-recycled P fraction. With `gamma_p=2`, the default assumes only about `0.75–1.05%` irreversible loss per turnover: `kappa_p=(gamma_p/tau)f_irreversible`. **Derived scale with an assumed loss fraction; not directly literature-backed.** |
+| `kappa_c` | `0.015 g C g⁻¹ DM d⁻¹` | Standing external-mycelium carbon loss paid before action; it reduces the free C received from the plant and can cause biomass loss when unpaid. It is a broader operating-respiration proxy, not a pure basal-maintenance measurement. | Transferred from direct external-mycelium respiration of *Funneliformis mosseae*: `1.5–3.8 ng C m⁻¹ h⁻¹` and `3.6 µg DM m⁻¹` convert to `0.010–0.025 g C g⁻¹ DM d⁻¹`; the ambient `0.016` rounds to `0.015` ([Heinemeyer et al. 2006](https://doi.org/10.1111/j.1469-8137.2006.01730.x)). The model represents external mycelium, but there is no direct biomass-normalised *R. irregularis* measurement. **Transferred/derived.** |
+| `kappa_p` | `0.001 mg P g⁻¹ DM d⁻¹` | Lumped irreversible free-P loss, excluding P transfer to the plant and structural P in biomass. | Set equal to the plant value so both partners carry the same small free-P-loss burden. This is an explicit model-policy choice, not a fungal measurement. Literature constrains fine-hyphal lifetimes to roughly `5–7 d` ([Bago et al. 1998](https://doi.org/10.1046/j.1469-8137.1998.00199.x); [Olsson & Johnson 2005](https://doi.org/10.1111/j.1461-0248.2005.00831.x)), but not the non-recycled P fraction. With `gamma_p=2`, it implies only about `0.25–0.35%` irreversible loss per fine-structure turnover: `kappa_p=(gamma_p/tau)f_irreversible`. **Model choice; not directly literature-backed.** |
 | `death_fraction` | `0.05` | Fungus dies when post-maintenance biomass falls below 5% of historical maximum. It is not hyphal turnover or stochastic mortality. | No empirical derivation is recorded. **Unsupported.** |
 | `hyphal_radius` | `5e-4 cm` (`5 µm`) | Converts fungal tissue volume to cylindrical length and length to absorbing area; also enters sparse resistance and depletion-zone overlap. | Adopted from [Schnepf & Roose (2006)](https://doi.org/10.1111/j.1469-8137.2006.01771.x), not identified as a direct *R. irregularis* measurement. **Transferred.** |
 | `hyphal_tissue_carbon_density` | `0.1155 g C cm⁻³ tissue` | Converts structural fungal carbon to living hyphal volume. Higher density produces less length and smaller colony extent per unit biomass. | Provisional `M_C` from [Bisot et al. (2026)](https://doi.org/10.1073/pnas.2512182123); their construction combines tissue density, dry fraction, and carbon fraction and notes uncertainty for AMF. **Transferred/provisional.** |
@@ -201,8 +201,7 @@ The following defaults should not be presented as measurements:
 - **Unsupported organism values:** plant constant whole-episode `kleaf`, `root_radius`,
   `root_length_density`, `beta_root_distribution`, `max_rooting_depth_cm`,
   `death_fraction`, and any interpretation of `biomass_cap` as a biological
-  maximum; fungal `kappa_c`
-  and `death_fraction`.
+  maximum; fungal `death_fraction`.
 - **Explicit biological abstractions:** plant and fungal `kappa_p`. Literature
   informs their scale and interpretation, but not the selected irreversible fraction.
 - **Explicit uptake/reward choices:** `uptake_reference_time_days`,
@@ -229,8 +228,10 @@ stoichiometry.
    explicit ontogenetic leaf-mass or leaf-area state before final inference.
 2. Obtain a direct mean seed-mass estimate for the intended *D. carota* population;
    the current `1 mg` value is only bounded by a multi-population range.
-4. Prioritise fungal `kappa_c`, because it is a large direct standing sink with no
-   recorded evidence and controls fungal dependence on traded plant C.
+4. Obtain a direct *R. irregularis* external-mycelium maintenance-respiration
+   measurement to replace the transferred `0.010–0.025 g C g⁻¹ DM d⁻¹ envelope;
+   fungal `kappa_c` remains a large direct standing sink that controls dependence
+   on traded plant C.
 5. Replace the plant root radius and spatial-density/depth parameters with matched
    *D. carota* fine-root measurements; these directly determine absorbing area and
    overlap geometry.

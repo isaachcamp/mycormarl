@@ -53,7 +53,8 @@ def test_accepted_growth_geometry_trait_defaults():
 
     assert fungus.gamma_c == pytest.approx(0.5)
     assert fungus.gamma_p == pytest.approx(2.0)
-    assert fungus.kappa_p == pytest.approx(0.003)
+    assert fungus.kappa_c == pytest.approx(0.015)
+    assert fungus.kappa_p == pytest.approx(0.001)
     assert fungus.initial_biomass == pytest.approx(0.0001)
     assert fungus.initial_c_pool == pytest.approx(
         fungus.initial_biomass * fungus.gamma_c
