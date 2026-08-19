@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "stage": "phase-1-pilot",
+  "pilot_fixture": false,
+  "model": {
+    "environment": {
+      "soil_radius_cm": 20.0,
+      "soil_depth_cm": 60.0,
+      "radial_interval_cm": 0.1,
+      "depth_interval_cm": 0.1,
+      "initial_solution_p_depth_profile": [
+        [0.0, 1.0],
+        [5.0, 1.0],
+        [15.0, 0.345],
+        [30.0, 0.170],
+        [60.0, 0.103],
+        [100.0, 0.069]
+      ]
+    },
+    "species": {
+      "plant": {},
+      "fungus": {}
+    }
+  },
+  "horizon": {
+    "days": 120.0,
+    "timestep_days": 0.025
+  },
+  "modes": ["mixed", "plant-only"],
+  "initial_p_micromolar": [0.1, 0.3, 1.0, 3.0],
+  "seeds": [0, 1, 2, 3, 4],
+  "training": {
+    "minimum_transition_budget": 48000,
+    "maximum_transition_budget": 192000,
+    "checkpoint_interval_timesteps": 12000,
+    "num_steps": 1,
+    "num_envs": 1,
+    "update_epochs": 1,
+    "num_minibatches": 1,
+    "stopping": {
+      "evaluation_window_checkpoints": 3,
+      "plateau_tolerances": {
+        "plant_fitness_absolute": 0.01,
+        "fungus_fitness_absolute": 0.01,
+        "action_absolute": 0.01
+      }
+    }
+  },
+  "evaluation": {
+    "protocol": "latent-location",
+    "episodes": 1
+  },
+  "qualification_artifacts": {
+    "plant_growth": "../qualification/plant-growth-qualification.json",
+    "static_controls": "../../outputs/phase-1-static-controls/phase-1-static-controls/result-bundle.json",
+    "domain": "../../outputs/profile-depth-direct-uptake-qualification/profile-depth-direct-uptake-qualification/result-bundle.json"
+  },
+  "output": {
+    "directory": "outputs/phase-1-pilot",
+    "identity": "phase-1-pilot"
+  }
+}
