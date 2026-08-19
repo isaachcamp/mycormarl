@@ -7,7 +7,6 @@ import json
 import hashlib
 import time
 import tracemalloc
-from pathlib import Path
 from typing import Any
 
 import jax
@@ -51,32 +50,6 @@ def _actions(manifest: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(policy, dict):
         raise ValueError("domain qualification requires static_policy")
     return {agent: _action(policy[agent], agent) for agent in (PLANT, FUNGUS)}
-
-
-def _load_parent(path: str | Path, manifest: dict[str, Any]) -> dict[str, Any]:
-    try:
-        parent = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise ValueError("static-controls artifact is unreadable") from error
-    if parent.get("control_format") != "mycormarl-static-controls" or parent.get("status") != "complete":
-        raise ValueError("domain qualification requires a complete static-controls artifact")
-    expected = {
-        (mode, p_level, seed)
-        for mode in manifest["modes"]
-        for p_level in manifest["initial_p_micromolar"]
-        for seed in manifest["seeds"]
-    }
-    entries = parent.get("entries", [])
-    actual = {(entry.get("mode"), entry.get("initial_p_micromolar"), entry.get("seed")) for entry in entries}
-    if actual != expected or any(entry.get("status") != "completed" for entry in entries):
-        raise ValueError("static-controls artifact does not cover the declared domain conditions")
-    parent_manifest = parent.get("manifest")
-    if not isinstance(parent_manifest, dict):
-        raise ValueError("static-controls artifact does not retain its manifest")
-    for field in ("horizon", "static_policy"):
-        if parent_manifest.get(field) != manifest.get(field):
-            raise ValueError(f"static-controls artifact has a different {field}")
-    return parent
 
 
 def _environment(
@@ -206,8 +179,8 @@ def _direct_plant_uptake_difference(candidate: dict[str, Any], reference: dict[s
 def run_domain_qualification(manifest: dict[str, Any]) -> dict[str, Any]:
     """Run candidate domains and return a frozen qualification artifact."""
     declaration = manifest.get("domain_qualification")
-    if not isinstance(declaration, dict) or not declaration.get("static_controls"):
-        raise ValueError("domain qualification requires domain_qualification.static_controls")
+    if not isinstance(declaration, dict):
+        raise ValueError("domain qualification requires a domain_qualification declaration")
     candidates = declaration.get("candidates")
     if not isinstance(candidates, list) or len(candidates) < 2:
         raise ValueError("domain qualification requires at least two candidate domains")
@@ -217,10 +190,6 @@ def run_domain_qualification(manifest: dict[str, Any]) -> dict[str, Any]:
     depth_profile = declaration.get("depth_profile", model_environment.get("initial_solution_p_depth_profile"))
     if depth_profile is not None and (not isinstance(depth_profile, list) or len(depth_profile) < 2):
         raise ValueError("profile domain qualification requires a depth_profile with at least two knots")
-    parent = _load_parent(declaration["static_controls"], manifest)
-    parent_environment = parent["manifest"].get("model", {}).get("environment", {})
-    if parent_environment.get("initial_solution_p_depth_profile") != depth_profile:
-        raise ValueError("static-controls artifact has a different initial-P scenario")
     actions = _actions(manifest)
     if any("soil_depth_cm" not in candidate for candidate in candidates):
         raise ValueError("each domain candidate requires soil_depth_cm")
@@ -252,7 +221,17 @@ def run_domain_qualification(manifest: dict[str, Any]) -> dict[str, Any]:
             outputs.append({
                 "name": candidate["name"],
                 "comparison_identity": hashlib.sha256(
-                    json.dumps({"parent": declaration["static_controls"], "candidate": candidate}, sort_keys=True).encode()
+                    json.dumps(
+                        {
+                            "candidate": candidate,
+                            "horizon": manifest["horizon"],
+                            "initial_p_micromolar": manifest["initial_p_micromolar"],
+                            "modes": manifest["modes"],
+                            "seeds": manifest["seeds"],
+                            "static_policy": manifest["static_policy"],
+                        },
+                        sort_keys=True,
+                    ).encode()
                 ).hexdigest(),
                 "domain": {key: candidate[key] for key in _DOMAIN_FIELDS if key in candidate},
                 "records": records,
@@ -326,5 +305,5 @@ def run_domain_qualification(manifest: dict[str, Any]) -> dict[str, Any]:
             "initial_p_scenario",
             "depth-profile" if depth_profile is not None else "uniform",
         ),
-        "parent_static_controls": declaration["static_controls"],
+        "static_policy": manifest["static_policy"],
     }

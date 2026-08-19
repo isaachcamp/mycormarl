@@ -283,8 +283,8 @@ def _validate_required_declarations(manifest: Any) -> None:
         raise ValueError("output identity must be a name, not a path")
     if manifest["stage"] == "domain-qualification":
         declaration = manifest.get("domain_qualification")
-        if not isinstance(declaration, dict) or not declaration.get("static_controls"):
-            raise ValueError("domain-qualification requires domain_qualification.static_controls")
+        if not isinstance(declaration, dict):
+            raise ValueError("domain-qualification requires a domain_qualification declaration")
         if not isinstance(declaration.get("candidates"), list) or len(declaration["candidates"]) < 2:
             raise ValueError("domain-qualification requires at least two candidate domains")
 

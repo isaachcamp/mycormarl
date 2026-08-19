@@ -291,24 +291,17 @@ def test_runner_rejects_a_stage_without_an_executor(tmp_path):
 
 def test_domain_qualification_emits_one_frozen_accepted_candidate(tmp_path):
     """Domain qualification records evidence and freezes the smallest safe grid."""
-    static_manifest = _manifest(tmp_path / "static", identity="static-parent")
-    static_manifest["stage"] = "static-controls"
-    static_manifest["modes"] = ["plant-only"]
-    static_manifest["static_policy"] = {
+    static_policy = {
         "plant": [0.0, 1.0, 0.0, 0.0],
         "fungus": [0.0, 1.0, 0.0, 0.0],
     }
-    static_manifest["model"]["environment"]["initial_solution_p_depth_profile"] = [[0.0, 1.0], [2.0, 1.0]]
-    static_path = _write_manifest(tmp_path / "static", static_manifest)
-    static_result = run_study(static_path)
 
     domain_manifest = _manifest(tmp_path / "domain", identity="domain")
     domain_manifest["stage"] = "domain-qualification"
     domain_manifest["modes"] = ["plant-only"]
-    domain_manifest["static_policy"] = static_manifest["static_policy"]
+    domain_manifest["static_policy"] = static_policy
     domain_manifest["model"]["species"]["plant"] = {"max_rooting_depth_cm": 0.5, "kfroot": 0.001}
     domain_manifest["domain_qualification"] = {
-        "static_controls": str(static_result.bundle_path),
         "depth_profile": [[0.0, 1.0], [2.0, 1.0]],
         "candidates": [
                 {"name": "small", "soil_radius_cm": 10.0, "soil_depth_cm": 1.0},
@@ -331,25 +324,17 @@ def test_domain_qualification_emits_one_frozen_accepted_candidate(tmp_path):
 
 def test_domain_qualification_records_exact_direct_plant_uptake_comparison(tmp_path):
     """Depth qualification compares the cumulative root-to-plant P flux."""
-    static_manifest = _manifest(tmp_path / "static", identity="static-parent")
-    static_manifest["stage"] = "static-controls"
-    static_manifest["modes"] = ["plant-only"]
-    static_manifest["static_policy"] = {
+    static_policy = {
         "plant": [0.0, 1.0, 0.0, 0.0],
         "fungus": [0.0, 1.0, 0.0, 0.0],
     }
-    static_manifest["model"]["environment"]["initial_solution_p_depth_profile"] = [
-        [5.0, 1.0], [15.0, 0.345], [30.0, 0.170], [60.0, 0.103], [100.0, 0.069],
-    ]
-    static_result = run_study(_write_manifest(tmp_path / "static", static_manifest))
 
     domain_manifest = _manifest(tmp_path / "domain", identity="direct-uptake-domain")
     domain_manifest["stage"] = "domain-qualification"
     domain_manifest["modes"] = ["plant-only"]
-    domain_manifest["static_policy"] = static_manifest["static_policy"]
+    domain_manifest["static_policy"] = static_policy
     domain_manifest["model"]["species"]["plant"] = {"kfroot": 0.001}
     domain_manifest["domain_qualification"] = {
-        "static_controls": str(static_result.bundle_path),
         "direct_plant_uptake_relative_tolerance": 1.0,
         "depth_profile": [[5.0, 1.0], [15.0, 0.345], [30.0, 0.170], [60.0, 0.103], [100.0, 0.069]],
         "candidates": [
@@ -368,20 +353,16 @@ def test_domain_qualification_records_exact_direct_plant_uptake_comparison(tmp_p
 
 def test_domain_qualification_records_uniform_depth_treatment_without_a_profile(tmp_path):
     """A qualification can request uniform P across each candidate's full depth."""
-    static_manifest = _manifest(tmp_path / "static", identity="uniform-static-parent")
-    static_manifest["stage"] = "static-controls"
-    static_manifest["static_policy"] = {
+    static_policy = {
         "plant": [0.0, 1.0, 0.0, 0.0],
         "fungus": [0.0, 1.0, 0.0, 0.0],
     }
-    static_result = run_study(_write_manifest(tmp_path / "static", static_manifest))
 
     domain_manifest = _manifest(tmp_path / "domain", identity="uniform-domain")
     domain_manifest["stage"] = "domain-qualification"
-    domain_manifest["static_policy"] = static_manifest["static_policy"]
+    domain_manifest["static_policy"] = static_policy
     domain_manifest["model"]["species"]["plant"] = {"max_rooting_depth_cm": 0.5, "kfroot": 0.001}
     domain_manifest["domain_qualification"] = {
-        "static_controls": str(static_result.bundle_path),
         "candidates": [
             {"name": "small", "soil_radius_cm": 10.0, "soil_depth_cm": 1.0},
             {"name": "reference", "soil_radius_cm": 20.0, "soil_depth_cm": 2.0},
@@ -397,13 +378,10 @@ def test_domain_qualification_selects_the_smallest_largest_domain_match_without_
     tmp_path, monkeypatch,
 ):
     """The selected depth passes both the fungal boundary and largest-depth gates."""
-    static_manifest = _manifest(tmp_path / "static", identity="static-parent")
-    static_manifest["stage"] = "static-controls"
-    static_manifest["static_policy"] = {
+    static_policy = {
         "plant": [0.0, 1.0, 0.0, 0.0],
         "fungus": [0.0, 1.0, 0.0, 0.0],
     }
-    static_result = run_study(_write_manifest(tmp_path / "static", static_manifest))
 
     uptake = {"5-cm": 80.0, "10-cm": 90.0, "20-cm": 98.0, "30-cm": 100.0}
 
@@ -422,9 +400,8 @@ def test_domain_qualification_selects_the_smallest_largest_domain_match_without_
     monkeypatch.setattr(domain_qualification_module, "_trajectory", trajectory)
     domain_manifest = _manifest(tmp_path / "domain", identity="adjacent-depth-domain")
     domain_manifest["stage"] = "domain-qualification"
-    domain_manifest["static_policy"] = static_manifest["static_policy"]
+    domain_manifest["static_policy"] = static_policy
     domain_manifest["domain_qualification"] = {
-        "static_controls": str(static_result.bundle_path),
         "candidates": [
             {"name": "5-cm", "soil_radius_cm": 1.0, "soil_depth_cm": 5.0},
             {"name": "10-cm", "soil_radius_cm": 1.0, "soil_depth_cm": 10.0},
