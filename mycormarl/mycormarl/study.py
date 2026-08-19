@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 from importlib.metadata import version
 import itertools
@@ -315,6 +316,14 @@ def _validate_required_declarations(manifest: Any) -> None:
             )
         ):
             raise ValueError("comparison-block training budgets must contain whole PPO updates")
+        if manifest["stage"] in {"comparison-block-training", "phase-1-pilot"}:
+            parallel_workers = manifest["training"].get("parallel_workers", 1)
+            if (
+                isinstance(parallel_workers, bool)
+                or not isinstance(parallel_workers, int)
+                or parallel_workers <= 0
+            ):
+                raise ValueError("training parallel_workers must be a positive integer")
     if manifest["stage"] == "phase-1-pilot":
         fixture = manifest.get("pilot_fixture", False)
         if not isinstance(fixture, bool):
@@ -672,6 +681,80 @@ def _stopping_decision(
     return result
 
 
+def _run_condition_training(
+    manifest: dict[str, Any],
+    output_dir: Path,
+    mode: str,
+    p_level: float,
+    seed: int,
+) -> dict[str, Any]:
+    """Train one independent condition; safe to execute in a worker thread."""
+    training = manifest["training"]
+    update_size = training.get("num_steps", 1) * training.get("num_envs", 1)
+    env = _training_environment(manifest, mode, p_level)
+    streams = derive_random_streams(seed)
+    condition_name = f"{mode}-p{p_level:g}-seed{seed}"
+    condition_dir = output_dir / "conditions" / condition_name
+    state = None
+    transitions = 0
+    checkpoints = []
+    stopping_decision = None
+    while transitions < training["maximum_transition_budget"]:
+        config = _training_config(manifest, update_size)
+        trained = jax.jit(make_train(env, config, streams, state))(
+            jax.random.PRNGKey(seed)
+        )
+        state = trained["runner_state"]
+        transitions += update_size
+        if transitions % training["checkpoint_interval_timesteps"]:
+            continue
+        metadata = {
+            "mode": mode,
+            "initial_p_micromolar": p_level,
+            "seed": seed,
+            "transitions": transitions,
+            "named_random_streams": streams.to_dict(),
+            "manifest": manifest,
+            "actor_interface_version": ACTOR_INTERFACE_VERSION,
+            "environment_state_schema_version": ENVIRONMENT_STATE_SCHEMA_VERSION,
+        }
+        checkpoint_path = condition_dir / f"checkpoints/checkpoint-{transitions:08d}.msgpack"
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint_path.write_bytes(_checkpoint_bytes(metadata, state))
+        evaluation = evaluate_checkpoint(
+            checkpoint_path,
+            env,
+            episodes=manifest["evaluation"]["episodes"],
+            protocol=manifest["evaluation"]["protocol"],
+            seed=seed,
+        )
+        evaluation_path = condition_dir / f"evaluations/checkpoint-{transitions:08d}.json"
+        save_evaluation_artifact(evaluation_path, evaluation, checkpoint=checkpoint_path)
+        checkpoints.append({
+            "transitions": transitions,
+            "checkpoint": str(checkpoint_path.relative_to(output_dir)),
+            "evaluation": str(evaluation_path.relative_to(output_dir)),
+            "metrics": _checkpoint_stopping_metrics(evaluation, mode),
+        })
+        stopping_decision = _stopping_decision(checkpoints, training, mode)
+        if stopping_decision["outcome"] in {"plateau-complete", "maximum-budget-unconverged"}:
+            break
+    assert stopping_decision is not None
+    return {
+        "mode": mode,
+        "initial_p_micromolar": p_level,
+        "seed": seed,
+        "status": "completed" if stopping_decision["outcome"] == "plateau-complete" else "unconverged",
+        "transitions": transitions,
+        "checkpoint": checkpoints[-1]["checkpoint"],
+        "random_streams": streams.to_dict(),
+        "evaluation": {"protocol": manifest["evaluation"]["protocol"], "episodes": manifest["evaluation"]["episodes"]},
+        "evaluation_artifacts": [checkpoint["evaluation"] for checkpoint in checkpoints],
+        "stopping_decision": stopping_decision,
+        "stopping_checkpoints": checkpoints,
+    }
+
+
 def _run_comparison_block_training(
     manifest: dict[str, Any],
     provenance: dict[str, Any],
@@ -713,82 +796,33 @@ def _run_comparison_block_training(
         if not bundle_path.exists():
             raise ValueError("existing outputs have no compatible execution identity")
 
-    training = manifest["training"]
-    update_size = training.get("num_steps", 1) * training.get("num_envs", 1)
-    entries = []
+    entries_by_condition = {}
     previous_entries = {
         (entry["mode"], entry["initial_p_micromolar"], entry["seed"]): entry
         for entry in existing_entries
     }
-    for mode, p_level, seed in itertools.product(
+    pending_conditions = []
+    requested_conditions = list(itertools.product(
         manifest["modes"], manifest["initial_p_micromolar"], manifest["seeds"]
-    ):
+    ))
+    for mode, p_level, seed in requested_conditions:
         existing = previous_entries.get((mode, p_level, seed))
         if existing is not None and existing["status"] in {"completed", "failed", "unconverged"}:
-            entries.append(existing)
+            entries_by_condition[(mode, p_level, seed)] = existing
             continue
-        env = _training_environment(manifest, mode, p_level)
-        streams = derive_random_streams(seed)
-        condition_name = f"{mode}-p{p_level:g}-seed{seed}"
-        condition_dir = output_dir / "conditions" / condition_name
-        state = None
-        transitions = 0
-        checkpoints = []
-        stopping_decision = None
-        while transitions < training["maximum_transition_budget"]:
-            config = _training_config(manifest, update_size)
-            trained = jax.jit(make_train(env, config, streams, state))(
-                jax.random.PRNGKey(seed)
-            )
-            state = trained["runner_state"]
-            transitions += update_size
-            if transitions % training["checkpoint_interval_timesteps"]:
-                continue
-            metadata = {
-                "mode": mode,
-                "initial_p_micromolar": p_level,
-                "seed": seed,
-                "transitions": transitions,
-                "named_random_streams": streams.to_dict(),
-                "manifest": manifest,
-                "actor_interface_version": ACTOR_INTERFACE_VERSION,
-                "environment_state_schema_version": ENVIRONMENT_STATE_SCHEMA_VERSION,
+        pending_conditions.append((mode, p_level, seed))
+    workers = min(manifest["training"].get("parallel_workers", 1), len(pending_conditions))
+    if workers:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                condition: executor.submit(
+                    _run_condition_training, manifest, output_dir, *condition
+                )
+                for condition in pending_conditions
             }
-            checkpoint_path = condition_dir / f"checkpoints/checkpoint-{transitions:08d}.msgpack"
-            checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-            checkpoint_path.write_bytes(_checkpoint_bytes(metadata, state))
-            evaluation = evaluate_checkpoint(
-                checkpoint_path,
-                env,
-                episodes=manifest["evaluation"]["episodes"],
-                protocol=manifest["evaluation"]["protocol"],
-                seed=seed,
-            )
-            evaluation_path = condition_dir / f"evaluations/checkpoint-{transitions:08d}.json"
-            save_evaluation_artifact(evaluation_path, evaluation, checkpoint=checkpoint_path)
-            checkpoints.append({
-                "transitions": transitions,
-                "checkpoint": str(checkpoint_path.relative_to(output_dir)),
-                "evaluation": str(evaluation_path.relative_to(output_dir)),
-                "metrics": _checkpoint_stopping_metrics(evaluation, mode),
-            })
-            stopping_decision = _stopping_decision(checkpoints, training, mode)
-            if stopping_decision["outcome"] in {"plateau-complete", "maximum-budget-unconverged"}:
-                break
-        assert stopping_decision is not None
-        entries.append({
-            "mode": mode,
-            "initial_p_micromolar": p_level,
-            "seed": seed,
-            "status": "completed" if stopping_decision["outcome"] == "plateau-complete" else "unconverged",
-            "transitions": transitions,
-            "checkpoint": checkpoints[-1]["checkpoint"],
-            "random_streams": streams.to_dict(),
-            "evaluation": {"protocol": manifest["evaluation"]["protocol"], "episodes": manifest["evaluation"]["episodes"]},
-            "evaluation_artifacts": [checkpoint["evaluation"] for checkpoint in checkpoints],
-            "stopping_decision": stopping_decision,
-            "stopping_checkpoints": checkpoints,
-        })
+            for condition, future in futures.items():
+                entries_by_condition[condition] = future.result()
+    entries = [entries_by_condition[condition] for condition in requested_conditions]
     bundle = {
         "format": STUDY_RESULT_FORMAT,
         "format_version": STUDY_RESULT_VERSION,

@@ -35,6 +35,7 @@
     "checkpoint_interval_timesteps": 12288,
     "num_steps": 128,
     "num_envs": 16,
+    "parallel_workers": 4,
     "update_epochs": 4,
     "num_minibatches": 8,
     "stopping": {
