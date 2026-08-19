@@ -489,7 +489,11 @@ class BaseMycorMarl(MultiAgentEnv):
                 self.z_edges,
             ),
         )
+        plant_p_before_uptake = state.plant_p_pool
+        fungus_p_before_uptake = state.fungus_p_pool
         state = self.step_phosphorus_field(state)
+        plant_direct_uptake_mg = state.plant_p_pool - plant_p_before_uptake
+        fungus_direct_uptake_mg = state.fungus_p_pool - fungus_p_before_uptake
 
         state = state.replace(step=state.step + 1)
 
@@ -552,6 +556,8 @@ class BaseMycorMarl(MultiAgentEnv):
                 "trade_out": plant_c_trade_out,
                 "trade_in": fungus_p_trade_out,
                 "trade_cancelled": trade_cancelled,
+                "direct_p_uptake_mg": plant_direct_uptake_mg,
+                "maintenance_p_required_mg": plant_maintenance["info"]["maint_p"],
             },
             FUNGUS: {
                 **fungus_step["info"],
@@ -563,6 +569,8 @@ class BaseMycorMarl(MultiAgentEnv):
                 "trade_out": fungus_p_trade_out,
                 "trade_in": plant_c_trade_out,
                 "trade_cancelled": trade_cancelled,
+                "direct_p_uptake_mg": fungus_direct_uptake_mg,
+                "maintenance_p_required_mg": fungus_maintenance["info"]["maint_p"],
             },
             "transitions": {
                 PLANT: completed_transition(
