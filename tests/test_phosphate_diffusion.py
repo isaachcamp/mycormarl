@@ -323,7 +323,6 @@ def _subcycling_config(dt_seconds=1.0):
         soil_depth_cm=1.0,
         radial_interval_cm=1.0,
         depth_interval_cm=1.0,
-        topsoil_depth_cm=1.0,
         initial_solution_p_um=0.0,
         theta_water=1.0,
         b_p=0.0,

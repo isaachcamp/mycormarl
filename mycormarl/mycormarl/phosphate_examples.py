@@ -27,7 +27,6 @@ def example_config() -> EnvConfig:
         soil_depth_cm=0.2,
         radial_interval_cm=0.1,
         depth_interval_cm=0.1,
-        topsoil_depth_cm=0.2,
         initial_solution_p_um=1.0,
     )
 

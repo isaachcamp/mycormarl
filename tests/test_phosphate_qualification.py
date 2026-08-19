@@ -67,7 +67,6 @@ def _diagnostic_environment():
         soil_depth_cm=1.0,
         radial_interval_cm=1.0,
         depth_interval_cm=1.0,
-        topsoil_depth_cm=1.0,
         initial_solution_p_um=1.0,
     )
     species = SpeciesParams(
@@ -245,7 +244,6 @@ def test_environment_uses_configured_episode_length_by_default():
             soil_depth_cm=1.0,
             radial_interval_cm=1.0,
             depth_interval_cm=1.0,
-            topsoil_depth_cm=1.0,
         ),
         SpeciesParams(
             plant=PlantTraits(initial_biomass=0.0),

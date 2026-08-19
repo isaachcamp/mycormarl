@@ -160,11 +160,11 @@ of a globally optimal strategy or a game-theoretic equilibrium.
 
 ### Uniform-P initial condition
 
-A reset condition in which every soil cell within the configured P-bearing
-region begins at the same solution-P concentration; cells outside that region
-remain at zero. After reset, the production finite-inventory soil model evolves
-normally: diffusion and root and fungal uptake may generate spatial and
-temporal concentration differences.
+A reset condition in which every soil cell in the configured domain begins at
+the same solution-P concentration. A supplied depth profile is the separate
+opt-in initial vertical-heterogeneity treatment. After reset, the production
+finite-inventory soil model evolves normally: diffusion and root and fungal
+uptake may generate spatial and temporal concentration differences.
 
 "Uniform" therefore describes the externally imposed initial condition, not a
 continuously replenished reservoir and not a constraint that keeps the field
@@ -212,4 +212,3 @@ partner is favoured under the modeled environmental distribution. Under the
 current expected-reward objective this is an insurance or risk-buffering
 result, not by itself evidence that the policy optimizes evolutionary bet
 hedging or geometric-mean fitness.
-

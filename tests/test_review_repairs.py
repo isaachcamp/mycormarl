@@ -28,7 +28,6 @@ def _small_config(mode="mixed"):
         soil_depth_cm=0.2,
         radial_interval_cm=0.1,
         depth_interval_cm=0.1,
-        topsoil_depth_cm=0.2,
         consumer_mode=mode,
     )
 

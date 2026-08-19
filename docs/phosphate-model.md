@@ -56,15 +56,23 @@ Implemented by
 [`solution_concentration_to_labile_amount`](../mycormarl/mycormarl/soil/phosphate_grid.py#L195-L210)
 and its inverse
 [`labile_amount_to_solution_concentration`](../mycormarl/mycormarl/soil/phosphate_grid.py#L213-L227).
-Round-trip, partial-topsoil, and canonical-state behaviour are tested in
+Round-trip, initial-field, and canonical-state behaviour are tested in
 [`test_labile_phosphate_state.py`](../tests/test_labile_phosphate_state.py#L49-L180).
 
-Initialisation creates a uniform solution concentration down to the configured
-topsoil depth, volume-averages a partially crossed layer, and immediately
-converts it to canonical amount. The default is `1 µM` in the upper `25 cm`.
-This is a provisional solution-P initial condition, not a direct equivalent of
-an agronomic extractable-P measurement; comparison with extraction data needs
-an observation/calibration model.
+Initialisation immediately converts the configured solution-P field to
+canonical amount. By default, `initial_solution_p_um` is uniform in every cell
+of the represented domain. An explicit `initial_solution_p_depth_profile` is
+the sole opt-in vertical-heterogeneity treatment: its `(depth cm, relative
+factor)` knots are linearly interpolated at cell-centre depth, apply uniformly
+in the radial direction, and scale `initial_solution_p_um`. The profile must
+cover the configured soil depth; values above its first knot retain the first
+factor. It is a relative distribution, not a pore-water calibration.
+
+Both treatments are provisional solution-P initial conditions, not direct
+equivalents of agronomic extractable-P or total soil-P measurements. Comparison
+with extraction data needs an observation/calibration model. After reset the
+finite-inventory model evolves normally, so diffusion and uptake may create
+further spatial differences.
 
 ## Conservative diffusion
 

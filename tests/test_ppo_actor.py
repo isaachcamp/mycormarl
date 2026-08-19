@@ -26,7 +26,6 @@ def _small_environment():
             soil_depth_cm=0.2,
             radial_interval_cm=0.1,
             depth_interval_cm=0.1,
-            topsoil_depth_cm=0.2,
         ),
         SpeciesParams(
             plant=PlantTraits(kappa_c=0.0, kappa_p=0.0),

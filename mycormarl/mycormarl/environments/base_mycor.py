@@ -216,9 +216,9 @@ class BaseMycorMarl(MultiAgentEnv):
             self.r_edges,
             self.z_edges,
             self.config.initial_solution_p_um,
-            self.config.topsoil_depth_cm,
             self.config.theta_water,
             self.config.b_p,
+            self.config.initial_solution_p_depth_profile,
         )
 
         # Positive initial biomass only if the organism is active.
@@ -733,10 +733,9 @@ class BaseMycorMarl(MultiAgentEnv):
     def _validate_soil_config(config: EnvConfig) -> None:
         """Validate all reset-critical soil scalars before allocating arrays.
 
-        This is the configuration boundary for grid geometry, topsoil extent,
-        non-negative initial solution P, linear buffering, diffusion, and CFL
-        safety. Numerical helpers can therefore stay branch-free and
-        JAX-compatible.
+        This is the configuration boundary for grid geometry, the initial
+        solution-P treatment, linear buffering, diffusion, and CFL safety.
+        Numerical helpers can therefore stay branch-free and JAX-compatible.
         """
         validate_axisymmetric_grid_parameters(
             config.soil_radius_cm,
@@ -779,18 +778,27 @@ class BaseMycorMarl(MultiAgentEnv):
             raise ValueError(
                 "uptake_transition_exponent must be finite and greater than zero"
             )
-        if not math.isfinite(config.topsoil_depth_cm) or not (
-            0.0 <= config.topsoil_depth_cm <= config.soil_depth_cm
-        ):
-            raise ValueError(
-                "topsoil_depth_cm must be finite and within the soil domain"
-            )
         if not math.isfinite(config.initial_solution_p_um) or (
             config.initial_solution_p_um < 0.0
         ):
             raise ValueError(
                 "initial_solution_p_um must be finite and non-negative"
             )
+        profile = config.initial_solution_p_depth_profile
+        if profile is not None:
+            try:
+                knots = tuple((float(depth), float(factor)) for depth, factor in profile)
+            except (TypeError, ValueError) as error:
+                raise ValueError("initial_solution_p_depth_profile must contain depth/factor pairs") from error
+            if len(knots) < 2:
+                raise ValueError("initial_solution_p_depth_profile requires at least two knots")
+            if knots[-1][0] < config.soil_depth_cm:
+                raise ValueError("initial_solution_p_depth_profile does not cover soil_depth_cm")
+            if any(
+                not math.isfinite(depth) or not math.isfinite(factor) or factor < 0.0
+                for depth, factor in knots
+            ) or any(right[0] <= left[0] for left, right in zip(knots, knots[1:])):
+                raise ValueError("initial_solution_p_depth_profile requires increasing finite depths and non-negative factors")
 
     def _cobb_douglas(self, c: chex.Array, p: chex.Array, alpha: float) -> chex.Array:
         """Compute Cobb-Douglas rewarding for reproduction based on phosphorus and carbon."""

@@ -27,7 +27,6 @@ def _environment(
             soil_depth_cm=1.0,
             radial_interval_cm=0.5,
             depth_interval_cm=0.5,
-            topsoil_depth_cm=0.5,
             initial_solution_p_um=0.0,
         ),
         SpeciesParams(
@@ -218,7 +217,6 @@ def test_single_consumer_modes_zero_absent_observation_and_association(
         soil_depth_cm=1.0,
         radial_interval_cm=0.5,
         depth_interval_cm=0.5,
-        topsoil_depth_cm=0.5,
         initial_solution_p_um=0.0,
     )
     env = _environment(config=config)

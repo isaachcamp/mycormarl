@@ -7,10 +7,71 @@ from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
 from mycormarl.soil.phosphate_grid import (
+    axisymmetric_profile_p_concentration,
     initial_labile_p_from_micromolar,
     labile_amount_to_solution_concentration,
     solution_concentration_to_labile_amount,
 )
+
+
+def test_relative_depth_profile_is_linearly_interpolated_and_clamped_above_anchor():
+    """A 5-cm anchor uses the selected grassland-relative profile exactly."""
+    concentration = axisymmetric_profile_p_concentration(
+        r_edges=jnp.array([0.0, 1.0]),
+        z_edges=jnp.array([0.0, 5.0, 10.0, 15.0, 30.0, 60.0, 100.0]),
+        surface_concentration_um=1.0,
+        depth_profile=((5.0, 1.0), (15.0, 0.345), (30.0, 0.170), (60.0, 0.103), (100.0, 0.069)),
+    )
+
+    assert concentration.shape == (1, 6)
+    # Cell centres: 2.5, 7.5, 12.5, 22.5, 45, and 80 cm.
+    assert concentration[0] == pytest.approx(
+        jnp.array([1.0, 0.83625, 0.50875, 0.2575, 0.1365, 0.086]) * 1e-3,
+        rel=1e-6,
+    )
+
+
+def test_absent_depth_profile_initializes_every_depth_cell_at_the_declared_concentration():
+    """No profile is the explicit uniform-through-depth treatment."""
+    env = BaseMycorMarl(
+        EnvConfig(
+            soil_radius_cm=1.0,
+            soil_depth_cm=3.0,
+            radial_interval_cm=1.0,
+            depth_interval_cm=1.0,
+            initial_solution_p_um=2.0,
+        ),
+        SpeciesParams(PlantTraits(), FungusTraits()),
+    )
+
+    _, state = env.reset(jax.random.PRNGKey(0))
+    concentration = labile_amount_to_solution_concentration(
+        state.soil_labile_p, env.cell_volumes, env.config.theta_water, env.config.b_p
+    )
+
+    assert jnp.allclose(concentration, 2e-3, rtol=1e-6, atol=1e-10)
+
+
+def test_depth_profile_is_the_only_opt_in_for_initial_vertical_heterogeneity():
+    """Profile knots scale the declared µM concentration by cell-centre depth."""
+    env = BaseMycorMarl(
+        EnvConfig(
+            soil_radius_cm=1.0,
+            soil_depth_cm=2.0,
+            radial_interval_cm=1.0,
+            depth_interval_cm=1.0,
+            initial_solution_p_um=2.0,
+            initial_solution_p_depth_profile=((0.0, 1.0), (2.0, 0.5)),
+        ),
+        SpeciesParams(PlantTraits(), FungusTraits()),
+    )
+
+    _, state = env.reset(jax.random.PRNGKey(0))
+    concentration = labile_amount_to_solution_concentration(
+        state.soil_labile_p, env.cell_volumes, env.config.theta_water, env.config.b_p
+    )
+
+    assert jnp.allclose(concentration, jnp.array([[1.75e-3, 1.25e-3]]), rtol=1e-6)
 
 
 @pytest.fixture()
@@ -32,13 +93,12 @@ def species():
 
 @pytest.fixture()
 def small_config():
-    """Provide a cheap grid with a topsoil boundary crossing one depth cell."""
+    """Provide a cheap grid for reset and buffering checks."""
     return EnvConfig(
         soil_radius_cm=2.0,
         soil_depth_cm=3.0,
         radial_interval_cm=1.0,
         depth_interval_cm=1.0,
-        topsoil_depth_cm=1.5,
         initial_solution_p_um=2.0,
         theta_water=0.3,
         b_p=239.0,
@@ -68,7 +128,7 @@ def test_buffered_amount_concentration_round_trip():
 
 
 def test_default_domain_initial_inventory_matches_configured_extents():
-    """Anchors reset inventory to the configured cylinder and upper 25 cm."""
+    """The default uniform treatment fills the configured cylinder."""
     r_edges = jnp.linspace(0.0, 50.0, 501)
     z_edges = jnp.linspace(0.0, 100.0, 1001)
 
@@ -76,30 +136,29 @@ def test_default_domain_initial_inventory_matches_configured_extents():
         r_edges,
         z_edges,
         concentration_um=1.0,
-        topsoil_depth_cm=25.0,
         theta_water=0.3,
         b_p=239.0,
     )
 
-    expected = jnp.pi * 50.0**2 * 25.0 * 0.001 * (0.3 + 239.0)
+    expected = jnp.pi * 50.0**2 * 100.0 * 0.001 * (0.3 + 239.0)
     assert amount.shape == (500, 1000)
-    assert jnp.sum(amount) == pytest.approx(expected, rel=1e-6)
-    assert jnp.all(amount[:, 250:] == 0.0)
+    # A 500,000-cell float32 reduction incurs about 1 ppm rounding error.
+    assert jnp.sum(amount) == pytest.approx(expected, rel=2e-6)
+    assert jnp.all(amount > 0.0)
 
 
-def test_partial_topsoil_amount_uses_fractional_cell_volume():
-    """Checks partial occupancy is applied to amount, not rounded by layer."""
+def test_uniform_amount_uses_each_cell_volume():
+    """Uniform Pi is converted to canonical amount in every cell."""
     amount = initial_labile_p_from_micromolar(
         r_edges=jnp.array([0.0, 1.0]),
         z_edges=jnp.array([0.0, 1.0, 3.0]),
         concentration_um=2.0,
-        topsoil_depth_cm=1.5,
         theta_water=0.3,
         b_p=0.0,
     )
 
     assert amount[0, 0] == pytest.approx(jnp.pi * 0.3 * 0.002)
-    assert amount[0, 1] == pytest.approx(jnp.pi * 0.5 * 0.3 * 0.002)
+    assert amount[0, 1] == pytest.approx(2.0 * jnp.pi * 0.3 * 0.002)
 
 
 def test_buffered_transformations_are_jittable():
@@ -125,7 +184,7 @@ def test_default_config_describes_reference_domain_and_initial_condition():
     assert config.soil_depth_cm == pytest.approx(100.0)
     assert config.radial_interval_cm == pytest.approx(0.1)
     assert config.depth_interval_cm == pytest.approx(0.1)
-    assert config.topsoil_depth_cm == pytest.approx(25.0)
+    assert config.initial_solution_p_depth_profile is None
     assert config.initial_solution_p_um == pytest.approx(1.0)
     assert config.theta_water == pytest.approx(0.3)
     assert config.b_p == pytest.approx(239.0)
@@ -172,9 +231,7 @@ def test_reset_recovers_configured_solution_field_and_preserves_biological_pools
         small_config.b_p,
     )
 
-    assert jnp.allclose(concentration[:, 0], 2e-3)
-    assert jnp.allclose(concentration[:, 1], 1e-3)
-    assert jnp.all(concentration[:, 2] == 0.0)
+    assert jnp.allclose(concentration, 2e-3)
     assert state.plant_p_pool[0] == pytest.approx(4.0)
     assert state.fungus_p_pool[0] == pytest.approx(7.0)
     assert state.plant_c_pool[0] == pytest.approx(3.0)
@@ -185,7 +242,6 @@ def test_reset_recovers_configured_solution_field_and_preserves_biological_pools
     "config",
     [
         EnvConfig(radial_interval_cm=0.0),
-        EnvConfig(topsoil_depth_cm=101.0),
         EnvConfig(theta_water=0.0),
         EnvConfig(b_p=-1.0),
         EnvConfig(initial_solution_p_um=-1.0),

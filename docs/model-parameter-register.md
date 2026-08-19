@@ -43,10 +43,9 @@ for the reference calibration. This is a qualification choice, not an
 ontogenetic claim; the runtime default remains `0.30` until deliberately
 migrated.
 
-There is also one current configuration defect. `EnvConfig.topsoil_depth_cm` is declared
-as `None`, although validation requires a finite number and the scientific documents
-specify an intended `25 cm`. This register reports the actual runtime declaration and
-the documented intent separately.
+Initial solution Pi is configured either as a uniform field across the represented
+domain or as an explicit depth profile. The old finite-topsoil initialization has
+been removed because it was a scenario convention rather than a calibrated profile.
 
 ## Evidence-status key
 
@@ -183,8 +182,8 @@ continuous closures are blended using `uptake_reference_time_days` and
 | `soil_depth_cm` | `100 cm` | Cylinder depth; controls soil volume, vertical boundary, and the represented fraction of the analytical root profile. | No literature or experimental-vessel source is recorded for the default. **Unsupported scenario geometry.** |
 | `radial_interval_cm` | `0.1 cm` | Exact uniform radial cell spacing. Smaller values increase resolution and cost; extent must be evenly divisible. | Existing spatial qualification retained `0.1 cm` against finer candidates for the reduced test problem. **Numerical choice; not universal convergence evidence.** |
 | `depth_interval_cm` | `0.1 cm` | Exact uniform depth spacing with the same cost and divisibility implications. | Same qualification basis and limitation as radial spacing. **Numerical choice.** |
-| `topsoil_depth_cm` | `None` in code; `25 cm` documented intent | Depth initially assigned `initial_solution_p_um`; below it starts with zero labile P. | `None` fails the current finite-number validator, whereas active phosphate documentation says `25 cm`. The `25 cm` profile is a scenario choice, not literature-derived. **Inconsistent and currently invalid default.** |
-| `initial_solution_p_um` | `1 µM` | Initial soil-solution inorganic phosphate within topsoil; through buffering it sets total initial labile inventory. It is not extractable or total soil P. | Order-of-magnitude low-P condition associated with [Vance et al. (2003)](https://doi.org/10.1046/j.1469-8137.2003.00695.x), not a universal mean. **Transferred/provisional.** |
+| `initial_solution_p_um` | `1 µM` | Initial soil-solution inorganic phosphate. With no depth profile it applies uniformly through the represented domain; a supplied profile scales it by depth. Through buffering it sets total initial labile inventory. It is not extractable or total soil P. | Order-of-magnitude low-P condition associated with [Vance et al. (2003)](https://doi.org/10.1046/j.1469-8137.2003.00695.x), not a universal mean. **Transferred/provisional.** |
+| `initial_solution_p_depth_profile` | `None` (uniform) | Optional `(depth cm, relative factor)` knots, linearly interpolated by cell-centre depth. | The selected grassland-derived shape is a structural scenario, not a calibrated pore-water profile. |
 | `phosphate_diffusion_coefficient_cm2_s` | `1e-5 cm² s⁻¹` | Solution diffusion coefficient in finite-volume transport; with water, impedance, and buffering it determines amount conductance and apparent propagation. | Provisional parameterisation from [Schnepf & Roose (2006)](https://doi.org/10.1111/j.1469-8137.2006.01771.x). **Transferred.** |
 | `b_p` | `239 cm³ cm⁻³` | Linear volumetric P buffer power. Larger values increase labile inventory at fixed solution concentration and slow apparent diffusion. | Reported by Schnepf and Roose and attributed there to Barber; it is soil-specific ([Schnepf & Roose 2006](https://doi.org/10.1111/j.1469-8137.2006.01771.x)). **Transferred.** |
 | `phosphate_impedance_factor` | `0.308` | Dimensionless tortuosity/impedance multiplier on diffusive amount flux. Lower values slow diffusion and increase sparse diffusion resistance. | Provisional Schnepf–Roose parameterisation. **Transferred.** |
@@ -207,8 +206,8 @@ The following defaults should not be presented as measurements:
   informs their scale and interpretation, but not the selected irreversible fraction.
 - **Explicit uptake/reward choices:** `uptake_reference_time_days`,
   `uptake_transition_exponent`, and `alpha`.
-- **Scenario geometry:** `soil_radius_cm`, `soil_depth_cm`, and the intended
-  `topsoil_depth_cm=25`.
+- **Scenario geometry and initial field:** `soil_radius_cm`, `soil_depth_cm`,
+  and the optional `initial_solution_p_depth_profile`.
 - **Numerical/experimental controls rather than empirical traits:** `max_steps`, `dt`,
   `consumer_mode`, both grid intervals, and `diffusion_cfl_safety`.
 
@@ -228,9 +227,7 @@ stoichiometry.
    `Forto` trajectory. Use the independent `50 g` numerical guard and reject
    any guard-contacting trajectory. Prefer an explicit ontogenetic leaf-mass
    or leaf-area state before final inference.
-2. Fix the `topsoil_depth_cm` declaration/documentation mismatch before calling the
-   complete `EnvConfig()` set a runnable default.
-3. Obtain a direct mean seed-mass estimate for the intended *D. carota* population;
+2. Obtain a direct mean seed-mass estimate for the intended *D. carota* population;
    the current `1 mg` value is only bounded by a multi-population range.
 4. Prioritise fungal `kappa_c`, because it is a large direct standing sink with no
    recorded evidence and controls fungal dependence on traded plant C.

@@ -41,7 +41,6 @@ def main() -> None:
         soil_depth_cm=1.0,
         radial_interval_cm=0.1,
         depth_interval_cm=0.1,
-        topsoil_depth_cm=1.0,
         consumer_mode=args.mode,
     )
     species = SpeciesParams(plant=PlantTraits(), fungus=FungusTraits())

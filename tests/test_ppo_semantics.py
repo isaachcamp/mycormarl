@@ -182,7 +182,6 @@ def test_rollout_carries_per_species_transition_validity():
             soil_depth_cm=0.2,
             radial_interval_cm=0.1,
             depth_interval_cm=0.1,
-            topsoil_depth_cm=0.2,
         ),
         SpeciesParams(plant=PlantTraits(), fungus=FungusTraits()),
     )
@@ -232,7 +231,6 @@ def test_undiscounted_training_rejects_indefinitely_viable_configured_consumer()
             soil_depth_cm=0.2,
             radial_interval_cm=0.1,
             depth_interval_cm=0.1,
-            topsoil_depth_cm=0.2,
         ),
         SpeciesParams(
             plant=PlantTraits(kappa_p=0.0),
@@ -253,7 +251,6 @@ def test_rollout_distinguishes_death_transition_from_dead_padding():
             soil_depth_cm=0.2,
             radial_interval_cm=0.1,
             depth_interval_cm=0.1,
-            topsoil_depth_cm=0.2,
         ),
         SpeciesParams(
             plant=PlantTraits(
@@ -315,7 +312,6 @@ def test_jitted_truncation_targets_use_final_observation_and_stop_gae_trace():
             soil_depth_cm=0.2,
             radial_interval_cm=0.1,
             depth_interval_cm=0.1,
-            topsoil_depth_cm=0.2,
         ),
         SpeciesParams(plant=PlantTraits(), fungus=FungusTraits()),
     )

@@ -47,7 +47,6 @@ def config():
         radial_interval_cm=0.5,
         soil_depth_cm=1.0,
         depth_interval_cm=0.5,
-        topsoil_depth_cm=0.5,
         initial_solution_p_um=0.0,
     )
 

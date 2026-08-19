@@ -46,7 +46,6 @@ COUPLED_FUNGUS_INITIAL_BIOMASS_G = 0.0001
 DEEP_SOIL_DURATION_DAYS = 2.0
 DEEP_SOIL_RADIUS_CM = 2.0
 DEEP_SOIL_DEPTH_CM = 100.0
-DEEP_SOIL_TOPSOIL_DEPTH_CM = 25.0
 ABSOLUTE_METRIC_FLOOR = 1e-10
 RELATIVE_TOLERANCE = 0.05
 MAXIMUM_RELATIVE_P_BALANCE_ERROR = 1e-5
@@ -111,7 +110,6 @@ def qualification_config(
         soil_depth_cm=2.0,
         radial_interval_cm=interval_cm,
         depth_interval_cm=interval_cm,
-        topsoil_depth_cm=1.0,
         initial_solution_p_um=concentration_um,
         uptake_reference_time_days=reference_time_days,
         uptake_transition_exponent=exponent,
@@ -401,7 +399,6 @@ def run_deep_soil_scenario(
         soil_depth_cm=DEEP_SOIL_DEPTH_CM,
         radial_interval_cm=interval_cm,
         depth_interval_cm=interval_cm,
-        topsoil_depth_cm=DEEP_SOIL_TOPSOIL_DEPTH_CM,
         initial_solution_p_um=1.0,
     )
     policy = StaticPolicy(0.25, 1.0, 0.0, 0.0)
@@ -534,8 +531,8 @@ def benchmark_environment(config: EnvConfig, repeats: int = 20) -> dict:
     env = BaseMycorMarl(config, qualification_species(coupled=True))
     _, state = env.reset(jax.random.PRNGKey(0))
     root, hypha = fixed_density_fields(env, "mixed") if env.config.soil_depth_cm == 2.0 else (
-        jnp.where(jnp.broadcast_to((0.5 * (env.z_edges[:-1] + env.z_edges[1:]) < env.config.topsoil_depth_cm)[None, :], env.grid_shape), 1.0, 0.0),
-        jnp.where(jnp.broadcast_to((0.5 * (env.z_edges[:-1] + env.z_edges[1:]) < env.config.topsoil_depth_cm)[None, :], env.grid_shape), env.species.fungus.saturation_density, 0.0),
+        jnp.ones(env.grid_shape),
+        jnp.full(env.grid_shape, env.species.fungus.saturation_density),
     )
     state = state.replace(root_length_density=root, hyphae_length_density=hypha)
     compiled_step = jax.jit(env.step_phosphorus_field)
@@ -685,7 +682,6 @@ def run_studies(include_target_benchmark: bool) -> dict:
             EnvConfig(
                 dt=selected_dt,
                 max_steps=annual_steps,
-                topsoil_depth_cm=25.0,
             ),
             repeats=20,
         )

@@ -27,7 +27,7 @@ configuration and organism traits
 | `state.py` | Canonical dynamic state, including cellwise labile P and organism pools. | Environment, soil evolution, and policies. |
 | `environments/base_mycor.py` | Owns step ordering, trade, growth, mortality, geometry refresh, soil evolution, observations, and termination. | JaxMARL training and complete simulations. |
 | `soil/phosphate_units.py` | Unit conversion, buffering identities, Michaelis–Menten flux, and scalar validation. | Grid initialisation and uptake kernels. |
-| `soil/phosphate_grid.py` | Axisymmetric edges, cell volumes, face areas, topsoil fractions, and concentration–amount transforms. | Environment construction and soil state conversion. |
+| `soil/phosphate_grid.py` | Axisymmetric edges, cell volumes, face areas, depth-profile interpolation, and concentration–amount transforms. | Environment construction and soil state conversion. |
 | `soil/phosphate_diffusion.py` | Conservative face conductances, explicit diffusion, CFL ceiling, and substep scheduling. | Integrated soil evolution. |
 | `soil/phosphate_uptake.py` | Continuous and analytical sparse requests, depletion-overlap blending, and proportional competition. | Integrated soil evolution and qualification diagnostics. |
 | `soil/soil.py` | Composes diffusion and uptake into one substep and repeats it on the cached numerical schedule. | `BaseMycorMarl.step_phosphorus_field`. |
