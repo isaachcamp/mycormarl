@@ -21,6 +21,10 @@ from mycormarl.policy_artifacts import (
     ACTOR_INTERFACE_VERSION,
     ENVIRONMENT_STATE_SCHEMA_VERSION,
 )
+from mycormarl.checkpoint_evaluation import (
+    evaluate_checkpoint,
+    save_evaluation_artifact,
+)
 from mycormarl.random_streams import (
     RANDOM_STREAM_DERIVATION_VERSION,
     RANDOM_STREAM_NAMES,
@@ -540,6 +544,18 @@ def _run_single_condition_training(
         intermediate_path = output_dir / f"checkpoints/checkpoint-{transitions:08d}.msgpack"
         intermediate_path.parent.mkdir(parents=True, exist_ok=True)
         intermediate_path.write_bytes(_checkpoint_bytes(intermediate_metadata, state))
+        evaluation = evaluate_checkpoint(
+            intermediate_path,
+            env,
+            episodes=manifest["evaluation"]["episodes"],
+            protocol=manifest["evaluation"]["protocol"],
+            seed=seed,
+        )
+        save_evaluation_artifact(
+            output_dir / f"evaluations/checkpoint-{transitions:08d}.json",
+            evaluation,
+            checkpoint=intermediate_path,
+        )
     checkpoint_name = f"checkpoints/checkpoint-{transitions:08d}.msgpack"
     checkpoint_path = output_dir / checkpoint_name
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -573,6 +589,10 @@ def _run_single_condition_training(
             "episodes": manifest["evaluation"]["episodes"],
             "state_sha256": state_digest,
         },
+        "evaluation_artifacts": [
+            f"evaluations/checkpoint-{checkpoint_step:08d}.json"
+            for checkpoint_step in range(update_size, transitions + 1, update_size)
+        ],
     }
     bundle = {
         "format": TRAINING_CHECKPOINT_FORMAT,

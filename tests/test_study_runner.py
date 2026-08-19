@@ -689,12 +689,22 @@ def test_single_condition_training_can_stop_and_resume_from_checkpoint(tmp_path)
     assert set(checkpoint_payload["runner_state"]) == {"0", "1", "2", "3"}
     assert set(checkpoint_payload["runner_state"]["0"]) == {"plant", "fungus"}
     assert "opt_state" in checkpoint_payload["runner_state"]["0"]["plant"]
+    first_evaluation = (
+        tmp_path / "outputs" / "training-resume" / "evaluations"
+        / "checkpoint-00000001.json"
+    )
+    assert first_evaluation.exists()
+    assert json.loads(first_evaluation.read_text(encoding="utf-8"))["protocol"] == "latent-location"
 
     resumed = run_study(manifest_path)
     resumed_bundle = json.loads(resumed.bundle_path.read_text(encoding="utf-8"))
     assert resumed_bundle["status"] == "complete"
     assert resumed_bundle["entries"][0]["status"] == "completed"
     assert resumed_bundle["entries"][0]["transitions"] == 2
+    assert (
+        tmp_path / "outputs" / "training-resume" / "evaluations"
+        / "checkpoint-00000002.json"
+    ).exists()
 
     uninterrupted_manifest = _manifest(tmp_path / "uninterrupted", identity="training-full")
     uninterrupted_manifest["stage"] = "single-condition-training"
