@@ -154,7 +154,8 @@ Before inspecting treatment-response signs, predeclare identical:
 - minimum and maximum training-transition budgets;
 - checkpoint intervals;
 - deterministic evaluation windows; and
-- plateau tolerances for plant fitness and policy-action summaries.
+- a scale-aware fitness plateau tolerance (absolute floor plus relative
+  window scale) and a policy-action summary tolerance.
 
 Choose numerical tolerances from blinded development learning curves without
 calculating `Delta_AM`. A run cannot stop before the minimum budget. Retain and

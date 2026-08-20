@@ -153,8 +153,8 @@ matrix under one frozen rule. Its `training` declaration replaces
   "stopping": {
     "evaluation_window_checkpoints": 3,
     "plateau_tolerances": {
-      "plant_fitness_absolute": 0.01,
-      "fungus_fitness_absolute": 0.01,
+      "fitness_absolute_floor": 0.0001,
+      "fitness_relative": 0.20,
       "action_absolute": 0.01
     }
   }
@@ -171,6 +171,18 @@ checkpoint metric and the final stopping decision. A run that reaches the
 common maximum without satisfying the rule is retained with status
 `unconverged`. Existing comparison-block output cannot be selectively
 extended; changed optimizer settings are a new block declaration.
+
+For a scale-aware fitness plateau, let `span` be the maximum minus minimum
+fitness over the declared checkpoint window and let `scale` be the largest
+absolute fitness in that window. Fitness is stable when
+`span <= fitness_absolute_floor + fitness_relative * scale`. The absolute
+floor prevents a percentage rule from becoming ill-conditioned near zero;
+the relative term keeps the criterion comparable across plant and fungal
+fitness magnitudes. `action_absolute` remains a raw physical-action span.
+The stopping decision records the scale and resulting fitness tolerance for
+each agent. Legacy manifests with separate per-agent absolute fitness fields
+remain readable as historical provenance, but new manifests should use the
+scale-aware declaration above.
 
 ## Condition matrix
 

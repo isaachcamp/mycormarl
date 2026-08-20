@@ -274,30 +274,47 @@ def _validate_required_declarations(manifest: Any) -> None:
         ):
             raise ValueError("comparison-block training budgets must align with checkpoints")
         stopping = training.get("stopping")
-        tolerance_fields = (
+        relative_fitness_fields = (
+            "fitness_absolute_floor",
+            "fitness_relative",
+            "action_absolute",
+        )
+        legacy_fitness_fields = (
             "plant_fitness_absolute",
             "fungus_fitness_absolute",
             "action_absolute",
+        )
+        tolerances = (
+            stopping.get("plateau_tolerances")
+            if isinstance(stopping, dict)
+            else None
+        )
+        scale_aware_declared = isinstance(tolerances, dict) and any(
+            field in tolerances
+            for field in ("fitness_absolute_floor", "fitness_relative")
+        )
+        required_tolerance_fields = (
+            relative_fitness_fields if scale_aware_declared else legacy_fitness_fields
         )
         if (
             not isinstance(stopping, dict)
             or not isinstance(stopping.get("evaluation_window_checkpoints"), int)
             or isinstance(stopping.get("evaluation_window_checkpoints"), bool)
             or stopping["evaluation_window_checkpoints"] < 2
-            or not isinstance(stopping.get("plateau_tolerances"), dict)
-            or any(field not in stopping["plateau_tolerances"] for field in tolerance_fields)
+            or not isinstance(tolerances, dict)
+            or any(field not in tolerances for field in required_tolerance_fields)
             or any(
-                isinstance(stopping["plateau_tolerances"][field], bool)
-                or not isinstance(stopping["plateau_tolerances"][field], (int, float))
-                or not math.isfinite(stopping["plateau_tolerances"][field])
-                or stopping["plateau_tolerances"][field] < 0.0
-                for field in tolerance_fields
+                isinstance(tolerances[field], bool)
+                or not isinstance(tolerances[field], (int, float))
+                or not math.isfinite(tolerances[field])
+                or tolerances[field] < 0.0
+                for field in required_tolerance_fields
             )
         ):
             raise ValueError(
                 "comparison-block training requires a stopping declaration with "
-                "an evaluation window and plant-fitness, fungus-fitness, and "
-                "action plateau tolerances"
+                "an evaluation window and either scale-aware fitness and action "
+                "plateau tolerances or the legacy fitness and action tolerances"
             )
     if manifest["stage"] in {"single-condition-training", "comparison-block-training", "phase-1-pilot"}:
         if manifest["stage"] == "single-condition-training" and (
@@ -991,11 +1008,32 @@ def _stopping_decision(
     def span(values: list[float]) -> float:
         return max(values) - min(values)
 
-    plant_span = span([checkpoint["metrics"]["fitness"]["plant"] for checkpoint in window])
-    result["plateau_metrics"]["plant"] = {
-        "fitness_span": plant_span,
-        "stable": plant_span <= tolerances["plant_fitness_absolute"],
-    }
+    def fitness_plateau(values: list[float], legacy_key: str) -> dict[str, Any]:
+        fitness_span = span(values)
+        if "fitness_relative" not in tolerances:
+            return {
+                "fitness_span": fitness_span,
+                "fitness_tolerance": tolerances[legacy_key],
+                "stable": fitness_span <= tolerances[legacy_key],
+            }
+        fitness_scale = max(abs(value) for value in values)
+        fitness_tolerance = (
+            tolerances["fitness_absolute_floor"]
+            + tolerances["fitness_relative"] * fitness_scale
+        )
+        return {
+            "fitness_span": fitness_span,
+            "fitness_scale": fitness_scale,
+            "fitness_absolute_floor": tolerances["fitness_absolute_floor"],
+            "fitness_relative_tolerance": tolerances["fitness_relative"],
+            "fitness_tolerance": fitness_tolerance,
+            "stable": fitness_span <= fitness_tolerance,
+        }
+
+    result["plateau_metrics"]["plant"] = fitness_plateau(
+        [checkpoint["metrics"]["fitness"]["plant"] for checkpoint in window],
+        "plant_fitness_absolute",
+    )
     action_span = max(
         span([checkpoint["metrics"]["actions"][agent][index] for checkpoint in window])
         for agent in (("plant", "fungus") if mode == "mixed" else ("plant",))
@@ -1006,11 +1044,10 @@ def _stopping_decision(
         "stable": action_span <= tolerances["action_absolute"],
     }
     if mode == "mixed":
-        fungus_span = span([checkpoint["metrics"]["fitness"]["fungus"] for checkpoint in window])
-        result["plateau_metrics"]["fungus"] = {
-            "fitness_span": fungus_span,
-            "stable": fungus_span <= tolerances["fungus_fitness_absolute"],
-        }
+        result["plateau_metrics"]["fungus"] = fitness_plateau(
+            [checkpoint["metrics"]["fitness"]["fungus"] for checkpoint in window],
+            "fungus_fitness_absolute",
+        )
     stable = all(metric["stable"] for metric in result["plateau_metrics"].values())
     if stable:
         result["outcome"] = "plateau-complete"

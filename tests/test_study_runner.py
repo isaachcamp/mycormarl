@@ -890,13 +890,14 @@ def test_comparison_block_retains_non_plateau_runs_as_unconverged(tmp_path, monk
     }
     calls = {"plant-only": 0}
 
-    def metrics(_evaluation, mode):
+    def metrics(checkpoint, _environment, **_kwargs):
+        mode = checkpoint.parent.parent.name.split("-p", maxsplit=1)[0]
         calls[mode] += 1
         actions = {"plant": [float(calls[mode])] * 4}
         fitness = {"plant": 1.0}
         return {"fitness": fitness, "actions": actions}
 
-    monkeypatch.setattr(study_module, "_checkpoint_stopping_metrics", metrics)
+    monkeypatch.setattr(study_module, "evaluate_checkpoint_summary", metrics)
 
     result = run_study(_write_manifest(tmp_path, manifest))
     bundle = json.loads(result.bundle_path.read_text(encoding="utf-8"))
@@ -950,6 +951,60 @@ def test_comparison_block_never_stops_before_minimum_and_records_plateau(tmp_pat
     )
 
 
+def test_fitness_plateau_uses_relative_window_scale_with_absolute_floor():
+    """Fitness stability is meaningful across both low- and high-fitness agents."""
+    training = {
+        "minimum_transition_budget": 2,
+        "maximum_transition_budget": 2,
+        "stopping": {
+            "evaluation_window_checkpoints": 3,
+            "plateau_tolerances": {
+                "fitness_absolute_floor": 1e-4,
+                "fitness_relative": 0.2,
+                "action_absolute": 0.0,
+            },
+        },
+    }
+    checkpoints = [
+        {"transitions": transition, "metrics": {
+            "fitness": {"plant": fitness},
+            "actions": {"plant": [0.0] * 4},
+        }}
+        for transition, fitness in ((1, 0.010), (2, 0.012), (3, 0.011))
+    ]
+
+    decision = study_module._stopping_decision(checkpoints, training, "plant-only")
+
+    plant = decision["plateau_metrics"]["plant"]
+    assert plant["fitness_span"] == pytest.approx(0.002)
+    assert plant["fitness_scale"] == pytest.approx(0.012)
+    assert plant["fitness_tolerance"] == pytest.approx(0.0025)
+    assert plant["stable"] is True
+
+
+def test_scale_aware_fitness_tolerance_requires_both_scale_terms(tmp_path):
+    """A partial relative declaration cannot silently fall back to a raw rule."""
+    manifest = _manifest(tmp_path)
+    manifest["stage"] = "comparison-block-training"
+    manifest["training"] = {
+        "minimum_transition_budget": 1,
+        "maximum_transition_budget": 2,
+        "checkpoint_interval_timesteps": 1,
+        "stopping": {
+            "evaluation_window_checkpoints": 2,
+            "plateau_tolerances": {
+                "fitness_relative": 0.2,
+                "plant_fitness_absolute": 0.0,
+                "fungus_fitness_absolute": 0.0,
+                "action_absolute": 0.0,
+            },
+        },
+    }
+
+    with pytest.raises(ValueError, match="stopping"):
+        run_study(_write_manifest(tmp_path, manifest))
+
+
 def test_mixed_mode_requires_fungal_fitness_stability(tmp_path, monkeypatch):
     """Fungal improvement keeps a mixed run open even when plant metrics plateau."""
     manifest = _manifest(tmp_path, identity="fungal-gate")
@@ -973,7 +1028,8 @@ def test_mixed_mode_requires_fungal_fitness_stability(tmp_path, monkeypatch):
     }
     calls = {"mixed": 0, "plant-only": 0}
 
-    def metrics(_evaluation, mode):
+    def metrics(checkpoint, _environment, **_kwargs):
+        mode = checkpoint.parent.parent.name.split("-p", maxsplit=1)[0]
         calls[mode] += 1
         result = {"fitness": {"plant": 1.0}, "actions": {"plant": [0.0] * 4}}
         if mode == "mixed":
@@ -981,7 +1037,7 @@ def test_mixed_mode_requires_fungal_fitness_stability(tmp_path, monkeypatch):
             result["actions"]["fungus"] = [0.0] * 4
         return result
 
-    monkeypatch.setattr(study_module, "_checkpoint_stopping_metrics", metrics)
+    monkeypatch.setattr(study_module, "evaluate_checkpoint_summary", metrics)
     bundle = json.loads(
         run_study(_write_manifest(tmp_path, manifest)).bundle_path.read_text(
             encoding="utf-8"
