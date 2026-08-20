@@ -130,6 +130,27 @@ def test_reduced_phase_1_fixture_uses_the_pilot_matrix_path(tmp_path):
     }
 
 
+def test_phase_1_checkpoint_records_ppo_diagnostics_for_training_analysis(tmp_path):
+    """Every saved pilot checkpoint exposes optimizer and PPO-health summaries."""
+    manifest = _pilot_manifest(tmp_path)
+    manifest["training"].update({
+        "minimum_transition_budget": 2,
+        "maximum_transition_budget": 2,
+    })
+
+    bundle = json.loads(
+        run_study(_write_manifest(tmp_path, manifest)).bundle_path.read_text()
+    )
+    diagnostics = bundle["entries"][0]["stopping_checkpoints"][0]["training_diagnostics"]
+
+    assert set(diagnostics) == {"plant", "fungus"}
+    for agent in diagnostics.values():
+        assert {
+            "learning_rate", "total_loss", "value_loss", "actor_loss",
+            "approx_kl", "latent_entropy",
+        } <= agent.keys()
+
+
 def test_scientific_phase_1_manifest_fixes_the_range_finding_design(tmp_path):
     """The named pilot cannot silently drift from its predeclared 40-run design."""
     manifest = _pilot_manifest(tmp_path, fixture=False)

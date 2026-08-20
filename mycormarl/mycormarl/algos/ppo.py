@@ -165,6 +165,7 @@ class PPOConfig:
     """Typed configuration for the two-policy PPO training loop."""
 
     TOTAL_TIMESTEPS: int = 5_000_000
+    RUN_TIMESTEPS: int | None = None
     NUM_STEPS: int = 128
     NUM_ENVS: int = 16
     NUM_ACTORS: int = 2
@@ -254,6 +255,9 @@ class PPOUpdateMetrics(NamedTuple):
     total_loss: jnp.ndarray
     value_loss: jnp.ndarray
     actor_loss: jnp.ndarray
+    learning_rate: jnp.ndarray
+    approx_kl: jnp.ndarray
+    latent_entropy: jnp.ndarray
     critic_valid_count: jnp.ndarray
     allocation_actor_valid_count: jnp.ndarray
     trade_actor_valid_count: jnp.ndarray
@@ -322,23 +326,31 @@ def make_train(
         raise ValueError("NUM_ACTORS must match the environment agent count")
     if config.NUM_STEPS % config.NUM_MINIBATCHES != 0:
         raise ValueError("NUM_STEPS must be divisible by NUM_MINIBATCHES")
-    if config.TOTAL_TIMESTEPS < config.NUM_STEPS * config.NUM_ENVS:
+    rollout_timesteps = config.NUM_STEPS * config.NUM_ENVS
+    if config.TOTAL_TIMESTEPS < rollout_timesteps:
         raise ValueError("TOTAL_TIMESTEPS must contain at least one PPO update")
+    run_timesteps = config.TOTAL_TIMESTEPS if config.RUN_TIMESTEPS is None else config.RUN_TIMESTEPS
+    if run_timesteps < rollout_timesteps or run_timesteps % rollout_timesteps:
+        raise ValueError("RUN_TIMESTEPS must contain whole PPO updates")
     for agent in env.agents:
         if env.observation_spaces[agent].shape != (5,):
             raise ValueError("each independent actor-critic requires five observations")
 
     NUM_UPDATES = (
-        config.TOTAL_TIMESTEPS // config.NUM_STEPS // config.NUM_ENVS
+        run_timesteps // config.NUM_STEPS // config.NUM_ENVS
     )
     MINIBATCH_SIZE = (
         # config.NUM_ACTORS * # Two separate networks, so do not multiply by NUM_ACTORS.
         config.NUM_STEPS // config.NUM_MINIBATCHES
     )
 
+    total_optimizer_steps = (
+        config.TOTAL_TIMESTEPS // rollout_timesteps
+        * config.NUM_MINIBATCHES * config.UPDATE_EPOCHS
+    )
+
     def linear_schedule(count):
-        frac = 1.0 - (count // (config.NUM_MINIBATCHES * config.UPDATE_EPOCHS)) / NUM_UPDATES
-        return config.LR * frac
+        return config.LR * jnp.maximum(0.0, 1.0 - count / total_optimizer_steps)
 
     def train(rng):
         """
@@ -372,8 +384,8 @@ def make_train(
                 environment_rng = random_streams.key("environment_variation")
                 minibatch_rng = random_streams.key("minibatch_ordering")
             init_x = jnp.zeros((1, env.observation_spaces[PLANT].shape[0]))
-            plant_tx = optax.adam(learning_rate=config.LR)
-            fungus_tx = optax.adam(learning_rate=config.LR)
+            plant_tx = optax.adam(learning_rate=linear_schedule)
+            fungus_tx = optax.adam(learning_rate=linear_schedule)
             plant_train_state = TrainState.create(
                 apply_fn=plant_policy.apply,
                 params=plant_policy.init(plant_rng, init_x),
@@ -663,8 +675,24 @@ def make_train(
                             -jnp.minimum(loss_actor1, loss_actor2),
                             traj_batch.allocation_actor_valid,
                         )
+                        approx_kl = masked_mean(
+                            old_log_probability - log_probability,
+                            traj_batch.allocation_actor_valid,
+                        )
+                        normal_entropy = lambda log_std: jnp.sum(
+                            log_std + 0.5 * (1.0 + jnp.log(2.0 * jnp.pi)), axis=-1
+                        )
+                        latent_entropy = masked_mean(
+                            normal_entropy(policy_parameters.allocation_log_std)
+                            + jnp.where(
+                                traj_batch.trade_actor_valid,
+                                normal_entropy(policy_parameters.trade_log_std),
+                                0.0,
+                            ),
+                            traj_batch.allocation_actor_valid,
+                        )
                         total_loss = loss_actor + config.VF_COEF * value_loss
-                        return total_loss, (value_loss, loss_actor)
+                        return total_loss, (value_loss, loss_actor, approx_kl, latent_entropy)
 
                     def _apply_update(state):
                         grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
@@ -678,7 +706,7 @@ def make_train(
 
                     def _skip_update(state):
                         zero = jnp.asarray(0.0)
-                        return state, (zero, zero, zero)
+                        return state, (zero, zero, zero, zero, zero)
 
                     return jax.lax.cond(
                         jnp.any(traj_batch.allocation_actor_valid),
@@ -756,8 +784,8 @@ def make_train(
             }
             rngs = (rngs[0], rngs[1], update_fungus_state[-1])
 
-            def _metrics(trajectory, loss_info):
-                total_loss, value_loss, actor_loss = loss_info
+            def _metrics(trajectory, loss_info, state):
+                total_loss, value_loss, actor_loss, approx_kl, latent_entropy = loss_info
                 sample_count = trajectory.critic_valid.size
                 critic_count = jnp.sum(trajectory.critic_valid)
                 allocation_count = jnp.sum(
@@ -768,6 +796,9 @@ def make_train(
                     total_loss=total_loss,
                     value_loss=value_loss,
                     actor_loss=actor_loss,
+                    learning_rate=linear_schedule(state.step),
+                    approx_kl=approx_kl,
+                    latent_entropy=latent_entropy,
                     critic_valid_count=critic_count,
                     allocation_actor_valid_count=allocation_count,
                     trade_actor_valid_count=trade_count,
@@ -778,8 +809,8 @@ def make_train(
                     trade_actor_valid_fraction=trade_count / sample_count,
                 )
 
-            plant_metrics = _metrics(plant_traj, plant_loss_info)
-            fungus_metrics = _metrics(fungus_traj, fungus_loss_info)
+            plant_metrics = _metrics(plant_traj, plant_loss_info, train_state[PLANT])
+            fungus_metrics = _metrics(fungus_traj, fungus_loss_info, train_state[FUNGUS])
 
             runner_state = (train_state, env_state, last_obs, rngs)
             return runner_state, (

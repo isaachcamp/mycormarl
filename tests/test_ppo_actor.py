@@ -223,3 +223,29 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
         for state in train_states.values()
         for leaf in jax.tree.leaves(state.params)
     )
+
+
+def test_resumed_training_anneals_learning_rate_over_the_global_budget():
+    """A resumed PPO chunk continues, rather than restarts, LR annealing."""
+    environment = _small_environment()
+    config = PPOConfig(
+        TOTAL_TIMESTEPS=4,
+        RUN_TIMESTEPS=2,
+        NUM_STEPS=2,
+        NUM_ENVS=1,
+        NUM_MINIBATCHES=1,
+        UPDATE_EPOCHS=1,
+        LR=1.0,
+        DISCOUNT_HALF_LIFE_DAYS=30.0,
+    )
+
+    first = jax.jit(make_train(environment, config))(jax.random.PRNGKey(9))
+    second = jax.jit(make_train(
+        environment, config, initial_runner_state=first["runner_state"],
+    ))(jax.random.PRNGKey(9))
+
+    for output, expected_rate in ((first, 0.5), (second, 0.0)):
+        for agent in (PLANT, FUNGUS):
+            assert jnp.isclose(
+                output["metrics"][agent].learning_rate[-1], expected_rate
+            )

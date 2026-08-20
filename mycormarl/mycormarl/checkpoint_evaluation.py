@@ -270,7 +270,7 @@ def _compiled_summary_runner(
         final_carry, trajectory = jax.lax.scan(
             step, (key, observations, state), None, length=environment.max_episode_steps
         )
-        return final_carry[0], trajectory
+        return final_carry[0], trajectory, final_carry[2]
 
     runner = jax.jit(run)
     _SUMMARY_RUNNERS[cache_key] = runner
@@ -388,7 +388,7 @@ def evaluate_policy_summary(
     episode_metrics = []
     for _ in range(episodes):
         runner = _compiled_summary_runner(environment, protocol)
-        key, trajectory = runner(parameters, key)
+        key, trajectory, final_state = runner(parameters, key)
         actions, rewards, done_flags = trajectory
         done_flags = jnp.asarray(done_flags, dtype=bool)
         has_termination = jnp.any(done_flags)
@@ -408,6 +408,14 @@ def evaluate_policy_summary(
                 ) / jnp.maximum(episode_length, 1)
                 for agent in (PLANT, FUNGUS)
             },
+            "final_raw_biomass": {
+                PLANT: _scalar(final_state.plant_biomass),
+                FUNGUS: _scalar(final_state.fungus_biomass),
+            },
+            "final_living_biomass": {
+                PLANT: 0.0 if bool(_scalar(final_state.plant_dead)) else _scalar(final_state.plant_biomass),
+                FUNGUS: 0.0 if bool(_scalar(final_state.fungus_dead)) else _scalar(final_state.fungus_biomass),
+            },
         })
     return {
         "fitness": {
@@ -420,6 +428,18 @@ def evaluate_policy_summary(
             agent: jnp.mean(jnp.stack([
                 item["actions"][agent] for item in episode_metrics
             ]), axis=0).tolist()
+            for agent in (PLANT, FUNGUS)
+        },
+        "final_raw_biomass": {
+            agent: float(jnp.mean(jnp.asarray([
+                item["final_raw_biomass"][agent] for item in episode_metrics
+            ])))
+            for agent in (PLANT, FUNGUS)
+        },
+        "final_living_biomass": {
+            agent: float(jnp.mean(jnp.asarray([
+                item["final_living_biomass"][agent] for item in episode_metrics
+            ])))
             for agent in (PLANT, FUNGUS)
         },
     }

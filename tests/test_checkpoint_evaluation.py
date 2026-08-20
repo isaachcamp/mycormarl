@@ -8,8 +8,10 @@ from mycormarl.checkpoint_evaluation import (
     LatentLocationEvaluation,
     SampledPolicyEvaluation,
     evaluate_checkpoint,
+    evaluate_policy_summary,
     evaluate_policy_parameters,
     save_evaluation_artifact,
+    save_evaluation_summary_artifact,
 )
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
@@ -113,6 +115,21 @@ def test_checkpoint_evaluation_and_artifact_preserve_the_complete_trace(tmp_path
 
     assert artifact.exists()
     assert '"protocol": "latent-location"' in artifact.read_text(encoding="utf-8")
+
+
+def test_checkpoint_summary_artifact_includes_final_biomass_for_post_analysis(tmp_path):
+    """Compact checkpoint JSONs retain the biomass endpoints needed for plots."""
+    environment = _environment()
+    summary = evaluate_policy_summary(
+        environment, _parameters(environment), episodes=1, seed=8,
+    )
+    artifact = tmp_path / "evaluation-summary.json"
+    save_evaluation_summary_artifact(artifact, summary, checkpoint="checkpoint.msgpack")
+
+    saved = __import__("json").loads(artifact.read_text(encoding="utf-8"))["summary"]
+    assert set(saved["final_raw_biomass"]) == {PLANT, FUNGUS}
+    assert set(saved["final_living_biomass"]) == {PLANT, FUNGUS}
+    assert saved["final_living_biomass"][PLANT] > 0.0
 
 
 def test_survivor_continues_after_partner_death_until_the_declared_horizon():

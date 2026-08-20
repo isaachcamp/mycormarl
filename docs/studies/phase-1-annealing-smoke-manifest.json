@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "stage": "comparison-block-training",
+  "model": {
+    "environment": {
+      "soil_radius_cm": 20.0,
+      "soil_depth_cm": 60.0,
+      "radial_interval_cm": 0.1,
+      "depth_interval_cm": 0.1,
+      "initial_solution_p_depth_profile": [[0.0, 1.0], [5.0, 1.0], [15.0, 0.345], [30.0, 0.170], [60.0, 0.103], [100.0, 0.069]]
+    },
+    "species": {"plant": {}, "fungus": {}}
+  },
+  "horizon": {"days": 120.0, "timestep_days": 0.025},
+  "modes": ["mixed", "plant-only"],
+  "initial_p_micromolar": [0.3],
+  "seeds": [0],
+  "training": {
+    "minimum_transition_budget": 49152,
+    "maximum_transition_budget": 49152,
+    "checkpoint_interval_timesteps": 12288,
+    "num_steps": 128,
+    "num_envs": 16,
+    "parallel_workers": 2,
+    "update_epochs": 4,
+    "num_minibatches": 8,
+    "stopping": {
+      "evaluation_window_checkpoints": 3,
+      "plateau_tolerances": {"plant_fitness_absolute": 0.01, "fungus_fitness_absolute": 0.01, "action_absolute": 0.01}
+    }
+  },
+  "evaluation": {"protocol": "latent-location", "episodes": 1},
+  "output": {"directory": "outputs/phase-1-annealing-smoke", "identity": "phase-1-annealing-smoke"}
+}

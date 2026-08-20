@@ -16,6 +16,7 @@ import subprocess
 from typing import Any
 
 import jax
+import jax.numpy as jnp
 from flax import serialization
 
 from mycormarl.policy_artifacts import (
@@ -898,13 +899,35 @@ def _training_environment(manifest: dict[str, Any], mode: str, p_level: float) -
 
 def _training_config(manifest: dict[str, Any], timesteps: int) -> PPOConfig:
     training = manifest["training"]
+    total_timesteps = training.get(
+        "maximum_transition_budget", training.get("total_timesteps")
+    )
     return PPOConfig(
-        TOTAL_TIMESTEPS=timesteps,
+        TOTAL_TIMESTEPS=total_timesteps,
+        RUN_TIMESTEPS=timesteps,
         NUM_STEPS=training.get("num_steps", 1),
         NUM_ENVS=training.get("num_envs", 1),
         UPDATE_EPOCHS=training.get("update_epochs", 1),
         NUM_MINIBATCHES=training.get("num_minibatches", 1),
     )
+
+
+def _training_diagnostics(chunks: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
+    """Summarise PPO optimizer health since the preceding saved checkpoint."""
+    fields = ("total_loss", "value_loss", "actor_loss", "approx_kl", "latent_entropy")
+    diagnostics: dict[str, dict[str, float]] = {}
+    for agent in ("plant", "fungus"):
+        metrics = [chunk[agent] for chunk in chunks]
+        diagnostics[agent] = {
+            field: float(jnp.mean(jnp.asarray([
+                jnp.mean(getattr(metric, field)) for metric in metrics
+            ])))
+            for field in fields
+        }
+        diagnostics[agent]["learning_rate"] = float(
+            jnp.ravel(metrics[-1].learning_rate)[-1]
+        )
+    return diagnostics
 
 
 def _checkpoint_bytes(metadata: dict[str, Any], runner_state: Any) -> bytes:
@@ -1015,6 +1038,7 @@ def _run_condition_training(
     state = None
     transitions = 0
     checkpoints = []
+    training_metric_chunks = []
     stopping_decision = None
     while transitions < training["maximum_transition_budget"]:
         config = _training_config(manifest, update_size)
@@ -1022,6 +1046,7 @@ def _run_condition_training(
             jax.random.PRNGKey(seed)
         )
         state = trained["runner_state"]
+        training_metric_chunks.append(trained["metrics"])
         transitions += update_size
         if transitions % training["checkpoint_interval_timesteps"]:
             continue
@@ -1046,12 +1071,16 @@ def _run_condition_training(
             protocol=manifest["evaluation"]["protocol"],
             seed=seed,
         )
+        training_diagnostics = _training_diagnostics(training_metric_chunks)
+        evaluation_summary["training_diagnostics"] = training_diagnostics
         checkpoints.append({
             "transitions": transitions,
             "checkpoint": str(checkpoint_path.relative_to(output_dir)),
             "evaluation": str(evaluation_path.relative_to(output_dir)),
             "metrics": evaluation_summary,
+            "training_diagnostics": training_diagnostics,
         })
+        training_metric_chunks = []
         stopping_decision = _stopping_decision(checkpoints, training, mode)
         if stopping_decision["outcome"] in {"plateau-complete", "maximum-budget-unconverged"}:
             evaluation = evaluate_checkpoint(
