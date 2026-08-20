@@ -30,12 +30,8 @@ def test_accepted_growth_geometry_trait_defaults():
     fungus = FungusTraits()
 
     assert plant.initial_biomass == pytest.approx(0.01)
-    assert plant.initial_c_pool == pytest.approx(
-        plant.initial_biomass * plant.gamma_c
-    )
-    assert plant.initial_p_pool == pytest.approx(
-        plant.initial_biomass * plant.gamma_p
-    )
+    assert plant.initial_c_pool is None
+    assert plant.initial_p_pool is None
     assert plant.gamma_c == pytest.approx(0.402)
     assert plant.gamma_p == pytest.approx(1.92)
     assert plant.kleaf == pytest.approx(0.50)
@@ -56,12 +52,8 @@ def test_accepted_growth_geometry_trait_defaults():
     assert fungus.kappa_c == pytest.approx(0.015)
     assert fungus.kappa_p == pytest.approx(0.001)
     assert fungus.initial_biomass == pytest.approx(0.0001)
-    assert fungus.initial_c_pool == pytest.approx(
-        fungus.initial_biomass * fungus.gamma_c
-    )
-    assert fungus.initial_p_pool == pytest.approx(
-        fungus.initial_biomass * fungus.gamma_p
-    )
+    assert fungus.initial_c_pool is None
+    assert fungus.initial_p_pool is None
     assert fungus.hyphal_radius == pytest.approx(5e-4)
     assert fungus.hyphal_tissue_carbon_density == pytest.approx(0.1155)
     assert fungus.saturation_density == pytest.approx(2_000.0)
