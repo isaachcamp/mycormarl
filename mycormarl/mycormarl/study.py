@@ -45,7 +45,7 @@ from mycormarl.domain_qualification import run_domain_qualification
 STUDY_RESULT_FORMAT = "mycormarl-study-result"
 STUDY_RESULT_VERSION = 2
 _STUDY_MODES = frozenset({"mixed", "plant-only"})
-_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training", "comparison-block-training", "phase-1-pilot", "static-controls", "domain-qualification"})
+_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training", "comparison-block-training", "phase-1-pilot", "phase-1-pilot-analysis", "static-controls", "domain-qualification"})
 TRAINING_CHECKPOINT_FORMAT = "mycormarl-ppo-checkpoint"
 TRAINING_CHECKPOINT_VERSION = 1
 _REQUIRED_MANIFEST_FIELDS = (
@@ -348,6 +348,10 @@ def _validate_required_declarations(manifest: Any) -> None:
             raise ValueError(
                 "Phase 1 pilot requires plant_growth, static_controls, and domain qualification artifacts"
             )
+    if manifest["stage"] == "phase-1-pilot-analysis":
+        if not isinstance(manifest.get("pilot_result_bundle"), str) or not manifest["pilot_result_bundle"]:
+            raise ValueError("Phase 1 pilot analysis requires a pilot_result_bundle path")
+        _validate_dense_design(manifest.get("dense_design"))
     evaluation = manifest["evaluation"]
     if not isinstance(evaluation, dict) or not {
         "protocol",
@@ -376,6 +380,63 @@ def _validate_required_declarations(manifest: Any) -> None:
             raise ValueError("domain-qualification requires a domain_qualification declaration")
         if not isinstance(declaration.get("candidates"), list) or len(declaration["candidates"]) < 2:
             raise ValueError("domain-qualification requires at least two candidate domains")
+
+
+def _validate_dense_design(design: Any) -> None:
+    """Require a complete prospective Phase 1 dense-map declaration."""
+    if not isinstance(design, dict):
+        raise ValueError("Phase 1 pilot analysis requires a dense_design object")
+    required = {
+        "initial_p_micromolar", "spacing", "retained_pilot_levels", "seeds",
+        "target_delta_am_standard_error", "domain_qualification_artifact",
+        "training_budget",
+    }
+    if not required.issubset(design):
+        raise ValueError("dense_design is missing a prospective design declaration")
+    levels = design["initial_p_micromolar"]
+    retained = design["retained_pilot_levels"]
+    seeds = design["seeds"]
+    if (
+        not isinstance(levels, list) or not levels
+        or any(not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value) or value <= 0 for value in levels)
+        or len(set(levels)) != len(levels)
+        or design["spacing"] != "logarithmic"
+        or not isinstance(retained, list) or not retained or any(value not in levels for value in retained)
+        or not isinstance(seeds, list) or not seeds or any(not isinstance(seed, int) or isinstance(seed, bool) or seed < 0 for seed in seeds) or len(set(seeds)) != len(seeds)
+        or not isinstance(design["target_delta_am_standard_error"], (int, float)) or isinstance(design["target_delta_am_standard_error"], bool) or not math.isfinite(design["target_delta_am_standard_error"]) or design["target_delta_am_standard_error"] <= 0
+        or not isinstance(design["domain_qualification_artifact"], str) or not design["domain_qualification_artifact"]
+        or not isinstance(design["training_budget"], dict)
+    ):
+        raise ValueError("dense_design is not a valid prospective dense-map declaration")
+    budget = design["training_budget"]
+    if (
+        not isinstance(budget.get("minimum_transition_budget"), int)
+        or not isinstance(budget.get("maximum_transition_budget"), int)
+        or budget["minimum_transition_budget"] <= 0
+        or budget["maximum_transition_budget"] < budget["minimum_transition_budget"]
+    ):
+        raise ValueError("dense_design training_budget is invalid")
+
+
+def _accepted_dense_domain_artifact(raw_path: str, manifest_path: Path) -> str:
+    """Verify that the prospective map inherits an accepted domain, not a label."""
+    path = Path(raw_path)
+    if not path.is_absolute():
+        path = manifest_path.parent / path
+    try:
+        artifact = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("dense design domain qualification artifact is unreadable") from error
+    if not isinstance(artifact, dict):
+        raise ValueError("dense design domain qualification artifact is not accepted")
+    qualification = artifact.get("qualification", artifact)
+    if (
+        artifact.get("status") != "complete"
+        or not isinstance(qualification, dict)
+        or not isinstance(qualification.get("accepted_domain"), dict)
+    ):
+        raise ValueError("dense design domain qualification artifact is not accepted")
+    return str(path)
 
 
 def _validated_existing_entries(
@@ -463,6 +524,245 @@ def _passed_pilot_qualification_artifacts(
     return artifact_paths
 
 
+def _mean(values: list[float]) -> float:
+    return sum(values) / len(values)
+
+
+def _sample_variance(values: list[float]) -> float | None:
+    if len(values) < 2:
+        return None
+    average = _mean(values)
+    return sum((value - average) ** 2 for value in values) / (len(values) - 1)
+
+
+def _sample_covariance(left: list[float], right: list[float]) -> float | None:
+    if len(left) != len(right) or len(left) < 2:
+        return None
+    left_mean, right_mean = _mean(left), _mean(right)
+    return sum(
+        (left_value - left_mean) * (right_value - right_mean)
+        for left_value, right_value in zip(left, right, strict=True)
+    ) / (len(left) - 1)
+
+
+def _pilot_entry_outcomes(entry: dict[str, Any], pilot_root: Path) -> dict[str, float]:
+    """Read one terminal latent-location evaluation through its saved artifact."""
+    artifacts = entry.get("evaluation_artifacts")
+    if not isinstance(artifacts, list) or not artifacts or not isinstance(artifacts[-1], str):
+        raise ValueError("pilot entry has no terminal evaluation artifact")
+    path = Path(artifacts[-1])
+    if not path.is_absolute():
+        path = pilot_root / path
+    try:
+        artifact = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("pilot evaluation artifact is unreadable") from error
+    if (
+        artifact.get("format") != "mycormarl-checkpoint-evaluation"
+        or artifact.get("format_version") != 1
+        or artifact.get("protocol") != "latent-location"
+        or not isinstance(artifact.get("episodes"), list)
+        or not artifact["episodes"]
+    ):
+        raise ValueError("pilot evaluation artifact is incompatible")
+    endpoints: dict[str, list[float]] = {
+        "fitness": [], "living_biomass": [], "gross_growth": [],
+    }
+    for episode in artifact["episodes"]:
+        try:
+            summary = episode["summary"]
+            endpoints["fitness"].append(float(summary["cumulative_reproductive_fitness"]["plant"]))
+            endpoints["living_biomass"].append(float(summary["final_living_biomass"]["plant"]))
+            endpoints["gross_growth"].append(float(summary["cumulative_gross_growth"]["plant"]))
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("pilot evaluation artifact has incomplete plant endpoints") from error
+    if any(not math.isfinite(value) for values in endpoints.values() for value in values):
+        raise ValueError("pilot evaluation artifact has non-finite plant endpoints")
+    return {name: _mean(values) for name, values in endpoints.items()}
+
+
+def _analyse_pilot_bundle(pilot_path: Path, dense_design: dict[str, Any]) -> dict[str, Any]:
+    """Aggregate the immutable paired pilot evidence without testing a hypothesis."""
+    try:
+        pilot = json.loads(pilot_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("pilot_result_bundle is unreadable") from error
+    manifest = pilot.get("manifest")
+    if (
+        pilot.get("format") != STUDY_RESULT_FORMAT or pilot.get("format_version") != STUDY_RESULT_VERSION
+        or pilot.get("status") != "complete" or not isinstance(manifest, dict)
+        or manifest.get("stage") != "phase-1-pilot"
+    ):
+        raise ValueError("pilot_result_bundle is not a completed Phase 1 pilot")
+    levels = manifest.get("initial_p_micromolar")
+    seeds = manifest.get("seeds")
+    if not isinstance(levels, list) or not isinstance(seeds, list) or not levels or not seeds:
+        raise ValueError("pilot_result_bundle has no declared treatment matrix")
+    if any(level not in dense_design["initial_p_micromolar"] for level in dense_design["retained_pilot_levels"]):
+        raise ValueError("dense design retained pilot level is not present in the pilot")
+    if set(dense_design["retained_pilot_levels"]) - set(levels):
+        raise ValueError("dense design retains an undeclared pilot level")
+    entries = pilot.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("pilot_result_bundle has no condition entries")
+    expected = {(mode, level, seed) for mode in _STUDY_MODES for level in levels for seed in seeds}
+    found: dict[tuple[str, float, int], dict[str, Any]] = {}
+    unresolved_conditions = []
+    for entry in entries:
+        key = (entry.get("mode"), entry.get("initial_p_micromolar"), entry.get("seed")) if isinstance(entry, dict) else None
+        if (
+            key not in expected
+            or key in found
+            or entry.get("status") not in {"completed", "failed", "unconverged"}
+        ):
+            raise ValueError("pilot_result_bundle has incomplete or unqualified paired outcomes")
+        found[key] = entry
+    if set(found) != expected:
+        raise ValueError("pilot_result_bundle has incomplete or unqualified paired outcomes")
+    for mode, level, seed in sorted(found):
+        status = found[(mode, level, seed)]["status"]
+        if status != "completed":
+            unresolved_conditions.append({
+                "mode": mode,
+                "initial_p_micromolar": level,
+                "seed": seed,
+                "status": status,
+            })
+    if unresolved_conditions:
+        return {
+            "pilot_result_bundle": str(pilot_path),
+            "levels": [],
+            "unresolved_conditions": unresolved_conditions,
+            "tendency": {
+                "classification": "unresolved-training-or-range-failure",
+                "reason": "pilot contains failed or unconverged learned IPPO outcomes",
+                "uses_complete_predeclared_grid": True,
+                "adjacent_monotonicity_required": False,
+                "confirmatory_inference": False,
+            },
+            "precision": None,
+            "eligible_for_dense_execution": False,
+        }
+
+    analyses = []
+    paired_variances = []
+    for level in levels:
+        rows = []
+        for seed in seeds:
+            mixed = _pilot_entry_outcomes(found[("mixed", level, seed)], pilot_path.parent)
+            plant_only = _pilot_entry_outcomes(found[("plant-only", level, seed)], pilot_path.parent)
+            rows.append({"seed": seed, "mixed": mixed, "plant_only": plant_only})
+        def values(mode: str, endpoint: str) -> list[float]:
+            return [row[mode][endpoint] for row in rows]
+        mixed_fitness, plant_fitness = values("mixed", "fitness"), values("plant_only", "fitness")
+        paired_fitness = [left - right for left, right in zip(mixed_fitness, plant_fitness, strict=True)]
+        paired_variance = _sample_variance(paired_fitness)
+        if paired_variance is not None:
+            paired_variances.append(paired_variance)
+        mixed_biomass, plant_biomass = values("mixed", "living_biomass"), values("plant_only", "living_biomass")
+        mean_plant_biomass = _mean(plant_biomass)
+        mgr = None if mean_plant_biomass == 0.0 else 100.0 * (_mean(mixed_biomass) / mean_plant_biomass - 1.0)
+        paired_differences = {
+            endpoint: [row["mixed"][endpoint] - row["plant_only"][endpoint] for row in rows]
+            for endpoint in ("fitness", "living_biomass", "gross_growth")
+        }
+        analyses.append({
+            "initial_p_micromolar": level,
+            "seed_outcomes": rows,
+            "marginal_outcomes": {
+                mode: {endpoint: values(mode, endpoint) for endpoint in ("fitness", "living_biomass", "gross_growth")}
+                for mode in ("mixed", "plant_only")
+            },
+            "delta_am": _mean(paired_fitness),
+            "paired_delta_am_variance": paired_variance,
+            "mgr_percent": mgr,
+            "mgr_missing_reason": "mean plant-only living biomass is zero" if mgr is None else None,
+            "paired_differences": paired_differences,
+            "paired_scatter": {
+                endpoint: [{"seed": row["seed"], "mixed": row["mixed"][endpoint], "plant_only": row["plant_only"][endpoint]} for row in rows]
+                for endpoint in ("fitness", "living_biomass", "gross_growth")
+            },
+            "descriptive_covariance": {
+                endpoint: _sample_covariance(values("mixed", endpoint), values("plant_only", endpoint))
+                for endpoint in ("fitness", "living_biomass", "gross_growth")
+            },
+        })
+    variance = max(paired_variances, default=None)
+    recommended = max(2, math.ceil((variance or 0.0) / dense_design["target_delta_am_standard_error"] ** 2))
+    if len(dense_design["seeds"]) < recommended:
+        raise ValueError("dense design replication does not meet pilot-variance precision target")
+    log_levels = [math.log(float(level["initial_p_micromolar"])) for level in analyses]
+    advantages = [float(level["delta_am"]) for level in analyses]
+    if len(analyses) < 2:
+        tendency = {
+            "classification": "unresolved-training-or-range-failure",
+            "log_p_slope": None,
+        }
+    else:
+        log_mean = _mean(log_levels)
+        advantage_mean = _mean(advantages)
+        slope_denominator = sum((value - log_mean) ** 2 for value in log_levels)
+        slope = sum(
+            (log_level - log_mean) * (advantage - advantage_mean)
+            for log_level, advantage in zip(log_levels, advantages, strict=True)
+        ) / slope_denominator
+        tendency = {
+            "classification": "supported-decreasing" if slope < 0.0 else "unsupported-decreasing",
+            "log_p_slope": slope,
+        }
+    tendency.update({
+        "uses_complete_predeclared_grid": True,
+        "adjacent_monotonicity_required": False,
+        "confirmatory_inference": False,
+    })
+    return {
+        "pilot_result_bundle": str(pilot_path),
+        "levels": analyses,
+        "unresolved_conditions": [],
+        "tendency": tendency,
+        "precision": {
+            "paired_delta_am_variance": variance,
+            "target_delta_am_standard_error": dense_design["target_delta_am_standard_error"],
+            "recommended_minimum_replication": recommended,
+            "frozen_replication": len(dense_design["seeds"]),
+        },
+        "eligible_for_dense_execution": True,
+    }
+
+
+def _dense_map_manifest(
+    analysis_manifest: dict[str, Any],
+    pilot_analysis: dict[str, Any],
+    domain_artifact: str,
+) -> dict[str, Any]:
+    """Freeze a standalone successor manifest before dense outcomes exist."""
+    design = analysis_manifest["dense_design"]
+    output = analysis_manifest["output"]
+    training = dict(analysis_manifest["training"])
+    training.update(design["training_budget"])
+    return {
+        "schema_version": analysis_manifest["schema_version"],
+        "stage": "phase-1-dense-map",
+        "model": analysis_manifest["model"],
+        "horizon": analysis_manifest["horizon"],
+        "modes": ["mixed", "plant-only"],
+        "initial_p_micromolar": design["initial_p_micromolar"],
+        "seeds": design["seeds"],
+        "training": training,
+        "evaluation": analysis_manifest["evaluation"],
+        "output": {
+            "directory": output["directory"],
+            "identity": f"{output['identity']}-dense-map",
+        },
+        "qualification_artifacts": {"domain": domain_artifact},
+        "parent_pilot_analysis": {
+            "pilot_result_bundle": pilot_analysis["pilot_result_bundle"],
+            "eligible_for_dense_execution": pilot_analysis["eligible_for_dense_execution"],
+        },
+        "dense_design": design,
+    }
+
+
 def _write_summary(bundle: dict[str, Any], summary_path: Path) -> None:
     summary = (
         f"# MycorMARL study: {bundle['manifest']['output']['identity']}\n\n"
@@ -476,6 +776,21 @@ def _write_summary(bundle: dict[str, Any], summary_path: Path) -> None:
         f"- Execution identity: {bundle['execution_identity']}\n"
     )
     qualification = bundle.get("qualification")
+    pilot_analysis = bundle.get("pilot_analysis")
+    if pilot_analysis is not None:
+        summary += (
+            "\n## Phase 1 pilot analysis\n\n"
+            "- This range-finding pilot is descriptive; it does not support confirmatory inference.\n"
+            f"- Tendency status: {pilot_analysis['tendency']['classification']}\n"
+            "- Dense-map replication is frozen from pilot paired-Delta_AM variance and the predeclared precision target.\n\n"
+            "| Initial P (micromolar) | Delta_AM | MGR (%) |\n"
+            "|---:|---:|---:|\n"
+        )
+        for level in pilot_analysis["levels"]:
+            mgr = "missing" if level["mgr_percent"] is None else f"{level['mgr_percent']:.6g}"
+            summary += (
+                f"| {level['initial_p_micromolar']:.6g} | {level['delta_am']:.6g} | {mgr} |\n"
+            )
     if qualification is not None:
         accepted = qualification["accepted_domain"]
         profile = qualification["initial_solution_p_profiled"]
@@ -1035,6 +1350,41 @@ def run_study(
             output_dir,
             qualification_artifacts,
         )
+    if manifest["stage"] == "phase-1-pilot-analysis":
+        if stop_after_timesteps is not None:
+            raise ValueError("phase-1-pilot-analysis does not support stop_after_timesteps")
+        pilot_path = Path(manifest["pilot_result_bundle"])
+        if not pilot_path.is_absolute():
+            pilot_path = manifest_source.parent / pilot_path
+        bundle_path = output_dir / "result-bundle.json"
+        summary_path = output_dir / "summary.md"
+        if output_dir.exists() and any(output_dir.iterdir()):
+            raise ValueError("existing outputs have no compatible execution identity")
+        domain_artifact = _accepted_dense_domain_artifact(
+            manifest["dense_design"]["domain_qualification_artifact"],
+            manifest_source,
+        )
+        pilot_analysis = _analyse_pilot_bundle(pilot_path, manifest["dense_design"])
+        dense_manifest = _dense_map_manifest(
+            manifest, pilot_analysis, domain_artifact,
+        )
+        bundle = {
+            "format": STUDY_RESULT_FORMAT,
+            "format_version": STUDY_RESULT_VERSION,
+            "study_identity": study_identity,
+            "execution_identity": execution_identity,
+            "manifest": manifest,
+            "provenance": provenance,
+            "pilot_analysis": pilot_analysis,
+            "dense_design": manifest["dense_design"],
+            "dense_manifest": dense_manifest,
+            "completion": {"completed": 1, "requested": 1},
+            "status": "complete",
+        }
+        output_dir.mkdir(parents=True, exist_ok=True)
+        bundle_path.write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _write_summary(bundle, summary_path)
+        return StudyResult(bundle_path, summary_path)
     if manifest["stage"] == "single-condition-training":
         if stop_after_timesteps is not None and (
             isinstance(stop_after_timesteps, bool)

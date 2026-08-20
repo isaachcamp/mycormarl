@@ -59,6 +59,15 @@ def _write_manifest(tmp_path, manifest):
     return path
 
 
+def _accepted_domain_artifact(tmp_path):
+    path = tmp_path / "accepted-domain.json"
+    path.write_text(json.dumps({
+        "status": "complete",
+        "qualification": {"accepted_domain": {"name": "qualified"}},
+    }), encoding="utf-8")
+    return path
+
+
 def _passed_pilot_qualifications(tmp_path):
     """Persist the three passed prerequisite artifacts for a reduced fixture."""
     artifacts = {
@@ -422,6 +431,240 @@ def test_runner_rejects_a_stage_without_an_executor(tmp_path):
     manifest["stage"] = "phase-1-dense-map"
 
     with pytest.raises(ValueError, match="stage"):
+        run_study(_write_manifest(tmp_path, manifest))
+
+    assert not (tmp_path / "outputs").exists()
+
+
+def test_phase_1_pilot_analysis_reports_mode_level_endpoints_and_freezes_dense_design(
+    tmp_path,
+):
+    """The runner derives pilot evidence and a prospective dense design together."""
+    pilot_root = tmp_path / "pilot"
+    pilot_root.mkdir()
+    entries = []
+    outcomes = {
+        1: {"mixed": (10.0, 20.0), "plant-only": (4.0, 10.0)},
+        2: {"mixed": (14.0, 4.0), "plant-only": (8.0, 2.0)},
+    }
+    for seed, modes in outcomes.items():
+        for mode, (fitness, biomass) in modes.items():
+            artifact = pilot_root / f"{mode}-{seed}.json"
+            artifact.write_text(json.dumps({
+                "format": "mycormarl-checkpoint-evaluation",
+                "format_version": 1,
+                "protocol": "latent-location",
+                "episodes": [{"summary": {
+                    "cumulative_reproductive_fitness": {"plant": fitness},
+                    "final_living_biomass": {"plant": biomass},
+                    "cumulative_gross_growth": {"plant": biomass + 1.0},
+                }}],
+            }), encoding="utf-8")
+            entries.append({
+                "mode": mode,
+                "initial_p_micromolar": 0.3,
+                "seed": seed,
+                "status": "completed",
+                "evaluation_artifacts": [artifact.name],
+            })
+    pilot_bundle = {
+        "format": "mycormarl-study-result",
+        "format_version": 2,
+        "manifest": {
+            "stage": "phase-1-pilot",
+            "initial_p_micromolar": [0.3],
+            "modes": ["mixed", "plant-only"],
+            "seeds": [1, 2],
+            "pilot_fixture": True,
+        },
+        "entries": entries,
+        "completion": {"completed": 4, "requested": 4},
+        "status": "complete",
+    }
+    pilot_path = pilot_root / "result-bundle.json"
+    pilot_path.write_text(json.dumps(pilot_bundle), encoding="utf-8")
+    domain_path = _accepted_domain_artifact(tmp_path)
+
+    manifest = _manifest(tmp_path, identity="pilot-analysis")
+    manifest["stage"] = "phase-1-pilot-analysis"
+    manifest["pilot_result_bundle"] = str(pilot_path)
+    manifest["dense_design"] = {
+        "initial_p_micromolar": [0.1, 0.3, 1.0],
+        "spacing": "logarithmic",
+        "retained_pilot_levels": [0.3],
+        "seeds": [11, 12, 13, 14],
+        "target_delta_am_standard_error": 1.0,
+        "domain_qualification_artifact": str(domain_path),
+        "training_budget": {"minimum_transition_budget": 100, "maximum_transition_budget": 200},
+    }
+
+    result = run_study(_write_manifest(tmp_path, manifest))
+    bundle = json.loads(result.bundle_path.read_text(encoding="utf-8"))
+
+    level = bundle["pilot_analysis"]["levels"][0]
+    assert level["delta_am"] == pytest.approx(6.0)
+    assert level["mgr_percent"] == pytest.approx(100.0)
+    assert level["paired_differences"]["fitness"] == [6.0, 6.0]
+    assert level["paired_delta_am_variance"] == pytest.approx(0.0)
+    assert level["paired_scatter"]["fitness"] == [
+        {"seed": 1, "mixed": 10.0, "plant_only": 4.0},
+        {"seed": 2, "mixed": 14.0, "plant_only": 8.0},
+    ]
+    assert bundle["dense_design"] == manifest["dense_design"]
+    assert bundle["pilot_analysis"]["precision"]["recommended_minimum_replication"] == 2
+    assert bundle["dense_manifest"]["stage"] == "phase-1-dense-map"
+    assert bundle["dense_manifest"]["initial_p_micromolar"] == [0.1, 0.3, 1.0]
+    assert bundle["dense_manifest"]["qualification_artifacts"]["domain"] == str(domain_path)
+    assert "confirmatory inference" in result.summary_path.read_text(encoding="utf-8")
+
+
+def test_phase_1_pilot_analysis_marks_mgr_missing_for_zero_mean_plant_only_biomass(
+    tmp_path,
+):
+    """A zero denominator remains explicit rather than becoming an epsilon ratio."""
+    pilot_root = tmp_path / "pilot"
+    pilot_root.mkdir()
+    entries = []
+    for seed, mode, biomass in ((1, "mixed", 3.0), (1, "plant-only", 0.0)):
+        artifact = pilot_root / f"{mode}-{seed}.json"
+        artifact.write_text(json.dumps({
+            "format": "mycormarl-checkpoint-evaluation",
+            "format_version": 1,
+            "protocol": "latent-location",
+            "episodes": [{"summary": {
+                "cumulative_reproductive_fitness": {"plant": 1.0},
+                "final_living_biomass": {"plant": biomass},
+                "cumulative_gross_growth": {"plant": 1.0},
+            }}],
+        }), encoding="utf-8")
+        entries.append({
+            "mode": mode, "initial_p_micromolar": 0.3, "seed": seed,
+            "status": "completed", "evaluation_artifacts": [artifact.name],
+        })
+    pilot_path = pilot_root / "result-bundle.json"
+    pilot_path.write_text(json.dumps({
+        "format": "mycormarl-study-result", "format_version": 2,
+        "manifest": {"stage": "phase-1-pilot", "initial_p_micromolar": [0.3],
+                     "modes": ["mixed", "plant-only"], "seeds": [1], "pilot_fixture": True},
+        "entries": entries, "completion": {"completed": 2, "requested": 2}, "status": "complete",
+    }), encoding="utf-8")
+    domain_path = _accepted_domain_artifact(tmp_path)
+    manifest = _manifest(tmp_path, identity="zero-mgr")
+    manifest.update({"stage": "phase-1-pilot-analysis", "pilot_result_bundle": str(pilot_path), "dense_design": {
+        "initial_p_micromolar": [0.1, 0.3], "spacing": "logarithmic",
+        "retained_pilot_levels": [0.3], "seeds": [11, 12],
+        "target_delta_am_standard_error": 10.0, "domain_qualification_artifact": str(domain_path),
+        "training_budget": {"minimum_transition_budget": 100, "maximum_transition_budget": 200},
+    }})
+
+    bundle = json.loads(run_study(_write_manifest(tmp_path, manifest)).bundle_path.read_text())
+
+    level = bundle["pilot_analysis"]["levels"][0]
+    assert level["mgr_percent"] is None
+    assert level["mgr_missing_reason"] == "mean plant-only living biomass is zero"
+
+
+def test_phase_1_pilot_analysis_supports_an_overall_noisy_decline_on_the_complete_grid(
+    tmp_path,
+):
+    """One upward noisy step does not discard the predeclared P-response tendency."""
+    pilot_root = tmp_path / "pilot"
+    pilot_root.mkdir()
+    levels = [0.1, 0.3, 1.0, 3.0]
+    deltas = [8.0, 5.0, 6.0, 0.0]
+    entries = []
+    for level, delta in zip(levels, deltas, strict=True):
+        for mode, fitness in (("mixed", delta), ("plant-only", 0.0)):
+            artifact = pilot_root / f"{mode}-{level}.json"
+            artifact.write_text(json.dumps({
+                "format": "mycormarl-checkpoint-evaluation", "format_version": 1,
+                "protocol": "latent-location", "episodes": [{"summary": {
+                    "cumulative_reproductive_fitness": {"plant": fitness},
+                    "final_living_biomass": {"plant": 1.0},
+                    "cumulative_gross_growth": {"plant": 1.0},
+                }}],
+            }), encoding="utf-8")
+            entries.append({"mode": mode, "initial_p_micromolar": level, "seed": 1,
+                            "status": "completed", "evaluation_artifacts": [artifact.name]})
+    pilot_path = pilot_root / "result-bundle.json"
+    pilot_path.write_text(json.dumps({
+        "format": "mycormarl-study-result", "format_version": 2,
+        "manifest": {"stage": "phase-1-pilot", "initial_p_micromolar": levels,
+                     "modes": ["mixed", "plant-only"], "seeds": [1], "pilot_fixture": True},
+        "entries": entries, "completion": {"completed": 8, "requested": 8}, "status": "complete",
+    }), encoding="utf-8")
+    domain_path = _accepted_domain_artifact(tmp_path)
+    manifest = _manifest(tmp_path, identity="noisy-tendency")
+    manifest.update({"stage": "phase-1-pilot-analysis", "pilot_result_bundle": str(pilot_path), "dense_design": {
+        "initial_p_micromolar": levels, "spacing": "logarithmic",
+        "retained_pilot_levels": levels, "seeds": [11, 12],
+        "target_delta_am_standard_error": 10.0, "domain_qualification_artifact": str(domain_path),
+        "training_budget": {"minimum_transition_budget": 100, "maximum_transition_budget": 200},
+    }})
+
+    bundle = json.loads(run_study(_write_manifest(tmp_path, manifest)).bundle_path.read_text())
+
+    tendency = bundle["pilot_analysis"]["tendency"]
+    assert tendency["classification"] == "supported-decreasing"
+    assert tendency["uses_complete_predeclared_grid"] is True
+    assert tendency["adjacent_monotonicity_required"] is False
+
+
+def test_phase_1_pilot_analysis_reports_unconverged_runs_as_unresolved(tmp_path):
+    """A training failure remains visible and cannot become a response tendency."""
+    pilot_root = tmp_path / "pilot"
+    pilot_root.mkdir()
+    entries = []
+    for mode in ("mixed", "plant-only"):
+        artifact = pilot_root / f"{mode}.json"
+        artifact.write_text(json.dumps({
+            "format": "mycormarl-checkpoint-evaluation", "format_version": 1,
+            "protocol": "latent-location", "episodes": [{"summary": {
+                "cumulative_reproductive_fitness": {"plant": 1.0},
+                "final_living_biomass": {"plant": 1.0},
+                "cumulative_gross_growth": {"plant": 1.0},
+            }}],
+        }), encoding="utf-8")
+        entries.append({"mode": mode, "initial_p_micromolar": 0.3, "seed": 1,
+                        "status": "unconverged" if mode == "mixed" else "completed",
+                        "evaluation_artifacts": [artifact.name]})
+    pilot_path = pilot_root / "result-bundle.json"
+    pilot_path.write_text(json.dumps({
+        "format": "mycormarl-study-result", "format_version": 2,
+        "manifest": {"stage": "phase-1-pilot", "initial_p_micromolar": [0.3],
+                     "modes": ["mixed", "plant-only"], "seeds": [1], "pilot_fixture": True},
+        "entries": entries, "completion": {"completed": 2, "requested": 2}, "status": "complete",
+    }), encoding="utf-8")
+    domain_path = _accepted_domain_artifact(tmp_path)
+    manifest = _manifest(tmp_path, identity="unresolved-pilot")
+    manifest.update({"stage": "phase-1-pilot-analysis", "pilot_result_bundle": str(pilot_path), "dense_design": {
+        "initial_p_micromolar": [0.1, 0.3], "spacing": "logarithmic",
+        "retained_pilot_levels": [0.3], "seeds": [11, 12],
+        "target_delta_am_standard_error": 1.0, "domain_qualification_artifact": str(domain_path),
+        "training_budget": {"minimum_transition_budget": 100, "maximum_transition_budget": 200},
+    }})
+
+    bundle = json.loads(run_study(_write_manifest(tmp_path, manifest)).bundle_path.read_text())
+
+    assert bundle["pilot_analysis"]["tendency"]["classification"] == "unresolved-training-or-range-failure"
+    assert bundle["pilot_analysis"]["unresolved_conditions"] == [
+        {"mode": "mixed", "initial_p_micromolar": 0.3, "seed": 1, "status": "unconverged"},
+    ]
+
+
+def test_phase_1_pilot_analysis_rejects_an_unaccepted_dense_domain_artifact(tmp_path):
+    """A prospective dense map inherits evidence, not an arbitrary path label."""
+    domain_path = tmp_path / "rejected-domain.json"
+    domain_path.write_text('{"status": "failed"}', encoding="utf-8")
+    manifest = _manifest(tmp_path, identity="unaccepted-domain")
+    manifest.update({"stage": "phase-1-pilot-analysis", "pilot_result_bundle": "missing-pilot.json", "dense_design": {
+        "initial_p_micromolar": [0.1, 0.3], "spacing": "logarithmic",
+        "retained_pilot_levels": [0.3], "seeds": [11, 12],
+        "target_delta_am_standard_error": 1.0, "domain_qualification_artifact": str(domain_path),
+        "training_budget": {"minimum_transition_budget": 100, "maximum_transition_budget": 200},
+    }})
+
+    with pytest.raises(ValueError, match="domain qualification artifact is not accepted"):
         run_study(_write_manifest(tmp_path, manifest))
 
     assert not (tmp_path / "outputs").exists()
