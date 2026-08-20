@@ -19,16 +19,16 @@ class PlantTraits:
     whole-plant dry biomass per day; it abstracts small losses such as
     herbivory and unrecovered turnover rather than measured P maintenance.
     Structural P is represented only by ``gamma_p``. ``jmax`` is µmol P
-    cm^-2 s^-1 and ``km`` is µmol P cm^-3. Initial free C and P pools each
-    contain one structural-biomass equivalent at the configured initial
-    biomass. ``biomass_cap`` is a numerical growth guard in g dry mass;
+    cm^-2 s^-1 and ``km`` is µmol P cm^-3. An unspecified initial free C or P
+    pool is derived at reset as one configured maintenance timestep; a numeric
+    value is an explicit override. ``biomass_cap`` is a numerical growth guard in g dry mass;
     ``biomass_observation_reference`` is the independent g dry mass scale used
     by the bounded actor observation.
     """
 
     initial_biomass: float = 0.01
-    initial_c_pool: float = 0.00402
-    initial_p_pool: float = 0.0192
+    initial_c_pool: float | None = None
+    initial_p_pool: float | None = None
     kleaf: float = 0.50  # biomass fraction dedicated to photosynthesis
     kfroot: float = 0.18  # fine-root dry-mass fraction of whole-plant dry mass
     amass: float = 0.05
@@ -70,9 +70,13 @@ def validate_plant_growth_geometry_traits(traits: PlantTraits) -> None:
         raise ValueError("plant initial_biomass must be finite and non-negative")
     if traits.initial_biomass > traits.biomass_cap:
         raise ValueError("plant initial_biomass must not exceed biomass_cap")
-    for name in ("initial_c_pool", "initial_p_pool", "kappa_c", "kappa_p", "amass"):
+    for name in ("kappa_c", "kappa_p", "amass"):
         value = getattr(traits, name)
         if not math.isfinite(value) or value < 0.0:
+            raise ValueError(f"plant {name} must be finite and non-negative")
+    for name in ("initial_c_pool", "initial_p_pool"):
+        value = getattr(traits, name)
+        if value is not None and (not math.isfinite(value) or value < 0.0):
             raise ValueError(f"plant {name} must be finite and non-negative")
     if not math.isfinite(traits.kleaf) or not 0.0 <= traits.kleaf <= 1.0:
         raise ValueError("plant kleaf must be finite and within [0, 1]")

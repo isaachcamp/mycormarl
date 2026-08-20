@@ -15,13 +15,14 @@ class FungusTraits:
     is represented only by ``gamma_p``. ``jmax`` is µmol P cm^-2 s^-1 and
     ``km`` is µmol P cm^-3. Initial biomass is an early-established living
     external-mycelium fixture; spores, inoculum, and colonized-root mass are
-    not represented, and each initial free pool contains one
-    structural-biomass equivalent.
+    not represented. An unspecified initial free pool is derived at reset as
+    one configured maintenance timestep; a numeric value is an explicit
+    override.
     """
 
     initial_biomass: float = 0.0001
-    initial_c_pool: float = 0.00005
-    initial_p_pool: float = 0.0002
+    initial_c_pool: float | None = None
+    initial_p_pool: float | None = None
     gamma_c: float = 0.5
     gamma_p: float = 2.0
     kappa_c: float = 0.015
@@ -48,9 +49,13 @@ def validate_fungus_growth_geometry_traits(traits: FungusTraits) -> None:
             raise ValueError(f"fungus {name} must be finite and greater than zero")
     if not math.isfinite(traits.initial_biomass) or traits.initial_biomass < 0.0:
         raise ValueError("fungus initial_biomass must be finite and non-negative")
-    for name in ("initial_c_pool", "initial_p_pool", "kappa_c", "kappa_p"):
+    for name in ("kappa_c", "kappa_p"):
         value = getattr(traits, name)
         if not math.isfinite(value) or value < 0.0:
+            raise ValueError(f"fungus {name} must be finite and non-negative")
+    for name in ("initial_c_pool", "initial_p_pool"):
+        value = getattr(traits, name)
+        if value is not None and (not math.isfinite(value) or value < 0.0):
             raise ValueError(f"fungus {name} must be finite and non-negative")
     if not math.isfinite(traits.death_fraction) or not (
         0.0 <= traits.death_fraction <= 1.0

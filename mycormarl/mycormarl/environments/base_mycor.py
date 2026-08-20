@@ -243,6 +243,15 @@ class BaseMycorMarl(MultiAgentEnv):
             self.z_edges,
         )
 
+        def reset_pool(
+            pool: float | None, kappa: float, biomass: float, active: bool
+        ) -> float:
+            if not active:
+                return 0.0
+            if pool is not None:
+                return pool
+            return kappa * biomass * self.config.dt
+
         return State(
             terminal=False,
             step=0,
@@ -250,18 +259,22 @@ class BaseMycorMarl(MultiAgentEnv):
             fungus_biomass=fungus_biomass,
             plant_history_max_biomass=plant_biomass,
             fungus_history_max_biomass=fungus_biomass,
-            plant_c_pool=jnp.array([
-                self.species.plant.initial_c_pool if self.plant_active else 0.0
-            ]),
-            plant_p_pool=jnp.array([
-                self.species.plant.initial_p_pool if self.plant_active else 0.0
-            ]),
-            fungus_c_pool=jnp.array([
-                self.species.fungus.initial_c_pool if self.fungus_active else 0.0
-            ]),
-            fungus_p_pool=jnp.array([
-                self.species.fungus.initial_p_pool if self.fungus_active else 0.0
-            ]),
+            plant_c_pool=jnp.array([reset_pool(
+                self.species.plant.initial_c_pool, self.species.plant.kappa_c,
+                self.species.plant.initial_biomass, self.plant_active,
+            )]),
+            plant_p_pool=jnp.array([reset_pool(
+                self.species.plant.initial_p_pool, self.species.plant.kappa_p,
+                self.species.plant.initial_biomass, self.plant_active,
+            )]),
+            fungus_c_pool=jnp.array([reset_pool(
+                self.species.fungus.initial_c_pool, self.species.fungus.kappa_c,
+                self.species.fungus.initial_biomass, self.fungus_active,
+            )]),
+            fungus_p_pool=jnp.array([reset_pool(
+                self.species.fungus.initial_p_pool, self.species.fungus.kappa_p,
+                self.species.fungus.initial_biomass, self.fungus_active,
+            )]),
             plant_last_p_received=jnp.array([0.0]),
             fungus_last_c_received=jnp.array([0.0]),
             soil_labile_p=soil_labile_p,
