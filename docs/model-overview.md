@@ -136,6 +136,12 @@ are exercised by
 [`test_independent_consumer_mode_keeps_absent_partner_dormant`](../tests/test_review_repairs.py#L73-L95)
 and [`test_absorbing_death_removes_real_root_geometry_and_uptake`](../tests/test_review_repairs.py#L96-L121).
 
+For an active partner, an unspecified reset free C or P pool funds exactly one
+following automatic-maintenance payment: `kappa_c × initial_biomass × dt` or
+`kappa_p × initial_biomass × dt`, respectively. This is distinct from
+structural resources implicit in biomass. An explicit numeric pool is a named
+scenario override, including qualification fixtures.
+
 The soil domain is closed to P at its top, bottom, outer radius, and symmetry
 axis. Organism uptake is consequently an internal soil-to-organism transfer;
 mortality and reproduction are explicit exports from the represented system.

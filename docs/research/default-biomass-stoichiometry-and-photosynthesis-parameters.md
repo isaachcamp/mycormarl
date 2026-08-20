@@ -6,12 +6,13 @@ initial plant and fungal biomass, initial resource pools, and plant `amass`.
 This note records evidence and the resulting parameter decisions; runtime
 changes are implemented in the corresponding trait definitions.
 
-**Supersession (6 August 2026):** the runtime defaults now represent an
-early-established resource-exchange fixture: plant biomass `0.01 g` with
-`0.00402 g C` and `0.0192 mg P` free pools, and living external fungal biomass
-`0.0001 g` with `0.00005 g C` and `0.0002 mg P` free pools. The propagule and
-one-spore values documented below remain provenance and sensitivity cases, not
-the active defaults.
+**Supersession (20 August 2026):** the runtime defaults represent an
+early-established resource-exchange fixture with plant biomass `0.01 g` and
+living external fungal biomass `0.0001 g`. Unspecified free pools fund exactly
+one configured next-step maintenance payment (`kappa × biomass × dt`); numeric
+pool values remain explicit provenance, qualification, or sensitivity
+overrides. The propagule and one-spore values documented below remain
+provenance and sensitivity cases, not active defaults.
 
 ## Accepted decisions
 

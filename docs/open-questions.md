@@ -56,6 +56,27 @@ verification records are retained under [`archive/`](archive/).
   preserving the calibrated daily budget; `f_light = 1` is the current
   uniform-in-time special case.
 
+## Within-step resource timing
+
+- **Reserve semantics and maintenance order:** The `reserve` component is
+  intended to retain free resources for next-step automatic maintenance, but
+  the current transition first pays maintenance and allocates pre-existing
+  pools, then credits photosynthetic C and direct soil-P uptake at the end of
+  the step. Consequently, an agent allocating all pre-existing resources to
+  growth can still use newly acquired end-of-step resources for its following
+  maintenance payment, without having reserved them. Decide whether to change
+  the transition order or redefine `reserve`; document and test the selected
+  timing contract before interpreting reserve policies.
+
+- **Reset free-pool contract:** Replace the default initial free C and P pools
+  of one structural-biomass equivalent with exactly one next-step maintenance
+  requirement for each resource (`kappa_c * initial_biomass * dt` and
+  `kappa_p * initial_biomass * dt`). Define how zero maintenance is
+  represented, ensure initial-biomass sensitivities recompute both pools from
+  the same rule, and update the parameter register, initialization tests, and
+  provenance documents. This changes the default environment and must be made
+  before interpreting resource-pressure sweeps.
+
 ## Uptake regimes and time
 
 - Determine a biologically motivated value for $T_{ref}$.
