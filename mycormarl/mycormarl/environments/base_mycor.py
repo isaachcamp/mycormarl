@@ -570,6 +570,7 @@ class BaseMycorMarl(MultiAgentEnv):
                 "trade_in": fungus_p_trade_out,
                 "trade_cancelled": trade_cancelled,
                 "direct_p_uptake_mg": plant_direct_uptake_mg,
+                "carbon_fixed": plant_carbon_fixed,
                 "maintenance_p_required_mg": plant_maintenance["info"]["maint_p"],
             },
             FUNGUS: {

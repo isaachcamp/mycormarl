@@ -124,6 +124,43 @@ def test_static_controls_report_fixed_trade_as_a_transfer_observable():
     assert mixed["transfers"]["fungus_p_out"] > 0.0
 
 
+def test_static_controls_record_gamma_normalized_limitation_trace():
+    manifest = _manifest()
+    manifest.update({
+        "modes": ["mixed"],
+        "initial_p_micromolar": [1.0],
+        "record_limitation_trace": True,
+        "static_policy": {
+            "plant": [0.0, 1.0, 0.0, 0.0],
+            "fungus": [0.0, 1.0, 0.0, 0.0],
+        },
+    })
+
+    entry = run_static_controls(manifest)["entries"][0]
+    trace = entry["limitation_trace"]
+
+    assert len(trace) == entry["steps"] == 2
+    assert {row["agents"]["plant"]["limiting_resource"] for row in trace} <= {
+        "none", "carbon", "phosphate", "balanced"
+    }
+    for row in trace:
+        for agent in ("plant", "fungus"):
+            values = row["agents"][agent]
+            assert values["allocated_c_normalized"] >= 0.0
+            assert values["allocated_p_normalized"] >= 0.0
+            assert values["used_c_normalized"] >= 0.0
+            assert values["used_p_normalized"] >= 0.0
+            assert values["acquired_c"] >= 0.0
+            assert values["acquired_p"] >= 0.0
+            assert values["maintenance_c_used"] >= 0.0
+            assert values["maintenance_p_used"] >= 0.0
+            assert values["maintenance_fraction_of_prior_acquired_c"] >= 0.0
+            assert values["maintenance_fraction_of_prior_acquired_p"] >= 0.0
+            assert "signed_pressure" in values
+            assert "trade_out_raw" in values
+            assert "trade_in_raw" in values
+
+
 def test_static_controls_reject_non_physical_actions_without_running_a_condition():
     manifest = _manifest()
     manifest["static_policy"]["plant"] = [jnp.nan, 0.0, 0.0, 1.0]

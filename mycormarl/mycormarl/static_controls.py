@@ -105,37 +105,106 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
         + jnp.sum(state.fungus_biomass) * env.species.fungus.gamma_p
     )
     initial_total = initial_p + initial_soil
-    steps = 0
-    uptake = {PLANT: 0.0, FUNGUS: 0.0}
-    transfers = {"plant_c_out": 0.0, "fungus_p_out": 0.0}
-    biological_deaths = {PLANT: 0, FUNGUS: 0}
-    step_environment = jax.jit(env.step_env)
-    while steps < env.max_episode_steps:
-        previous = state
-        _, state, _, dones, info = step_environment(jax.random.PRNGKey(seed + steps + 1), state, actions)
-        for agent, trade_out, trade_in, trade_out_key, trade_in_key in (
-            (PLANT, "trade_out", "trade_in", "plant_c_out", None),
-            (FUNGUS, "trade_out", "trade_in", "fungus_p_out", None),
-        ):
-            diagnostics = info[agent]
-            uptake[agent] += float(
-                state.__getattribute__(f"{agent}_p_pool")[0]
-                - previous.__getattribute__(f"{agent}_p_pool")[0]
-                + diagnostics["maint_p_used"][0]
-                + diagnostics["growth_p_used"][0]
-                + diagnostics["reproduction_p"][0]
-                + (diagnostics[trade_out][0] if agent == FUNGUS else 0.0)
-                - diagnostics[trade_in][0]
+    record_limitation_trace = bool(manifest.get("record_limitation_trace", False))
+
+    def rollout(initial_state):
+        def condition(carry):
+            current_state, steps, *_ = carry
+            return (steps < env.max_episode_steps) & ~current_state.terminal
+
+        def advance(carry):
+            previous, steps, uptake, transfers, deaths, growth, carbon_fixed, trace, prior_acquired = carry
+            _, current, _, _, info = env.step_env(
+                jax.random.PRNGKey(seed + steps + 1), previous, actions
             )
-            transfers[trade_out_key] += float(diagnostics[trade_out][0])
-        for agent in _AGENTS:
-            biological_deaths[agent] += int(
-                bool(info["transitions"][agent].operational_at_start)
-                and not bool(info["transitions"][agent].operational_at_end)
-            )
-        steps += 1
-        if bool(dones["__all__"]):
-            break
+            plant_info = info[PLANT]
+            fungus_info = info[FUNGUS]
+            uptake = uptake + jnp.array([
+                plant_info["direct_p_uptake_mg"][0],
+                fungus_info["direct_p_uptake_mg"][0],
+            ])
+            transfers = transfers + jnp.array([
+                plant_info["trade_out"][0], fungus_info["trade_out"][0]
+            ])
+            deaths = deaths + jnp.array([
+                info["transitions"][PLANT].operational_at_start
+                & ~info["transitions"][PLANT].operational_at_end,
+                info["transitions"][FUNGUS].operational_at_start
+                & ~info["transitions"][FUNGUS].operational_at_end,
+            ], dtype=jnp.int32)
+            growth = growth + jnp.array([
+                plant_info["growth"][0], fungus_info["growth"][0]
+            ])
+            carbon_fixed = carbon_fixed + plant_info["carbon_fixed"][0]
+            acquired = jnp.zeros((2, 2))
+            if record_limitation_trace:
+                normalized_allocated = jnp.array([
+                    plant_info["growth_c_allocated"][0] / env.species.plant.gamma_c,
+                    plant_info["growth_p_allocated"][0] / env.species.plant.gamma_p,
+                    fungus_info["growth_c_allocated"][0] / env.species.fungus.gamma_c,
+                    fungus_info["growth_p_allocated"][0] / env.species.fungus.gamma_p,
+                ]).reshape(2, 2)
+                normalized_used = jnp.array([
+                    plant_info["growth_c_used"][0] / env.species.plant.gamma_c,
+                    plant_info["growth_p_used"][0] / env.species.plant.gamma_p,
+                    fungus_info["growth_c_used"][0] / env.species.fungus.gamma_c,
+                    fungus_info["growth_p_used"][0] / env.species.fungus.gamma_p,
+                ]).reshape(2, 2)
+                ratios = normalized_allocated / jnp.maximum(normalized_used, 1e-12)
+                acquired = jnp.array([
+                    plant_info["carbon_fixed"][0],
+                    plant_info["direct_p_uptake_mg"][0] + plant_info["trade_in"][0],
+                    fungus_info["trade_in"][0],
+                    fungus_info["direct_p_uptake_mg"][0],
+                ]).reshape(2, 2)
+                maintenance_used = jnp.array([
+                    plant_info["maint_c_used"][0], plant_info["maint_p_used"][0],
+                    fungus_info["maint_c_used"][0], fungus_info["maint_p_used"][0],
+                ]).reshape(2, 2)
+                maintenance_fraction = maintenance_used / jnp.maximum(prior_acquired, 1e-12)
+                trade_out = jnp.array([plant_info["trade_out"][0], fungus_info["trade_out"][0]])
+                trade_in = jnp.array([plant_info["trade_in"][0], fungus_info["trade_in"][0]])
+                trade_out_normalized = jnp.array([
+                    trade_out[0] / env.species.plant.gamma_c,
+                    trade_out[1] / env.species.fungus.gamma_p,
+                ])
+                trade_in_normalized = jnp.array([
+                    trade_in[0] / env.species.plant.gamma_p,
+                    trade_in[1] / env.species.fungus.gamma_c,
+                ])
+                c_capacity = normalized_allocated[:, 0]
+                p_capacity = normalized_allocated[:, 1]
+                signed_pressure = p_capacity - c_capacity
+                limiting_code = jnp.where(
+                    (c_capacity <= 1e-12) & (p_capacity <= 1e-12), 0.0,
+                    jnp.where(jnp.isclose(c_capacity, p_capacity, rtol=1e-5, atol=1e-12), 3.0,
+                              jnp.where(c_capacity < p_capacity, 1.0, 2.0)),
+                )
+                trace_row = jnp.concatenate([
+                    normalized_allocated, normalized_used, ratios,
+                    acquired, maintenance_used, maintenance_fraction,
+                    jnp.stack((trade_out, trade_in, trade_out_normalized, trade_in_normalized), axis=1),
+                    signed_pressure[:, None],
+                ], axis=1)
+                trace_row = jnp.concatenate([trace_row, limiting_code[:, None]], axis=1)
+                trace = trace.at[steps].set(trace_row)
+            return current, steps + 1, uptake, transfers, deaths, growth, carbon_fixed, trace, acquired
+
+        return jax.lax.while_loop(
+            condition,
+            advance,
+            (initial_state, jnp.array(0), jnp.zeros(2), jnp.zeros(2),
+             jnp.zeros(2, dtype=jnp.int32), jnp.zeros(2), jnp.array(0.0),
+             jnp.zeros((env.max_episode_steps, 2, 18)), jnp.zeros((2, 2))),
+        )
+
+    state, steps, uptake_values, transfer_values, death_values, growth_values, carbon_fixed, trace_values, _ = jax.jit(rollout)(state)
+    uptake = {PLANT: float(uptake_values[0]), FUNGUS: float(uptake_values[1])}
+    transfers = {
+        "plant_c_out": float(transfer_values[0]),
+        "fungus_p_out": float(transfer_values[1]),
+    }
+    biological_deaths = {PLANT: int(death_values[0]), FUNGUS: int(death_values[1])}
 
     final_soil = float(jnp.sum(state.soil_labile_p) * MICROMOL_P_TO_MG_P)
     final_pools = float(
@@ -177,22 +246,74 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
         "plant_reproduction": float(jnp.sum(state.cumulative_plant_p_reproduction_export_mg)),
         "fungus_reproduction": float(jnp.sum(state.cumulative_fungus_p_reproduction_export_mg)),
     }
-    return {
+    result = {
         "mode": mode, "initial_p_micromolar": p_level, "seed": seed,
         "status": "rejected" if reasons else "completed",
         "rejection_reasons": reasons,
-        "steps": steps, "uniform_initial_p": uniform,
+        "steps": int(steps), "uniform_initial_p": uniform,
         "initial_solution_p_profiled": env.config.initial_solution_p_depth_profile is not None,
         "biomass": {PLANT: float(state.plant_biomass[0]), FUNGUS: float(state.fungus_biomass[0])},
         "c_pools": {PLANT: float(state.plant_c_pool[0]), FUNGUS: float(state.fungus_c_pool[0])},
         "p_pools": {PLANT: float(state.plant_p_pool[0]), FUNGUS: float(state.fungus_p_pool[0])},
         "uptake": uptake, "transfers": transfers, "biological_deaths": biological_deaths,
+        "cumulative_growth": {PLANT: float(growth_values[0]), FUNGUS: float(growth_values[1])},
+        "cumulative_direct_p_uptake_mg": uptake,
+        "cumulative_carbon_fixed": float(carbon_fixed),
         "soil_inventory_initial": initial_soil, "soil_inventory_final": final_soil,
         "p_loss_or_export": losses,
         "p_loss_or_export_counters": p_loss_or_export_counters,
         "p_accounting_residual": residual,
         "terminated": bool(state.terminal),
     }
+    if record_limitation_trace:
+        labels = ("none", "carbon", "phosphate", "balanced")
+        trace = []
+        for index in range(int(steps)):
+            row = trace_values[index]
+            trace.append({
+                "step": index + 1,
+                "day": (index + 1) * env.config.dt,
+                "agents": {
+                    agent: {
+                        "allocated_c_normalized": float(row[agent_index, 0]),
+                        "allocated_p_normalized": float(row[agent_index, 1]),
+                        "used_c_normalized": float(row[agent_index, 2]),
+                        "used_p_normalized": float(row[agent_index, 3]),
+                        "allocated_to_used_c_ratio": float(row[agent_index, 4]),
+                        "allocated_to_used_p_ratio": float(row[agent_index, 5]),
+                        "limiting_resource": labels[int(row[agent_index, 17])],
+                        "acquired_c": float(row[agent_index, 7]),
+                        "acquired_p": float(row[agent_index, 8]),
+                        "maintenance_c_used": float(row[agent_index, 9]),
+                        "maintenance_p_used": float(row[agent_index, 10]),
+                        "maintenance_fraction_of_prior_acquired_c": float(row[agent_index, 10]),
+                        "maintenance_fraction_of_prior_acquired_p": float(row[agent_index, 11]),
+                        "trade_out_raw": float(row[agent_index, 12]),
+                        "trade_in_raw": float(row[agent_index, 13]),
+                        "trade_out_gamma_normalized": float(row[agent_index, 14]),
+                        "trade_in_recipient_gamma_normalized": float(row[agent_index, 15]),
+                        "signed_pressure": float(row[agent_index, 16]),
+                        "no_realized_growth": bool(float(row[agent_index, 2] + row[agent_index, 3]) <= 1e-12),
+                    }
+                    for agent, agent_index in ((PLANT, 0), (FUNGUS, 1))
+                },
+            })
+        result["limitation_trace"] = trace
+        result["limitation_trace_definition"] = {
+            "normalized_units": "g biomass-equivalent resource = allocated_or_used_resource / gamma",
+            "limiting_resource": "lower gamma-normalized growth allocation; none if both are zero; balanced if equal",
+            "ratio": "gamma-normalized allocated growth resource / gamma-normalized used growth resource",
+            "acquired_resources": {
+                "plant_c": "photosynthetic carbon fixation",
+                "plant_p": "direct soil-P uptake plus fungal P transfer",
+                "fungus_c": "plant C transfer",
+                "fungus_p": "direct soil-P uptake",
+            },
+            "maintenance_fraction": "maintenance resource used / corresponding resource acquired in the prior recorded step; the first step has no prior acquisition and is zero",
+            "signed_pressure": "P-equivalent allocation minus C-equivalent allocation (positive C-limited, negative P-limited); no_realized_growth is a separate mask",
+            "trade": "raw outgoing and incoming resource amounts plus outgoing/recipient gamma-normalized equivalents",
+        }
+    return result
 
 
 def run_static_controls(manifest: dict[str, Any]) -> dict[str, Any]:
