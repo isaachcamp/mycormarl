@@ -1,0 +1,47 @@
+{
+  "format": "mycormarl-resource-pressure-experiment-manifest",
+  "format_version": 1,
+  "sampling": "paired_low_p_gamma",
+  "design_seed": 4047,
+  "base_sample_count": 50,
+  "sample_count": 250,
+  "retain_count": 12,
+  "horizon": {
+    "days": 120.0,
+    "timestep_days": 0.025
+  },
+  "model": {
+    "environment": {
+      "soil_radius_cm": 20.0,
+      "soil_depth_cm": 60.0,
+      "radial_interval_cm": 0.1,
+      "depth_interval_cm": 0.1
+    }
+  },
+  "static_policy": {
+    "plant": [0.1, 1.0, 0.0, 0.0],
+    "fungus": [0.5, 1.0, 0.0, 0.0]
+  },
+  "record_limitation_trace": true,
+  "record_resource_accounting": true,
+  "write_combined_bundle": false,
+  "design_notes": {
+    "purpose": "Self-contained paired experiment testing whether fungal phosphate construction cost creates a fungal P-limitation regime under low initial P and thereby controls plant biomass",
+    "sampling": "50 matched continuous Latin-hypercube base conditions crossed with five fungal gamma_P values",
+    "fungus_gamma_p_levels": [2.0, 1.5, 1.0, 0.75, 0.5],
+    "initial_solution_p_micromolar": [0.1, 0.3],
+    "kappa_p": "fixed at zero for plant and fungus",
+    "continuous_ranges": {
+      "plant_kappa_c": "0.01x through 0.693145x of the default plant kappa_C, sampled logarithmically",
+      "fungus_kappa_c": "0.01x through 0.693145x of the default fungus kappa_C, sampled logarithmically",
+      "fungus_initial_biomass": "1x through 100x of the default initial AMF biomass, sampled logarithmically",
+      "initial_solution_p_micromolar": "continuous range 0.1–0.3",
+      "plant_trade": "continuous range 0.05–0.2",
+      "fungus_trade": "continuous range 0.5–0.8"
+    },
+    "paired_factors": "plant/fungus kappa_C, initial AMF biomass, both trade fractions, and initial P are identical within each five-run block; only fungal gamma_P changes",
+    "common_random_numbers": "same deterministic seed is used across matched gamma_P values",
+    "interpretation": "A fungal P-limitation regime is identified from the fraction of realised-growth timesteps labelled phosphate-limited in the fungal limitation trace; plant biomass, fungal biomass, and fungal P export are supporting outcomes",
+    "outputs": "Checkpoint JSON files contain limitation traces and cumulative C/P accounting; no combined result bundle is written"
+  }
+}

@@ -12,6 +12,7 @@ wheels/
 outputs/
 plots/
 lessons/
+docs/analysis/
 
 .vscode/
 
