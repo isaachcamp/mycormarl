@@ -1,0 +1,41 @@
+{
+  "format": "mycormarl-resource-pressure-experiment-manifest",
+  "format_version": 1,
+  "sampling": "continuous_lhs",
+  "design_seed": 3047,
+  "sample_count": 360,
+  "retain_count": 12,
+  "write_combined_bundle": false,
+  "horizon": {
+    "days": 80.0,
+    "timestep_days": 0.05
+  },
+  "model": {
+    "environment": {
+      "soil_radius_cm": 40.0,
+      "soil_depth_cm": 60.0,
+      "radial_interval_cm": 0.2,
+      "depth_interval_cm": 0.2
+    }
+  },
+  "static_policy": {
+    "plant": [0.1, 1.0, 0.0, 0.0],
+    "fungus": [0.5, 1.0, 0.0, 0.0]
+  },
+  "record_limitation_trace": true,
+  "record_resource_accounting": true,
+  "design_notes": {
+    "sampling": "canonical 360-condition continuous Latin hypercube for issue #47; it retains the seven factor ranges and seed from the prior 300-condition screen, with an updated spatial and temporal protocol",
+    "kappa_p": "fixed at zero for plant and fungus",
+    "continuous_ranges": {
+      "plant_kappa_c": "0.01x through the former 0.693145x level, logarithmic",
+      "fungus_kappa_c": "0.01x through the former 0.693145x level, logarithmic",
+      "fungus_initial_biomass": "1x through 100x, logarithmic",
+      "initial_solution_p_micromolar": [0.1, 1.0],
+      "plant_trade": [0.05, 0.2],
+      "fungus_trade": [0.5, 0.8],
+      "fungus_gamma_p": [0.5, 2.0]
+    },
+    "accounting": "cumulative per-agent C/P acquisition, maintenance, growth, trade-in, and trade-out; final organism and soil pools remain separate"
+  }
+}
