@@ -17,17 +17,17 @@ in isolation.
   root curves imply whole-plant RGRs of approximately `0.066`, `0.065`, `0.060`,
   and `0.042 d^-1` in successive 20-day windows from 40 to 120 DAS
   ([Cecilio Filho & Peixoto 2013](https://repositorio.unesp.br/bitstream/11449/75622/1/2-s2.0-84878476833.pdf)).
-- MycorMARL's sustained carbon-only ceiling is `0.0199 d^-1`, and its idealized
-  upper-bound biomass after spending the initial free pools and growing for
-  120 days is only about **0.22 g**. That is about two orders of magnitude below
-  the Forto endpoint.
+- With the runtime-faithful carbon and maintenance timing, `kleaf=0.50` has a
+  sustained carbon-only ceiling of `0.0448 d^-1` and reaches only **2.15 g** at
+  120 days in the high-P all-growth control. The corrected static calibration
+  selects `kleaf=0.68`: it reaches **31.38 g** without touching the `50 g` guard.
 - The active `amass = 0.05 g C g^-1 leaf DM reference-day^-1` remains a
   defensible rounded midpoint for the explicitly stated 16-hour,
   450-micromol-PAR reference day. The underlying carrot measurements were made
   at 20 degrees C and 350 micromol CO2 mol^-1, and the plants were raised under
   a 16-hour photoperiod at `450 +/- 20 micromol PAR m^-2 s^-1`
   ([Kyei-Boahen et al. 2003](https://ps.ueb.cas.cz/pdfs/phs/2003/02/30.pdf)).
-- The larger inconsistency is `kleaf = 0.30`. Forto's fitted curves imply leaf
+- The historical larger inconsistency was `kleaf = 0.30`. Forto's fitted curves imply leaf
   mass fractions declining from about **0.81 at 40 DAS** to **0.23 at 120 DAS**.
   Thus `0.30` is representative of a mature plant, not the early and middle
   growth phases. Independent glasshouse carrot measurements also show that
@@ -46,12 +46,10 @@ in isolation.
   is more defensible than `35.05 g`: it leaves headroom above the fitted Forto
   trajectory, but remains an engineering choice that runs should not contact.
 
-The most defensible immediate qualification is therefore to vary the effective
-whole-plant fixation term `kleaf * amass`, prioritising a higher or dynamic
-`kleaf` over an unsupported increase in leaf-level `amass`. A fixed `kleaf`
-near `0.60` is a useful **interim sensitivity**, not a final ontogenetic model:
-with the current `amass`, maintenance, and structural-C coefficient it gives a
-carbon-only ceiling of about `0.057 d^-1`, close to the Forto 40--120 DAS mean.
+The calibration therefore varies the effective whole-plant fixation term
+`kleaf * amass`, prioritising a higher or dynamic `kleaf` over an unsupported
+increase in leaf-level `amass`. The selected fixed `kleaf=0.68` is a static
+calibration, not a final ontogenetic model.
 
 ## 1. What the model currently implies
 
@@ -64,18 +62,17 @@ C_fixed = biomass * kleaf * amass * dt
 and pays standing maintenance before allocation. With the active defaults,
 
 ```text
-kleaf * amass = 0.30 * 0.05 = 0.015 g C g^-1 plant DM d^-1
-net C before growth = 0.015 - 0.007 = 0.008 g C g^-1 DM d^-1
-maximum sustained RGR = 0.008 / 0.402 = 0.0199 d^-1
+kleaf * amass = 0.68 * 0.05 = 0.034 g C g^-1 plant DM d^-1
+net C before growth = 0.034 - 0.007 = 0.027 g C g^-1 DM d^-1
+maximum sustained RGR = 0.027 / 0.402 = 0.0672 d^-1
 ```
 
 This is an upper bound before reproduction or fungal transfer, and assumes P
-is sufficient. Each initial free pool contains one structural-biomass
-equivalent, so an idealized growth-only plant can first double from `0.01` to
-`0.02 g`, then reach
+is sufficient. Runtime reset pools fund one maintenance timestep rather than a
+structural-biomass equivalent. The corrected high-P, all-growth control reaches
 
 ```text
-0.02 * exp(0.0199 * 120) = 0.218 g DM.
+31.38 g DM at day 120.
 ```
 
 The calculation follows the runtime traits in
@@ -174,7 +171,7 @@ condition.
 
 ## 4. The fixed leaf fraction is the larger mismatch
 
-The active `kleaf = 0.30` produces the same whole-plant fixation term at every
+The active `kleaf = 0.68` produces the same whole-plant fixation term at every
 age. Forto's fitted leaf mass fraction falls from `0.81` at 40 DAS to `0.23` at
 120 DAS. With `amass = 0.05`, those fractions imply the following unshaded
 whole-plant apparent-gross inputs:
@@ -187,10 +184,9 @@ whole-plant apparent-gross inputs:
 | 100 | 0.362 | 0.0181 |
 | 120 | 0.234 | 0.0117 |
 
-The current constant is `0.015`. It therefore strongly understates the early
-and middle source mass, approximates the mature crop, and slightly overstates
-the late fitted Forto value. This pattern can explain both the very low
-cumulative model upper bound and why simply increasing `amass` would be risky:
+The current constant is `0.034`. It is within the early fitted source mass but
+overstates the mature crop, which is why a fixed calibration cannot reproduce
+the observed late deceleration and why simply increasing `amass` would be risky:
 a larger constant `amass` corrects early growth by maintaining excessive late
 fixation, preserving exponential growth where observed crop growth decelerates.
 Because harvested foliar dry matter includes support tissue, these products
@@ -299,13 +295,13 @@ threshold. A practical hierarchy is:
    ceiling is low.** Preserve it as the 450-PAR, 16-hour reference-day value.
    Add `0.06` and `0.07` as irradiance sensitivities if the intended reference
    day is closer to 700--1000 PAR.
-2. **Use `kleaf = 0.50` as the provisional static reference calibration.** The
-   completed plant-only, high-P sweep retained `0.30`, `0.45`, `0.475`, `0.50`,
-   `0.525`, `0.55`, `0.575`, and `0.60`. `0.50` reached `34.60 g DM` at day
-   120 without contacting the `50 g` guard; `0.475` reached `23.84 g`, just
-   below the favourable `25--35 g` range, while `0.525` and higher contacted
-   the guard. This is a static calibration reference, not an ontogenetic claim.
-   The runtime default remains `0.30` until deliberately migrated.
+2. **Use `kleaf = 0.68` as the static reference calibration.** The corrected
+   runtime-faithful plant-only, high-P sweep retained `0.30`, `0.45`, `0.50`,
+   `0.60`, `0.65`, `0.675`, `0.68`, and `0.70`. `0.68` reached `31.38 g DM`
+   at day 120, inside the favourable `25--35 g` range and below the `50 g`
+   guard; `0.65` reached `20.07 g`, while `0.70` reached `42.27 g`. This is a
+   static calibration reference, not an ontogenetic claim. The runtime default
+   is deliberately migrated to `0.68`.
 3. **Prefer an ontogenetic leaf-mass or leaf-area state before final inference.**
    A constant `kleaf` cannot reproduce both rapid early growth and late
    deceleration without conflating partitioning with leaf physiology.

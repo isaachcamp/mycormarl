@@ -31,7 +31,7 @@ def _summary(result: dict) -> str:
         rgr = [checkpoints[str(day)]["windowed_rgr_per_day"] for day in (60, 80, 100, 120)]
         mean_rgr = sum(rgr) / len(rgr)
         lines.append(
-            f"| {case['kleaf']:.2f} | {case['biomass_g_dm']['120']:.6g} | "
+            f"| {case['kleaf']:.3g} | {case['biomass_g_dm']['120']:.6g} | "
             f"{mean_rgr:.6g} | {case['realized_limitation']} | {case['status']} |"
         )
     lines.extend(
@@ -61,7 +61,7 @@ def _figure(result: dict, path: Path) -> None:
             case["checkpoints"][str(day)]["windowed_rgr_per_day"]
             for day in (60, 80, 100, 120)
         ]
-        label = f"static kleaf={case['kleaf']:.2f}"
+        label = f"static kleaf={case['kleaf']:.3g}"
         if case["cap_contact"]:
             label += " (cap contact)"
         axis.plot(
@@ -89,7 +89,7 @@ def main() -> None:
         "--kleaf",
         type=float,
         nargs="+",
-        default=(0.30, 0.45, 0.50, 0.60),
+        default=(0.30, 0.45, 0.50, 0.60, 0.65, 0.675, 0.68, 0.70),
         help="candidate fixed kleaf values; defaults to the reference sensitivities",
     )
     args = parser.parse_args()

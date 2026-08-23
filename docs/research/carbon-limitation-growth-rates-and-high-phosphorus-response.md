@@ -220,7 +220,7 @@ A subsequent species-matched audit shows that this ceiling is nevertheless
 too low for a favourable 120-day cultivated-carrot scenario. Fitted `Forto`
 whole-plant RGR declined from approximately `0.066` to `0.042 d^-1` across
 successive 20-day windows between 40 and 120 DAS, reaching `23.26 g` measured
-shoot-plus-storage-root DM. The mismatch is associated primarily with the
+shoot-plus-storage-root DM. The historical mismatch was associated primarily with the
 fixed `kleaf=0.30`, not evidence that the leaf-level `amass=0.05` should be
 doubled. See
 [`carrot-growth-biomass-cap-and-carbon-fixation.md`](carrot-growth-biomass-cap-and-carbon-fixation.md).

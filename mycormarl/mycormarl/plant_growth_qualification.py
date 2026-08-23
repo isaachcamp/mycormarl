@@ -22,8 +22,10 @@ def _validate_kleaf_values(values: Iterable[float]) -> tuple[float, ...]:
 
 def _case(kleaf: float, *, amass: float, dt: float, cap: float) -> dict[str, Any]:
     biomass = 0.01
-    free_c = 0.00402
-    free_p = 0.0192
+    # Match BaseMycorMarl.reset: the initial free pools fund one maintenance
+    # payment, rather than an additional biomass equivalent.
+    free_c = 0.007 * biomass * dt
+    free_p = 0.001 * biomass * dt
     initial_c = free_c
     initial_p = free_p
     checkpoints: dict[str, dict[str, float]] = {}
@@ -34,24 +36,19 @@ def _case(kleaf: float, *, amass: float, dt: float, cap: float) -> dict[str, Any
     accounting_by_day: dict[int, tuple[float, float, float, float]] = {}
 
     for step in range(1, round(120 / dt) + 1):
-        maintenance = min(free_c, 0.007 * biomass * dt)
+        required_c = 0.007 * biomass * dt
+        required_p = 0.001 * biomass * dt
+        maintenance = min(free_c, required_c)
+        p_maintenance = min(free_p, required_p)
+        c_deficit = required_c - maintenance
+        p_deficit = required_p - p_maintenance
+        biomass -= min(biomass, max(c_deficit / 0.402, p_deficit / 1.92))
         free_c -= maintenance
-        maintenance_c += maintenance
-        gross = biomass * kleaf * amass * dt
-        free_c += gross
-        gross_c += gross
-
-        # High P is represented as a non-limiting external supply. Supply only
-        # the P needed by the carbon-limited structural increment so the report
-        # can distinguish realised C limitation from the analytical bound.
-        p_maintenance = min(free_p, 0.001 * biomass * dt)
         free_p -= p_maintenance
-        carbon_limited_growth = max(0.0, free_c / 0.402)
-        p_needed = carbon_limited_growth * 1.92
-        supplied_p = max(0.0, p_needed - free_p)
-        free_p += supplied_p
-        p_uptake += supplied_p
+        maintenance_c += maintenance
+
         growth = min(free_c / 0.402, free_p / 1.92)
+        growth = min(growth, max(cap - biomass, 0.0))
         free_c -= growth * 0.402
         free_p -= growth * 1.92
         biomass += growth
@@ -59,6 +56,22 @@ def _case(kleaf: float, *, amass: float, dt: float, cap: float) -> dict[str, Any
         if biomass >= cap:
             cap_contact = True
             biomass = cap
+
+        # Runtime adds fixed C and soil uptake after allocation. The high-P
+        # control preloads exactly enough P for the following transition's
+        # maintenance and carbon-limited growth allocation.
+        gross = biomass * kleaf * amass * dt
+        free_c += gross
+        gross_c += gross
+        next_required_c = 0.007 * biomass * dt
+        next_required_p = 0.001 * biomass * dt
+        next_growth_c = max(free_c - next_required_c, 0.0)
+        supplied_p = max(
+            0.0,
+            next_required_p + next_growth_c * 1.92 / 0.402 - free_p,
+        )
+        free_p += supplied_p
+        p_uptake += supplied_p
         day = round(step * dt)
         if day in _CHECKPOINT_DAYS and abs(step * dt - day) < 1e-9:
             biomass_by_day[day] = biomass
@@ -108,7 +121,7 @@ def _case(kleaf: float, *, amass: float, dt: float, cap: float) -> dict[str, Any
 
 def run_plant_growth_qualification(
     *,
-    kleaf_values: Iterable[float] = (0.30, 0.45, 0.50, 0.60),
+    kleaf_values: Iterable[float] = (0.30, 0.45, 0.50, 0.60, 0.65, 0.675, 0.68, 0.70),
     amass: float = 0.05,
     timestep_days: float = 0.025,
     biomass_cap: float = 50.0,
@@ -119,7 +132,8 @@ def run_plant_growth_qualification(
         raise ValueError("amass and timestep_days must be finite and positive")
     if biomass_cap <= 0 or not math.isfinite(biomass_cap):
         raise ValueError("biomass_cap must be finite and positive")
-    net_fixation = 0.30 * 0.05 - 0.007
+    selected_kleaf = 0.68
+    net_fixation = selected_kleaf * amass - 0.007
     cases = {
         f"kleaf_{value:.3f}": _case(
             value, amass=amass, dt=timestep_days, cap=biomass_cap
@@ -128,16 +142,18 @@ def run_plant_growth_qualification(
     }
     return {
         "stage": "plant-growth-qualification",
-        "selected_kleaf": 0.50,
+        "selected_kleaf": selected_kleaf,
         "policy": {"consumer_mode": "plant-only", "trade": 0.0, "growth": 1.0, "reproduction": 0.0, "reserve": 0.0},
         "horizon_days": 120,
         "timestep_days": timestep_days,
         "cases": cases,
         "analytical_carbon_only": {
-            "effective_fixation_g_c_per_g_dm_day": 0.015,
+            "effective_fixation_g_c_per_g_dm_day": selected_kleaf * amass,
             "net_carbon_rate_g_c_per_g_dm_day": net_fixation,
             "sustained_rgr_per_day": net_fixation / 0.402,
-            "upper_bound_endpoint_g_dm": 0.02 * math.exp((net_fixation / 0.402) * 120),
+            "upper_bound_endpoint_g_dm": 0.01 * (
+                1.0 + (net_fixation / 0.402) * timestep_days
+            ) ** (round(120 / timestep_days) - 1),
         },
         "reference": {
             "forto_endpoint_g_dm": 23.26,

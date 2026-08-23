@@ -90,9 +90,9 @@ fractions, then converting dry biomass with `gamma_c = 0.402`, gives
 from the apparent-gross `amass` input, all fitted standing-biomass maintenance
 is assigned to `kappa_c` rather than partitioned between the two parameters.
 
-At the accepted `amass = 0.05` and `kleaf = 0.30`, carbon supply is `0.015 g C
+At the accepted `amass = 0.05` and `kleaf = 0.68`, carbon supply is `0.034 g C
 g⁻¹ whole-plant DM d⁻¹`. Subtracting `kappa_c = 0.007` leaves
-`0.008 g C g⁻¹ whole-plant DM d⁻¹` before growth and fungal trade.
+`0.027 g C g⁻¹ whole-plant DM d⁻¹` before growth and fungal trade.
 
 ## Executive findings
 
