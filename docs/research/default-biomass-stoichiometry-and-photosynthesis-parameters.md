@@ -8,8 +8,9 @@ changes are implemented in the corresponding trait definitions.
 
 **Supersession (20 August 2026):** the runtime defaults represent an
 early-established resource-exchange fixture with plant biomass `0.01 g` and
-living external fungal biomass `0.0001 g`. Unspecified free pools fund exactly
-one configured next-step maintenance payment (`kappa × biomass × dt`); numeric
+living external fungal biomass `0.001 g`. Default P loss is disabled
+(`kappa_p=0`), so unspecified default free-P pools are zero; unspecified free-C
+pools fund exactly one configured next-step maintenance payment (`kappa_c × biomass × dt`); numeric
 pool values remain explicit provenance, qualification, or sensitivity
 overrides. The propagule and one-spore values documented below remain
 provenance and sensitivity cases, not active defaults.
@@ -108,7 +109,7 @@ g⁻¹ whole-plant DM d⁻¹`. Subtracting `kappa_c = 0.007` leaves
 | Fungal initial biomass | No direct numerical *R. irregularis* dry mass per spore was recovered. The strongest fallback is a counted-and-dried five-species AMF calibration, `M = 0.4458e-5 d^2.5372`, where `M` is µg dry mass spore⁻¹ and `d` is mean diameter in µm ([Sieverding et al. 1989](https://doi.org/10.1016/0038-0717(89)90013-8)). Applying it to the reported *R. irregularis* diameter limits gives **0.214–1.885 µg spore⁻¹**. | **Selected: `7.97e-7 g`**, the regression evaluated at the 117.5-µm range midpoint. This is an empirical cross-species estimate, not a measured *R. irregularis* mean. |
 | Plant `amass` | Carrot net light-response curves plus their fitted respiration intercepts give an apparent-gross **7.79–11.17 µmol CO₂ m⁻² s⁻¹** at the study's 450 µmol m⁻² s⁻¹ irradiance and 16-h photoperiod ([Kyei-Boahen et al. 2003](https://ps.ueb.cas.cz/pdfs/phs/2003/02/30.pdf)). Independent carrot accessions had SLA **66–94 cm² g⁻¹ leaf DM** ([Acosta-Motos et al. 2021](https://doi.org/10.3390/agronomy11122460)). | **Selected: `0.05 g C g⁻¹ leaf DM d⁻¹`**, the rounded midpoint of the `0.036–0.073` apparent-gross reference-day range. This is not true biochemical gross photosynthesis. |
 | Plant `kappa_c` | A carrot growth model fitted `q_s.maint = 0.021 d⁻¹` and `q_r.maint = 0.015 d⁻¹` at 20 °C, with `Q10 = 2` ([Reid 2019](https://doi.org/10.1080/01140671.2019.1588134)). A full-day, 20 °C whole-plant conversion is `0.00694 g C g⁻¹ DM d⁻¹`. | **Selected: `0.007 g C g⁻¹ whole-plant DM d⁻¹`**, charging all fitted standing-biomass maintenance separately from apparent-gross carbon input. |
-| Plant `kappa_p` | Carrot time courses show continued P accumulation and redistribution to the storage root, while no primary carrot study recovered a sustained irreversible P-loss rate ([Fernández-Pérez et al. 2023](https://doi.org/10.17584/rcch.2023v17i3.16508); [Cecílio Filho et al. 2013](https://acervodigital.unesp.br/handle/11449/75622)). | **Selected: `0.001 mg P g⁻¹ whole-plant DM d⁻¹`** as a small positive abstraction for herbivory, leakage, and unrecovered turnover—not measured carrot maintenance. Sensitivity: `0`, `0.001`, `0.002`; exploratory high-turnover case `0.005`. |
+| Plant `kappa_p` | Carrot time courses show continued P accumulation and redistribution to the storage root, while no primary carrot study recovered a sustained irreversible P-loss rate ([Fernández-Pérez et al. 2023](https://doi.org/10.17584/rcch.2023v17i3.16508); [Cecílio Filho et al. 2013](https://acervodigital.unesp.br/handle/11449/75622)). | **Selected: `0 mg P g⁻¹ whole-plant DM d⁻¹`** as the conservation default. Positive `0.001` and `0.002` values remain explicit loss sensitivities; `0.005` is exploratory. |
 
 ## 1. Preserve the repository contracts
 

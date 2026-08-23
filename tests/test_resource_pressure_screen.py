@@ -80,7 +80,7 @@ def test_factorial_runner_applies_focal_and_fixed_reference_controls(monkeypatch
     assert captured["model"]["species"]["fungus"] == {
         "kappa_c": pytest.approx(0.0015),
         "kappa_p": 0.0,
-        "initial_biomass": pytest.approx(0.001),
+        "initial_biomass": pytest.approx(0.01),
         "gamma_p": 0.5,
     }
 
@@ -122,7 +122,7 @@ def test_factorial_runner_uses_declared_manifest_levels_and_reference_controls(m
     assert {entry["factors"]["plant_kappa_c"] for entry in result["entries"]} == {0.3}
     assert {entry["factors"]["fungus_gamma_p"] for entry in result["entries"]} == {1.2}
     assert [entry["traits"]["fungus"]["initial_biomass"] for entry in result["entries"]] == [
-        pytest.approx(0.0002), pytest.approx(0.0002),
+        pytest.approx(0.002), pytest.approx(0.002),
     ]
 
 

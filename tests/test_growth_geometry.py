@@ -37,7 +37,7 @@ def test_accepted_growth_geometry_trait_defaults():
     assert plant.kleaf == pytest.approx(0.68)
     assert plant.amass == pytest.approx(0.05)
     assert plant.kappa_c == pytest.approx(0.007)
-    assert plant.kappa_p == pytest.approx(0.001)
+    assert plant.kappa_p == pytest.approx(0.0)
     assert plant.kleaf * plant.amass - plant.kappa_c == pytest.approx(0.027)
     assert plant.kfroot == pytest.approx(0.18)
     assert plant.specific_root_length == pytest.approx(25_434.3)
@@ -50,8 +50,8 @@ def test_accepted_growth_geometry_trait_defaults():
     assert fungus.gamma_c == pytest.approx(0.5)
     assert fungus.gamma_p == pytest.approx(1.3)
     assert fungus.kappa_c == pytest.approx(0.015)
-    assert fungus.kappa_p == pytest.approx(0.001)
-    assert fungus.initial_biomass == pytest.approx(0.0001)
+    assert fungus.kappa_p == pytest.approx(0.0)
+    assert fungus.initial_biomass == pytest.approx(0.001)
     assert fungus.initial_c_pool is None
     assert fungus.initial_p_pool is None
     assert fungus.hyphal_radius == pytest.approx(5e-4)
@@ -92,8 +92,8 @@ def test_established_fungal_fixture_maps_to_external_hyphae():
         traits.saturation_density,
     )
 
-    assert length == pytest.approx(551.185974, rel=1e-6)
-    assert radius == pytest.approx(0.5086314, rel=1e-6)
+    assert length == pytest.approx(5511.859863, rel=1e-6)
+    assert radius == pytest.approx(1.0958132, rel=1e-6)
 
 
 def test_fungal_biomass_for_colony_radius_inverts_geometry_pipeline():

@@ -20,13 +20,13 @@ class FungusTraits:
     override.
     """
 
-    initial_biomass: float = 0.0001
+    initial_biomass: float = 0.001
     initial_c_pool: float | None = None
     initial_p_pool: float | None = None
     gamma_c: float = 0.5
     gamma_p: float = 1.3
     kappa_c: float = 0.015
-    kappa_p: float = 0.001
+    kappa_p: float = 0.0
     death_fraction: float = 0.05
     hyphal_radius: float = 5e-4
     hyphal_tissue_carbon_density: float = 0.1155

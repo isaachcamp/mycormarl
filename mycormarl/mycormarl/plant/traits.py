@@ -43,7 +43,7 @@ class PlantTraits:
     gamma_c: float = 0.402
     gamma_p: float = 1.92
     kappa_c: float = 0.007
-    kappa_p: float = 0.001
+    kappa_p: float = 0.0
     death_fraction: float = 0.20
     biomass_cap: float = 50.0
     biomass_observation_reference: float = 50.0

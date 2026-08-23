@@ -194,10 +194,11 @@ destinations.
 
 ## Parameter-register disposition
 
-The fungal defaults now use `kappa_p = 0.001`, matching the plant's explicit
-small-loss assumption, and `kappa_c = 0.015`, the transferred AM-ERM
-respiration reference. Neither parameter should be presented as a direct
-*R. irregularis* maintenance measurement.
+The fungal default now uses `kappa_p = 0` as the conservation-preserving
+baseline; positive values remain explicit sensitivity cases. Its
+`kappa_c = 0.015` is the transferred AM-ERM respiration reference. Neither
+parameter should be presented as a direct *R. irregularis* maintenance
+measurement.
 
 ## Primary sources
 
