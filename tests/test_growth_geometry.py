@@ -48,7 +48,7 @@ def test_accepted_growth_geometry_trait_defaults():
     assert plant.biomass_observation_reference == pytest.approx(50.0)
 
     assert fungus.gamma_c == pytest.approx(0.5)
-    assert fungus.gamma_p == pytest.approx(2.0)
+    assert fungus.gamma_p == pytest.approx(1.3)
     assert fungus.kappa_c == pytest.approx(0.015)
     assert fungus.kappa_p == pytest.approx(0.001)
     assert fungus.initial_biomass == pytest.approx(0.0001)

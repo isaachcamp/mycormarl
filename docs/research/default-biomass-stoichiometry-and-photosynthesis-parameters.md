@@ -16,24 +16,28 @@ provenance and sensitivity cases, not active defaults.
 
 ## Accepted decisions
 
-### Fungal `gamma_p`: use the ordinary spore value
+### Fungal `gamma_p`: use the low-P spore value
 
-Use **`gamma_p = 2 mg P g⁻¹ dry biomass`** as the provisional fungal
-default. Olsson et al. describe approximately `2,000 µg P g⁻¹`
-(`2 mg P g⁻¹`) as an ordinary concentration inside *Glomus intraradices*
-spores. The isolate lineage was subsequently called *G. irregulare* and is now
+Use **`gamma_p = 1.3 mg P g⁻¹ dry biomass`** as the evidence-led fungal
+default. Low-P spores of *Glomus intraradices* contained `1.3 ± 0.35 mg P g⁻¹`.
+The isolate lineage was subsequently called *G. irregulare* and is now
 *Rhizophagus irregularis* ([Olsson et al. 2008](https://doi.org/10.1128/AEM.00376-08)).
-The value is therefore an approximate spore P-content measurement, not a direct
-measurement of whole-mycelium structural stoichiometry or maintenance
-expenditure.
+The value is a low-P spore P-content proxy, not a direct measurement of
+whole-extraradical-mycelium structural stoichiometry or maintenance expenditure.
 
-The selection uses the paper's ordinary spore-level concentration rather than
-the lower `1.3 ± 0.35 mg P g⁻¹` treatment mean. In the current model,
+The selection uses the directly measured low-P treatment mean. In the current model,
 `gamma_p` is the structural P cost used for growth and for converting an unmet
 maintenance-P deficit into lost biomass. It does **not** set maintenance
 demand; that rate is `kappa_p`. Consequently, lowering `gamma_p` reduces the P
 cost of growth but increases the biomass lost for a given unmet P-maintenance
 deficit.
+
+Spores should not be described as generally more P- or nutrient-dense than
+extraradical mycelium. Spores are storage and survival structures, and their P
+content was P-plastic; however, the same study measured `2.4–9.6 mg P g⁻¹` in
+four selected young-hypha regions. Those observations do not provide a matched
+whole-extraradical-mycelium comparison and do not establish a universal
+spore-versus-hypha concentration ordering.
 
 ### Fungal saturation density: use the lower observed upper-profile estimate
 
@@ -98,7 +102,7 @@ g⁻¹ whole-plant DM d⁻¹`. Subtracting `kappa_c = 0.007` leaves
 
 | Model quantity | Closest primary evidence | Recommendation for planning |
 |---|---|---|
-| Fungal `gamma_p` | *Glomus intraradices* (the isolate was subsequently called *G. irregulare*, now *Rhizophagus irregularis*) spores contained **1.3 ± 0.35 mg P g⁻¹** under low P and **8.0 ± 1.6 mg P g⁻¹** under high P; four selected young-hypha regions contained **2.4–9.6 mg P g⁻¹** ([Olsson et al. 2008](https://doi.org/10.1128/AEM.00376-08)). | **Selected provisionally: `2 mg P g⁻¹`**, the paper's approximate ordinary spore concentration. It is not an invariant whole-fungus stoichiometry or a direct maintenance-rate measurement. |
+| Fungal `gamma_p` | *Glomus intraradices* (the isolate was subsequently called *G. irregulare*, now *Rhizophagus irregularis*) spores contained **1.3 ± 0.35 mg P g⁻¹** under low P and **8.0 ± 1.6 mg P g⁻¹** under high P; four selected young-hypha regions contained **2.4–9.6 mg P g⁻¹** ([Olsson et al. 2008](https://doi.org/10.1128/AEM.00376-08)). | **Selected: `1.3 mg P g⁻¹`**, the directly measured low-P spore mean. It is not an invariant whole-fungus stoichiometry or a direct maintenance-rate measurement; the hyphal measurements do not support claiming spores are generally P-denser than extraradical mycelium. |
 | Fungal saturation density | Jakobsen et al.'s external-hypha profiles reach approximately **20–25 m hypha cm⁻³ soil**, i.e. **2,000–2,500 cm cm⁻³**, while later mechanistic work summarizes the measurements as order `10³ cm cm⁻³` ([Jakobsen et al. 1992](https://doi.org/10.1111/j.1469-8137.1992.tb01077.x); [Schnepf & Roose 2006](https://doi.org/10.1111/j.1469-8137.2006.01771.x)). | **Selected: `2,000 cm cm⁻³`**, the lower observed upper-profile estimate. It is not a universal AMF constant. |
 | Plant initial biomass | A 40-population study found *Daucus carota* population means spanning **0.7–3.3 mg** ([Vandelook et al. 2024](https://doi.org/10.1017/S0960258524000230)). | **Selected: `0.001 g dry mass`**, a representative low-end one-milligram propagule, with one structural-biomass equivalent in each free pool. This is literature-bounded rather than a directly reported species mean. |
 | Fungal initial biomass | No direct numerical *R. irregularis* dry mass per spore was recovered. The strongest fallback is a counted-and-dried five-species AMF calibration, `M = 0.4458e-5 d^2.5372`, where `M` is µg dry mass spore⁻¹ and `d` is mean diameter in µm ([Sieverding et al. 1989](https://doi.org/10.1016/0038-0717(89)90013-8)). Applying it to the reported *R. irregularis* diameter limits gives **0.214–1.885 µg spore⁻¹**. | **Selected: `7.97e-7 g`**, the regression evaluated at the 117.5-µm range midpoint. This is an empirical cross-species estimate, not a measured *R. irregularis* mean. |
@@ -144,10 +148,10 @@ not establish fixed structural P demand. The paper itself describes about
 `2,000 µg g⁻¹` (2 mg g⁻¹) as the usual spore-level concentration
 ([Olsson et al. 2008](https://doi.org/10.1128/AEM.00376-08)).
 
-**Decision:** use `2 mg P g⁻¹`, the paper's approximate ordinary spore
-concentration, as the fixed P-content assumption. The low-P treatment mean
-(`1.3 mg P g⁻¹`) and high-P treatment mean (`8 mg P g⁻¹`) should remain
-sensitivity cases because the model treats `gamma_p` as fixed stoichiometry.
+**Decision:** use `1.3 mg P g⁻¹`, the directly measured low-P spore mean, as
+the fixed P-content assumption. The high-P treatment mean (`8 mg P g⁻¹`) and
+the lower exploratory screen values remain sensitivity cases because the model
+treats `gamma_p` as fixed stoichiometry.
 
 ## 3. Saturated external-hyphal density
 
@@ -260,8 +264,8 @@ Once a fungal mass `M_f` is chosen, pools follow without ambiguity:
 - `initial_p_pool = M_f * gamma_p` in mg P.
 
 At the accepted `M_f = 7.97e-7 g`, `gamma_c = 0.5` gives exactly
-`3.985e-7 g C`, and the selected `gamma_p = 2 mg g⁻¹` gives exactly
-`1.594e-6 mg P`.
+`3.985e-7 g C`, and the selected `gamma_p = 1.3 mg g⁻¹` gives exactly
+`1.0361e-6 mg P`.
 
 ## 5. `amass`: area-based observations versus the model's mass-based rate
 

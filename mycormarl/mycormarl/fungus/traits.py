@@ -24,7 +24,7 @@ class FungusTraits:
     initial_c_pool: float | None = None
     initial_p_pool: float | None = None
     gamma_c: float = 0.5
-    gamma_p: float = 2.0
+    gamma_p: float = 1.3
     kappa_c: float = 0.015
     kappa_p: float = 0.001
     death_fraction: float = 0.05

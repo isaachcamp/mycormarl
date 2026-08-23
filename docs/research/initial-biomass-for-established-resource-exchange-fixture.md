@@ -29,7 +29,7 @@ equivalent, the corresponding initial pools are:
 - plant C: `0.01 × 0.402 = 0.00402 g C`;
 - plant P: `0.01 × 1.92 = 0.0192 mg P`;
 - fungal C: `0.0001 × 0.5 = 0.00005 g C`;
-- fungal P: `0.0001 × 2 = 0.0002 mg P`.
+- fungal P: `0.0001 × 1.3 = 0.00013 mg P`.
 
 ## Why 10 mg is reasonable for the plant fixture
 

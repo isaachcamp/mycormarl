@@ -143,29 +143,29 @@ The relevant evidence has different dimensions:
 |---|---|---|
 | *G. intraradices* branched absorbing structures developed for an average 7 d then degenerated (Bago et al. 1998); fine absorbing hyphae lasted `5.3 +/− 0.52 d`, while runner hyphae and spores persisted and most labelled C remained after 32 d (Olsson & Johnson 2005). | A `5–7 d` **fine-structure** turnover timescale and evidence against applying it to all fungal biomass. | Whole-mycelium turnover; P mass balance; remobilisation fraction; irreversible P loss. |
 | Field AM external hyphae had mean radiocarbon ages interpreted as `5–6 d` (Staddon et al. 2003). | A broad AMF C-turnover timescale of `0.167–0.20 d^-1`. | Species-specific *R. irregularis* behaviour, P turnover, or whether label replacement is death, redistribution, or metabolic replacement. |
-| *G. intraradices* lineage spores had `1.3 +/− 0.35 mg P g^-1` under low P and `8.0 +/− 1.6 mg P g^-1` under high P; `2 mg P g^-1` is an ordinary-spore concentration used by this model as `gamma_p` (Olsson et al. 2008). | A provisional structural P stock scale. | A stock concentration is not a daily loss flux and differs strongly by P supply and structure. |
+| *G. intraradices* lineage spores had `1.3 +/− 0.35 mg P g^-1` under low P and `8.0 +/− 1.6 mg P g^-1` under high P; `1.3 mg P g^-1` is the low-P spore value used by this model as `gamma_p` (Olsson et al. 2008). | A provisional structural P stock scale. | A stock concentration is not a daily loss flux and differs strongly by P supply and structure. |
 | Isolated intraradical *Gigaspora margarita* hyphae released phosphate as poly-P declined; glucose-enhanced efflux was about `3.5 ug P g^-1 fresh hyphae h^-1` (Solaiman & Saito 2001). | Mechanistic evidence for fungal-to-host P transfer / internal poly-P hydrolysis. | Different species, fresh-mass denominator, fragmented isolated tissue, and—most decisively—the destination is P transfer, which MycorMARL already represents as trade rather than loss. |
 
-With the model's provisional `gamma_p = 2 mg P g^-1 DM`, it is useful to make
+With the model's provisional `gamma_p = 1.3 mg P g^-1 DM`, it is useful to make
 the unmeasured non-recycling fraction explicit:
 
 `kappa_p = (gamma_p / tau) * f_irreversible`.
 
 If, unrealistically, every unit of represented fungal biomass had the fine
 structure lifetime `tau = 5–7 d`, complete non-recycled loss would be
-`2/7–2/5 = 0.286–0.400 mg P g^-1 DM d^-1`. This is an **upper-envelope
+`1.3/7–1.3/5 = 0.186–0.260 mg P g^-1 DM d^-1`. This is an **upper-envelope
 scenario**, not a measurement or a recommended rate. The shared default
 `0.001` instead implies
 
-`f_irreversible = kappa_p * tau / gamma_p = 0.25–0.35%`.
+`f_irreversible = kappa_p * tau / gamma_p = 0.38–0.54%`.
 
 | Assumed irreversible fraction of the fine-structure P stock | Derived `kappa_p` (mg P g^-1 DM d^-1) |
 |---:|---:|
 | 0% | 0 |
-| 1% | 0.0029–0.0040 |
-| 5% | 0.014–0.020 |
-| 10% | 0.029–0.040 |
-| 100% | 0.286–0.400 |
+| 1% | 0.0019–0.0026 |
+| 5% | 0.0093–0.013 |
+| 10% | 0.019–0.026 |
+| 100% | 0.186–0.260 |
 
 This calculation makes the shared `0.001` interpretable as a deliberately
 small non-recycling assumption, rather than an apparent measurement. It does
