@@ -106,6 +106,7 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
     )
     initial_total = initial_p + initial_soil
     record_limitation_trace = bool(manifest.get("record_limitation_trace", False))
+    record_resource_accounting = bool(manifest.get("record_resource_accounting", False))
 
     def rollout(initial_state):
         def condition(carry):
@@ -113,7 +114,7 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
             return (steps < env.max_episode_steps) & ~current_state.terminal
 
         def advance(carry):
-            previous, steps, uptake, transfers, deaths, growth, carbon_fixed, trace, prior_acquired = carry
+            previous, steps, uptake, transfers, deaths, growth, carbon_fixed, trace, prior_acquired, accounting = carry
             _, current, _, _, info = env.step_env(
                 jax.random.PRNGKey(seed + steps + 1), previous, actions
             )
@@ -136,6 +137,31 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
                 plant_info["growth"][0], fungus_info["growth"][0]
             ])
             carbon_fixed = carbon_fixed + plant_info["carbon_fixed"][0]
+            step_accounting = jnp.zeros((2, 2, 5))
+            if record_resource_accounting:
+                # Resource axis: C=0, P=1. Destination axis is acquired,
+                # maintenance, growth, trade_in, trade_out.
+                step_accounting = step_accounting.at[:, :, 0].set(jnp.array([
+                    [plant_info["carbon_fixed"][0], plant_info["direct_p_uptake_mg"][0] + plant_info["trade_in"][0]],
+                    [fungus_info["trade_in"][0], fungus_info["direct_p_uptake_mg"][0]],
+                ]))
+                step_accounting = step_accounting.at[:, :, 1].set(jnp.array([
+                    [plant_info["maint_c_used"][0], plant_info["maint_p_used"][0]],
+                    [fungus_info["maint_c_used"][0], fungus_info["maint_p_used"][0]],
+                ]))
+                step_accounting = step_accounting.at[:, :, 2].set(jnp.array([
+                    [plant_info["growth_c_used"][0], plant_info["growth_p_used"][0]],
+                    [fungus_info["growth_c_used"][0], fungus_info["growth_p_used"][0]],
+                ]))
+                step_accounting = step_accounting.at[:, :, 3].set(jnp.array([
+                    [0.0, plant_info["trade_in"][0]],
+                    [fungus_info["trade_in"][0], 0.0],
+                ]))
+                step_accounting = step_accounting.at[:, :, 4].set(jnp.array([
+                    [plant_info["trade_out"][0], 0.0],
+                    [0.0, fungus_info["trade_out"][0]],
+                ]))
+                accounting = accounting + step_accounting
             acquired = jnp.zeros((2, 2))
             if record_limitation_trace:
                 normalized_allocated = jnp.array([
@@ -174,7 +200,9 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
                 ])
                 c_capacity = normalized_allocated[:, 0]
                 p_capacity = normalized_allocated[:, 1]
-                signed_pressure = p_capacity - c_capacity
+                # Positive pressure denotes phosphate limitation: carbon has
+                # greater biomass-equivalent growth capacity than phosphate.
+                signed_pressure = c_capacity - p_capacity
                 limiting_code = jnp.where(
                     (c_capacity <= 1e-12) & (p_capacity <= 1e-12), 0.0,
                     jnp.where(jnp.isclose(c_capacity, p_capacity, rtol=1e-5, atol=1e-12), 3.0,
@@ -188,17 +216,18 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
                 ], axis=1)
                 trace_row = jnp.concatenate([trace_row, limiting_code[:, None]], axis=1)
                 trace = trace.at[steps].set(trace_row)
-            return current, steps + 1, uptake, transfers, deaths, growth, carbon_fixed, trace, acquired
+            return current, steps + 1, uptake, transfers, deaths, growth, carbon_fixed, trace, acquired, accounting
 
         return jax.lax.while_loop(
             condition,
             advance,
             (initial_state, jnp.array(0), jnp.zeros(2), jnp.zeros(2),
              jnp.zeros(2, dtype=jnp.int32), jnp.zeros(2), jnp.array(0.0),
-             jnp.zeros((env.max_episode_steps, 2, 18)), jnp.zeros((2, 2))),
+             jnp.zeros((env.max_episode_steps, 2, 18)), jnp.zeros((2, 2)),
+             jnp.zeros((2, 2, 5))),
         )
 
-    state, steps, uptake_values, transfer_values, death_values, growth_values, carbon_fixed, trace_values, _ = jax.jit(rollout)(state)
+    state, steps, uptake_values, transfer_values, death_values, growth_values, carbon_fixed, trace_values, _, accounting_values = jax.jit(rollout)(state)
     uptake = {PLANT: float(uptake_values[0]), FUNGUS: float(uptake_values[1])}
     transfers = {
         "plant_c_out": float(transfer_values[0]),
@@ -265,6 +294,26 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
         "p_accounting_residual": residual,
         "terminated": bool(state.terminal),
     }
+    if record_resource_accounting:
+        destinations = ("acquired", "maintenance", "growth", "trade_in", "trade_out")
+        resources = ("c", "p")
+        result["resource_accounting"] = {
+            agent: {
+                resource: {
+                    destination: float(accounting_values[index, resource_index, destination_index])
+                    for destination_index, destination in enumerate(destinations)
+                }
+                for resource_index, resource in enumerate(resources)
+            }
+            for index, agent in enumerate(_AGENTS)
+        }
+        result["resource_accounting_definition"] = {
+            "resources": "C and P amounts in the model's native units",
+            "destinations": "cumulative flows observed during each timestep; final pools are reported separately",
+            "acquired": "photosynthetic fixation or direct uptake plus incoming trade",
+            "growth": "resource consumed for realized structural biomass growth",
+            "trade_in_out": "resource transferred between agents",
+        }
     if record_limitation_trace:
         labels = ("none", "carbon", "phosphate", "balanced")
         trace = []
@@ -284,8 +333,8 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
                         "limiting_resource": labels[int(row[agent_index, 17])],
                         "acquired_c": float(row[agent_index, 7]),
                         "acquired_p": float(row[agent_index, 8]),
-                        "maintenance_c_used": float(row[agent_index, 9]),
-                        "maintenance_p_used": float(row[agent_index, 10]),
+                        "maintenance_c_used": float(row[agent_index, 8]),
+                        "maintenance_p_used": float(row[agent_index, 9]),
                         "maintenance_fraction_of_prior_acquired_c": float(row[agent_index, 10]),
                         "maintenance_fraction_of_prior_acquired_p": float(row[agent_index, 11]),
                         "trade_out_raw": float(row[agent_index, 12]),
@@ -310,7 +359,7 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
                 "fungus_p": "direct soil-P uptake",
             },
             "maintenance_fraction": "maintenance resource used / corresponding resource acquired in the prior recorded step; the first step has no prior acquisition and is zero",
-            "signed_pressure": "P-equivalent allocation minus C-equivalent allocation (positive C-limited, negative P-limited); no_realized_growth is a separate mask",
+            "signed_pressure": "C-equivalent allocation minus P-equivalent allocation (positive P-limited, negative C-limited); no_realized_growth is a separate mask",
             "trade": "raw outgoing and incoming resource amounts plus outgoing/recipient gamma-normalized equivalents",
         }
     return result
