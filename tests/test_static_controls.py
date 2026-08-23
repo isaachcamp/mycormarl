@@ -157,6 +157,9 @@ def test_static_controls_record_gamma_normalized_limitation_trace():
             assert values["maintenance_fraction_of_prior_acquired_c"] >= 0.0
             assert values["maintenance_fraction_of_prior_acquired_p"] >= 0.0
             assert "signed_pressure" in values
+            assert values["signed_pressure"] == pytest.approx(
+                values["allocated_c_normalized"] - values["allocated_p_normalized"]
+            )
             assert "trade_out_raw" in values
             assert "trade_in_raw" in values
 
