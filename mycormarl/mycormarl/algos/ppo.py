@@ -177,12 +177,15 @@ class PPOConfig:
     CLIP_EPS: float = 0.2
     ACTIVATION: str = "tanh"
     LR: float = 2.5e-4
+    PLANT_INITIAL_TRADE: float = 0.05
+    FUNGUS_INITIAL_TRADE: float = 0.75
 
 
 class ActorCritic(nn.Module):
     """Shared network architecture used by each independent actor--critic."""
 
     activation: str = "relu"
+    initial_trade: float = 0.1
 
     @nn.compact
     def __call__(self, obs: jnp.ndarray) -> Tuple[PolicyParameters, jnp.ndarray]:
@@ -196,7 +199,7 @@ class ActorCritic(nn.Module):
         trade_loc = nn.Dense(
             1,
             kernel_init=constant(0.0),
-            bias_init=constant(jnp.log(0.1 / 0.9)),
+            bias_init=constant(jnp.log(self.initial_trade / (1.0 - self.initial_trade))),
             name="trade_head",
         )(policy_features)[..., 0]
         allocation_loc = nn.Dense(
@@ -368,8 +371,14 @@ def make_train(
         # Initialize independent plant and fungus networks.  The optional
         # runner state is used by the study checkpoint seam to continue the
         # same optimizer, environment, and named-RNG state.
-        plant_policy = ActorCritic(activation=config.ACTIVATION)
-        fungus_policy = ActorCritic(activation=config.ACTIVATION)
+        plant_policy = ActorCritic(
+            activation=config.ACTIVATION,
+            initial_trade=config.PLANT_INITIAL_TRADE,
+        )
+        fungus_policy = ActorCritic(
+            activation=config.ACTIVATION,
+            initial_trade=config.FUNGUS_INITIAL_TRADE,
+        )
 
         if initial_runner_state is None:
             if random_streams is None:

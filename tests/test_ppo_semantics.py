@@ -294,7 +294,7 @@ def test_rollout_distinguishes_death_transition_from_dead_padding():
     )
     assert jnp.allclose(
         fungus_parameters["trade_head"]["bias"],
-        jnp.log(0.1 / 0.9),
+        jnp.log(0.75 / 0.25),
     )
     assert jnp.array_equal(
         fungus_parameters["trade_log_std"],

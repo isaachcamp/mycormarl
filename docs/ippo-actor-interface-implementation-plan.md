@@ -387,7 +387,9 @@ allocation_logits = [
 
 Initialise:
 
-- trade location bias to `logit(0.1)`, giving a 10% initial median;
+- trade location bias is configurable per policy. The study-training defaults
+  precondition the plant at a 0.05 trade fraction and the fungus at 0.75;
+  standalone `ActorCritic` construction retains a 0.1 compatibility default.
 - both allocation location biases to zero and use equal initial allocation
   scales, so the location-transformed action is exactly uniform and the
   centred logistic-normal distribution is exchangeable across growth,
@@ -799,7 +801,8 @@ and no actionable review finding remains.
   uptake disappear, rewards/actions become inert, and the survivor continues.
 - **Timing:** received trade, photosynthate, and uptake cannot fund allocation
   until the next environment step.
-- **Policy transform:** trade initial median is 0.1; the allocation location
+- **Policy transform:** the trade transform is sigmoid. Study training starts
+  the plant and fungus medians at 0.05 and 0.75 respectively; the allocation location
   transforms to the uniform simplex; the zero-sum contrast is orthonormal and
   permutation-symmetric with equal initial scales; latent and physical shapes
   are correct; physical actions satisfy constraints without clipping.

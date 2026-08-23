@@ -116,6 +116,18 @@ def test_actor_initialises_two_gaussian_heads_and_a_local_critic():
     assert jnp.allclose(policy.allocation_log_std, 0.0)
 
 
+def test_actor_trade_head_can_be_preconditioned_at_requested_fraction():
+    """The zero-feature trade logit maps exactly to the configured prior."""
+    observations = jnp.zeros((2, 5), dtype=jnp.float32)
+    for initial_trade in (0.05, 0.75):
+        actor_critic = ActorCritic(initial_trade=initial_trade)
+        parameters = actor_critic.init(jax.random.PRNGKey(11), observations)
+        policy, _ = actor_critic.apply(parameters, observations)
+        assert jnp.allclose(
+            jax.nn.sigmoid(policy.trade_loc), initial_trade
+        )
+
+
 def test_standard_normal_log_probability_matches_known_density():
     """The explicit latent likelihood uses the standard Gaussian density."""
     log_probability = normal_log_probability(

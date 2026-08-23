@@ -41,8 +41,8 @@
     "stopping": {
       "evaluation_window_checkpoints": 3,
       "plateau_tolerances": {
-        "plant_fitness_absolute": 0.01,
-        "fungus_fitness_absolute": 0.01,
+        "fitness_absolute_floor": 0.0001,
+        "fitness_relative": 0.2,
         "action_absolute": 0.01
       }
     }
