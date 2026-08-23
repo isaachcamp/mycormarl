@@ -42,6 +42,90 @@ _CONTINUOUS_RESOURCE_PRESSURE_RANGES = {
 }
 
 
+_FACTORIAL_RESOURCE_PRESSURE_LEVELS = {
+    "plant_kappa_c": (0.01, 0.0178, 0.0316, 0.0562, 0.1, 0.1778, 0.3162, 0.5623, 1.0),
+    "initial_solution_p_micromolar": (0.5, 0.7, 0.9, 1.1, 1.3),
+    "plant_trade": (0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1),
+}
+
+_FACTORIAL_RESOURCE_PRESSURE_FIXED_FACTORS = {
+    "plant_kappa_p": 0.0,
+    "fungus_kappa_c": 0.1,
+    "fungus_kappa_p": 0.0,
+    "fungus_initial_biomass": 10.0,
+    "fungus_trade": 0.75,
+    "fungus_gamma_p": 0.5,
+}
+
+
+def build_factorial_resource_pressure_design(
+    *,
+    factor_levels: dict[str, tuple[float, ...]] | None = None,
+    fixed_factors: dict[str, float] | None = None,
+) -> list[dict[str, Any]]:
+    """Build issue #48's deterministic plant-boundary Cartesian design."""
+    factor_levels = factor_levels or _FACTORIAL_RESOURCE_PRESSURE_LEVELS
+    fixed_factors = fixed_factors or _FACTORIAL_RESOURCE_PRESSURE_FIXED_FACTORS
+    design = []
+    for plant_kappa_c in factor_levels["plant_kappa_c"]:
+        for initial_p in factor_levels["initial_solution_p_micromolar"]:
+            for plant_trade in factor_levels["plant_trade"]:
+                design.append({
+                    "id": f"condition-{len(design) + 1:03d}",
+                    "factors": {
+                        **fixed_factors,
+                        "plant_kappa_c": plant_kappa_c,
+                        "initial_solution_p_micromolar": initial_p,
+                        "plant_trade": plant_trade,
+                    },
+                })
+    return design
+
+
+def _factorial_manifest_design(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    """Translate the public factorial manifest into executable factor values."""
+    levels = manifest.get("factor_levels", {})
+    reference = manifest.get("reference_controls", {})
+    required_levels = {
+        "plant_kappa_c_multiplier",
+        "initial_solution_p_micromolar",
+        "plant_trade",
+    }
+    required_reference = {
+        "fungus_kappa_c_multiplier",
+        "fungus_gamma_p_mg_per_g_dm",
+        "fungus_initial_biomass_multiplier",
+        "fungus_trade",
+        "plant_kappa_p_multiplier",
+        "fungus_kappa_p_multiplier",
+        "plant_initial_biomass_g",
+    }
+    missing = sorted(required_levels - levels.keys()) + sorted(required_reference - reference.keys())
+    if missing:
+        raise ValueError("factorial resource-pressure manifest missing: " + ", ".join(missing))
+    if not math.isclose(
+        float(reference["plant_initial_biomass_g"]), PlantTraits().initial_biomass
+    ):
+        raise ValueError("factorial resource-pressure experiment fixes plant initial biomass at its default")
+    return build_factorial_resource_pressure_design(
+        factor_levels={
+            "plant_kappa_c": tuple(float(value) for value in levels["plant_kappa_c_multiplier"]),
+            "initial_solution_p_micromolar": tuple(
+                float(value) for value in levels["initial_solution_p_micromolar"]
+            ),
+            "plant_trade": tuple(float(value) for value in levels["plant_trade"]),
+        },
+        fixed_factors={
+            "plant_kappa_p": float(reference["plant_kappa_p_multiplier"]),
+            "fungus_kappa_c": float(reference["fungus_kappa_c_multiplier"]),
+            "fungus_kappa_p": float(reference["fungus_kappa_p_multiplier"]),
+            "fungus_initial_biomass": float(reference["fungus_initial_biomass_multiplier"]),
+            "fungus_trade": float(reference["fungus_trade"]),
+            "fungus_gamma_p": float(reference["fungus_gamma_p_mg_per_g_dm"]),
+        },
+    )
+
+
 def build_continuous_resource_pressure_design(
     design_seed: int, sample_count: int = 360
 ) -> list[dict[str, Any]]:
@@ -69,6 +153,18 @@ def build_continuous_resource_pressure_design(
         }
         for index in range(sample_count)
     ]
+
+
+def _build_resource_pressure_design(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build the declared sampling design for a resource-pressure manifest."""
+    sampling = manifest.get("sampling")
+    if sampling == "continuous_lhs":
+        return build_continuous_resource_pressure_design(
+            manifest["design_seed"], manifest["sample_count"]
+        )
+    if sampling == "discrete_factorial":
+        return _factorial_manifest_design(manifest)
+    raise ValueError("resource-pressure experiment requires continuous_lhs or discrete_factorial sampling")
 
 
 def _resource_pressure_condition_traits(factors: dict[str, float], timestep_days: float) -> dict[str, Any]:
@@ -121,7 +217,7 @@ def run_resource_pressure_experiment(
     existing_entries: list[dict[str, Any]] | None = None,
     progress_callback: Any | None = None,
 ) -> dict[str, Any]:
-    """Run issue #47's canonical continuous resource-pressure screen.
+    """Run a manifest-driven resource-pressure screen.
 
     ``design_override`` and ``existing_entries`` are used by the writer to
     resume condition-level checkpoints without changing sampled rows.
@@ -132,14 +228,12 @@ def run_resource_pressure_experiment(
         raise ValueError("resource-pressure experiment manifest missing: " + ", ".join(missing))
     if manifest.get("format") != "mycormarl-resource-pressure-experiment-manifest":
         raise ValueError("resource-pressure experiment requires the canonical manifest format")
-    if manifest.get("sampling") != "continuous_lhs":
-        raise ValueError("resource-pressure experiment requires continuous_lhs sampling")
+    if manifest.get("sampling") not in {"continuous_lhs", "discrete_factorial"}:
+        raise ValueError("resource-pressure experiment requires continuous_lhs or discrete_factorial sampling")
     if design_override is not None:
         design = design_override
     else:
-        design = build_continuous_resource_pressure_design(
-            manifest["design_seed"], manifest["sample_count"]
-        )
+        design = _build_resource_pressure_design(manifest)
     if len(design) != manifest["sample_count"]:
         raise ValueError("resource-pressure design length does not match sample_count")
     existing_by_id = {entry["id"]: entry for entry in (existing_entries or [])}
@@ -173,9 +267,17 @@ def run_resource_pressure_experiment(
         "status": "complete" if not rejected else "completed-with-rejections",
         "manifest": manifest,
         "design": {
-            "method": "continuous Latin-hypercube",
+            "method": (
+                "continuous Latin-hypercube"
+                if manifest["sampling"] == "continuous_lhs"
+                else "discrete Cartesian factorial"
+            ),
             "seed": manifest["design_seed"], "sample_count": len(design),
-            "factor_levels": _CONTINUOUS_RESOURCE_PRESSURE_RANGES,
+            "factor_levels": (
+                _CONTINUOUS_RESOURCE_PRESSURE_RANGES
+                if manifest["sampling"] == "continuous_lhs"
+                else _FACTORIAL_RESOURCE_PRESSURE_LEVELS
+            ),
             "conditions": design,
         },
         "entries": entries,
@@ -206,19 +308,21 @@ def write_resource_pressure_experiment(manifest: dict[str, Any], output_path: Pa
         for key in ("design_seed", "sample_count", "horizon", "model", "static_policy", "record_limitation_trace", "record_resource_accounting", "sampling", "write_combined_bundle"):
             if saved_manifest.get(key) != manifest.get(key):
                 raise ValueError(f"existing resource-pressure progress differs in {key}")
+        if saved_manifest != manifest:
+            raise ValueError("existing resource-pressure manifest differs")
         design = saved_progress["design"]["conditions"]
     elif existing_bundle is not None:
         saved_manifest = existing_bundle.get("manifest", {})
         for key in ("design_seed", "sample_count", "horizon", "model", "static_policy", "record_limitation_trace", "record_resource_accounting", "sampling", "write_combined_bundle"):
             if saved_manifest.get(key) != manifest.get(key):
                 raise ValueError(f"existing resource-pressure output differs in {key}")
+        if saved_manifest != manifest:
+            raise ValueError("existing resource-pressure manifest differs")
         design = existing_bundle["design"]["conditions"]
     else:
-        design = build_continuous_resource_pressure_design(
-            manifest["design_seed"], manifest["sample_count"]
-        )
+        design = _build_resource_pressure_design(manifest)
     if len(design) < manifest["sample_count"]:
-        raise ValueError("continuous LHS sample_count changed; use a fresh output")
+        raise ValueError("resource-pressure sample_count changed; use a fresh output")
     elif len(design) > manifest["sample_count"]:
         raise ValueError("sample_count is smaller than the saved resource-pressure design")
 

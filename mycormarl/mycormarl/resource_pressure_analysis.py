@@ -23,6 +23,113 @@ TRACE_FACTORS = (
 )
 
 
+def _plant_limitation_response(entry: dict[str, Any]) -> dict[str, float | int | None]:
+    """Return plant limitation fractions over realised-growth timesteps only."""
+    trace = [step["agents"]["plant"] for step in entry["limitation_trace"]]
+    realised = [step for step in trace if not step["no_realized_growth"]]
+    if not realised:
+        return {
+            "realised_growth_steps": 0,
+            "plant_p_limited_fraction": None,
+            "plant_c_limited_fraction": None,
+        }
+    count = len(realised)
+    return {
+        "realised_growth_steps": count,
+        "plant_p_limited_fraction": sum(
+            step["limiting_resource"] == "phosphate" for step in realised
+        ) / count,
+        "plant_c_limited_fraction": sum(
+            step["limiting_resource"] == "carbon" for step in realised
+        ) / count,
+    }
+
+
+def factorial_plant_boundary_rows(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Estimate observed plant P/C boundaries from factorial checkpoint entries.
+
+    A threshold is calculated only within the first adjacent sampled initial-P
+    pair that brackets a P-limited fraction of 0.5.  No response curve is fit
+    and censoring preserves outcomes outside the 0.5--1.3 µM test interval.
+    """
+    grouped: dict[tuple[float, float], list[dict[str, Any]]] = {}
+    for entry in entries:
+        factors = entry["factors"]
+        key = (float(factors["plant_kappa_c"]), float(factors["plant_trade"]))
+        grouped.setdefault(key, []).append(entry)
+
+    rows = []
+    for (plant_kappa_c, plant_trade), cell_entries in sorted(grouped.items()):
+        response = []
+        for entry in sorted(
+            cell_entries,
+            key=lambda item: float(item["factors"]["initial_solution_p_micromolar"]),
+        ):
+            response.append({
+                "initial_solution_p_micromolar": float(
+                    entry["factors"]["initial_solution_p_micromolar"]
+                ),
+                "final_plant_biomass_g": float(entry["biomass"]["plant"]),
+                "final_fungus_biomass_g": float(entry["biomass"]["fungus"]),
+                **_plant_limitation_response(entry),
+            })
+
+        valid = [point for point in response if point["plant_p_limited_fraction"] is not None]
+        threshold = None
+        status = "insufficient-realised-growth"
+        if valid:
+            exact = next(
+                (point for point in valid if point["plant_p_limited_fraction"] == 0.5), None
+            )
+            if exact is not None:
+                threshold = exact["initial_solution_p_micromolar"]
+                status = "observed-level"
+            else:
+                for lower, upper in zip(response, response[1:]):
+                    if (
+                        lower["plant_p_limited_fraction"] is None
+                        or upper["plant_p_limited_fraction"] is None
+                    ):
+                        continue
+                    lower_fraction = float(lower["plant_p_limited_fraction"])
+                    upper_fraction = float(upper["plant_p_limited_fraction"])
+                    if (lower_fraction - 0.5) * (upper_fraction - 0.5) < 0.0:
+                        lower_p = float(lower["initial_solution_p_micromolar"])
+                        upper_p = float(upper["initial_solution_p_micromolar"])
+                        threshold = lower_p + (0.5 - lower_fraction) * (
+                            upper_p - lower_p
+                        ) / (upper_fraction - lower_fraction)
+                        status = "observed-crossing"
+                        break
+                if threshold is None:
+                    fractions = [float(point["plant_p_limited_fraction"]) for point in valid]
+                    if all(fraction > 0.5 for fraction in fractions):
+                        status = "upper-censored"
+                    elif all(fraction < 0.5 for fraction in fractions):
+                        status = "lower-censored"
+                    else:
+                        status = "unbracketed"
+
+        fractions = [float(point["plant_p_limited_fraction"]) for point in valid]
+        rows.append({
+            "plant_kappa_c": plant_kappa_c,
+            "plant_trade": plant_trade,
+            "threshold_initial_p_micromolar": threshold,
+            "threshold_status": status,
+            "response_is_monotonic_nonincreasing": all(
+                left >= right for left, right in zip(fractions, fractions[1:])
+            ),
+            "mean_final_plant_biomass_g": sum(
+                point["final_plant_biomass_g"] for point in response
+            ) / len(response),
+            "mean_final_fungus_biomass_g": sum(
+                point["final_fungus_biomass_g"] for point in response
+            ) / len(response),
+            "p_response": response,
+        })
+    return rows
+
+
 def reconstruct_biomass_trajectory(entry: dict[str, Any], agent: str) -> list[tuple[float, float]]:
     """Return ``(day, biomass_g)`` from the initial biomass and realised growth."""
     biomass = float(entry["initial_biomass"][agent])
