@@ -839,9 +839,6 @@ def _write_summary(bundle: dict[str, Any], summary_path: Path) -> None:
             "- Acceptance gates: no fungal lower-boundary contact; maximum "
             "direct-plant-Pi uptake difference to the largest depth domain "
             f"≤ {uptake_tolerance:.0%}.\n"
-            "| Candidate | Depth (cm) | Status | Fungal lower-boundary contact | "
-            "Largest-depth comparison | Max uptake difference | Runtime (s) |\n"
-            "|---|---:|---|---|---|---:|---:|\n"
         )
         if accepted is None:
             summary += "- Accepted depth: none\n\n"
@@ -850,6 +847,11 @@ def _write_summary(bundle: dict[str, Any], summary_path: Path) -> None:
                 f"- Accepted depth: {accepted['domain']['soil_depth_cm']} cm "
                 f"({accepted['name']})\n\n"
             )
+        summary += (
+            "| Candidate | Depth (cm) | Status | Fungal lower-boundary contact | "
+            "Largest-depth comparison | Max uptake difference | Runtime (s) |\n"
+            "|---|---:|---|---|---|---:|---:|\n"
+        )
         for candidate in qualification["candidates"]:
             uptake = candidate["direct_plant_uptake_behavior"]
             difference = uptake["maximum_relative_difference"]

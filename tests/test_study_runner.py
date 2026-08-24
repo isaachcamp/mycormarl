@@ -763,6 +763,7 @@ def test_domain_qualification_persists_candidate_evidence_when_none_pass(tmp_pat
     summary = result.summary_path.read_text(encoding="utf-8")
     assert "Qualification outcome: rejected" in summary
     assert "Accepted depth: none" in summary
+    assert summary.index("Accepted depth: none") < summary.index("| Candidate |")
 
 
 def test_domain_qualification_records_exact_direct_plant_uptake_comparison(tmp_path):
