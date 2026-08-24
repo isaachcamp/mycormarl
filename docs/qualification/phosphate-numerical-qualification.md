@@ -2,18 +2,18 @@
 
 ## Outcome
 
-Selected interval: `0.1 cm`; selected fixed-geometry soil-solver timestep: `0.025 day`.
+Selected interval: `0.05 cm`; selected fixed-geometry soil-solver timestep: `0.025 day`.
 Grid had a passing coarser candidate: `True`; timestep had a passing larger candidate: `True`.
 Deep-soil confinement and extended-P balance pass: `True`.
 
-The numerical timestep selection requires 5% next-smaller agreement for both fixed-geometry soil observables and coupled trajectories under a fixed 1-day policy decision interval. Candidates that do not divide that interval cannot resolve the declared policy schedule and are ineligible. Grid convergence continues to include coupled endpoint pools. This is numerical qualification, not empirical validation.
+Numerical timestep and spatial selection both require 5% agreement with the next-smaller discretisation and the finest tested discretisation. Timestep comparisons cover fixed-geometry soil observables and coupled trajectories under a fixed 1-day policy decision interval; candidates that do not divide that interval are ineligible. Grid convergence includes coupled endpoint pools. This is numerical qualification, not empirical validation.
 
 ## Balance and diagnostic ranges
 
 - Maximum relative P-balance error: `1.142e-06`.
-- Mean continuous-weight range: `0` to `0.837801`.
+- Mean continuous-weight range: `0` to `0.837803`.
 - Maximum cellwise continuous weight: `0.837802`.
-- Diffusion CFL ceiling range: `40465.9` to `647456` seconds.
+- Diffusion CFL ceiling range: `40465.9` to `1.03593e+07` seconds.
 - Capped-demand fraction range: `0` to `0`.
 - Maximum coupled extended-P balance error: `2.112e-07`.
 
@@ -29,26 +29,28 @@ The numerical timestep selection requires 5% next-smaller agreement for both fix
 
 ## Timestep convergence
 
-| Candidate day | Reference day | Worst fixed-soil solver change | Coupled fixed-policy change | Solver pass |
-|---:|---:|---:|---:|:---:|
-| 0.025 | 0.0125 | 0.187% | 3.195% | yes |
-| 0.05 | 0.025 | 0.376% | 6.604% | no |
-| 0.1 | 0.05 | 0.755% | 13.874% | no |
-| 0.2 | 0.1 | 1.525% | 28.958% | no |
+| Candidate day | Next-smaller ref day | Worst fixed-soil change | Coupled fixed-policy change | Finest ref day | Worst fixed-soil change | Coupled fixed-policy change | Pass |
+|---:|---:|---:|---:|---:|---:|---:|:---:|
+| 0.025 | 0.0125 | 0.187% | 3.195% | 0.0125 | 0.187% | 3.195% | yes |
+| 0.05 | 0.025 | 0.376% | 6.604% | 0.0125 | 0.564% | 10.009% | no |
+| 0.1 | 0.05 | 0.755% | 13.874% | 0.0125 | 1.323% | 25.273% | no |
+| 0.2 | 0.1 | 1.525% | 28.958% | 0.0125 | 2.869% | 61.548% | no |
 
 ## Grid convergence
 
-| Candidate cm | Reference cm | Worst fixed-soil change | Coupled change | Pass |
-|---:|---:|---:|---:|:---:|
-| 0.05 | 0.025 | 0.210% | 2.222% | yes |
-| 0.1 | 0.05 | 0.180% | 4.348% | yes |
+| Candidate cm | Next-smaller ref cm | Worst fixed-soil change | Coupled change | Finest ref cm | Worst fixed-soil change | Coupled change | Pass |
+|---:|---:|---:|---:|---:|---:|---:|:---:|
+| 0.05 | 0.025 | 0.210% | 2.222% | 0.025 | 0.210% | 2.222% | yes |
+| 0.1 | 0.05 | 0.180% | 4.348% | 0.025 | 0.390% | 6.667% | no |
+| 0.2 | 0.1 | 0.107% | 2.036% | 0.025 | 0.496% | 6.667% | no |
+| 0.4 | 0.2 | 20.033% | 20.000% | 0.025 | 20.430% | 20.000% | no |
 
 ## Deep-soil integration check
 
 - Confinement and extended-P balance pass: `True`.
 - Maximum fungal density wholly outside the colony: `0` cm cm^-3.
 - Maximum fungal uptake request wholly outside the colony: `0` micromol P per cell.
-- Maximum relative extended-P balance error: `8.916e-08`.
+- Maximum relative extended-P balance error: `7.410e-08`.
 
 ## Transition sensitivity (mixed mode)
 
@@ -62,7 +64,7 @@ The numerical timestep selection requires 5% next-smaller agreement for both fix
 
 ## Performance
 
-- Reduced grid: `400` cells, compile+first step `0.135 s`, warmed step `0.000030 s`.
+- Reduced grid: `1600` cells, compile+first step `0.139 s`, warmed step `0.000059 s`.
 - Target benchmark skipped by command-line option.
 
 ## Interpretation and limitations

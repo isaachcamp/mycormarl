@@ -39,7 +39,7 @@ from mycormarl.soil.phosphate_units import MICROMOL_P_TO_MG_P
 
 CONCENTRATIONS_UM = (0.1, 0.3, 1.0, 3.0, 10.0)
 TIMESTEPS_DAYS = (0.0125, 0.025, 0.05, 0.1, 0.2)
-GRID_INTERVALS_CM = (0.1, 0.05, 0.025)
+GRID_INTERVALS_CM = (0.4, 0.2, 0.1, 0.05, 0.025)
 MODES = ("root_only", "fungus_only", "mixed")
 HORIZON_DAYS = 2.0
 COUPLED_POLICY_DECISION_INTERVAL_DAYS = 1.0
@@ -515,29 +515,69 @@ def compare_coupled_timestep_convergence(
 
 
 def select_solver_timestep(
-    timestep_comparisons: list[dict], coupled_timestep_comparisons: list[dict]
+    timestep_comparisons: list[dict],
+    coupled_timestep_comparisons: list[dict],
+    finest_timestep_comparisons: list[dict] | None = None,
+    finest_coupled_timestep_comparisons: list[dict] | None = None,
 ) -> float:
-    """Select the largest timestep passing fixed-soil and coupled-dynamics gates."""
+    """Select the largest timestep passing adjacent and finest-step gates."""
+    finest_timestep_comparisons = (
+        timestep_comparisons
+        if finest_timestep_comparisons is None
+        else finest_timestep_comparisons
+    )
+    finest_coupled_timestep_comparisons = (
+        coupled_timestep_comparisons
+        if finest_coupled_timestep_comparisons is None
+        else finest_coupled_timestep_comparisons
+    )
     passing = []
     for dt_days in TIMESTEPS_DAYS[1:]:
-        rows = [
-            row
-            for row in timestep_comparisons
-            if row["candidate_dt_days"] == dt_days
-        ]
-        coupled_rows = [
-            row
-            for row in coupled_timestep_comparisons
-            if row["candidate_dt_days"] == dt_days
-        ]
-        if (
-            rows
-            and coupled_rows
+        comparison_sets = (
+            timestep_comparisons,
+            coupled_timestep_comparisons,
+            finest_timestep_comparisons,
+            finest_coupled_timestep_comparisons,
+        )
+        if all(
+            (rows := [
+                row
+                for row in comparisons
+                if row["candidate_dt_days"] == dt_days
+            ])
             and all(row["passes_5_percent"] for row in rows)
-            and all(row["passes_5_percent"] for row in coupled_rows)
+            for comparisons in comparison_sets
         ):
             passing.append(dt_days)
     return max(passing) if passing else min(TIMESTEPS_DAYS)
+
+
+def select_spatial_interval(
+    next_fixed_comparisons: list[dict],
+    next_coupled_comparisons: list[dict],
+    finest_fixed_comparisons: list[dict],
+    finest_coupled_comparisons: list[dict],
+) -> float:
+    """Select the coarsest grid satisfying adjacent and finest-grid gates."""
+    passing = []
+    for interval_cm in sorted(GRID_INTERVALS_CM)[1:]:
+        comparison_sets = (
+            next_fixed_comparisons,
+            next_coupled_comparisons,
+            finest_fixed_comparisons,
+            finest_coupled_comparisons,
+        )
+        if all(
+            (rows := [
+                row
+                for row in comparisons
+                if row["candidate_interval_cm"] == interval_cm
+            ])
+            and all(row["passes_5_percent"] for row in rows)
+            for comparisons in comparison_sets
+        ):
+            passing.append(interval_cm)
+    return max(passing) if passing else min(GRID_INTERVALS_CM)
 
 
 def _array_bytes(value) -> int:
@@ -657,11 +697,29 @@ def run_studies(include_target_benchmark: bool) -> dict:
         ordered = sorted((row for row in timestep if row["mode"] == mode), key=lambda row: row["dt_days"])
         for reference, candidate in zip(ordered, ordered[1:]):
             timestep_comparisons.append({"mode": mode, "candidate_dt_days": candidate["dt_days"], "reference_dt_days": reference["dt_days"], **_comparison(candidate, reference, primary)})
+    finest_timestep_comparisons = []
+    for mode in MODES:
+        ordered = sorted(
+            (row for row in timestep if row["mode"] == mode),
+            key=lambda row: row["dt_days"],
+        )
+        reference = ordered[0]
+        for candidate in ordered[1:]:
+            finest_timestep_comparisons.append({"mode": mode, "candidate_dt_days": candidate["dt_days"], "reference_dt_days": reference["dt_days"], **_comparison(candidate, reference, primary)})
     grid_comparisons = []
     for mode in MODES:
         ordered = sorted((row for row in grid if row["mode"] == mode), key=lambda row: row["interval_cm"])
         for reference, candidate in zip(ordered, ordered[1:]):
             grid_comparisons.append({"mode": mode, "candidate_interval_cm": candidate["interval_cm"], "reference_interval_cm": reference["interval_cm"], **_comparison(candidate, reference, primary)})
+    finest_grid_comparisons = []
+    for mode in MODES:
+        ordered = sorted(
+            (row for row in grid if row["mode"] == mode),
+            key=lambda row: row["interval_cm"],
+        )
+        reference = ordered[0]
+        for candidate in ordered[1:]:
+            finest_grid_comparisons.append({"mode": mode, "candidate_interval_cm": candidate["interval_cm"], "reference_interval_cm": reference["interval_cm"], **_comparison(candidate, reference, primary)})
     coupled_metrics = (
         "plant_uptake_micromol",
         "fungus_uptake_micromol",
@@ -683,6 +741,15 @@ def run_studies(include_target_benchmark: bool) -> dict:
         {"candidate_interval_cm": candidate["interval_cm"], "reference_interval_cm": reference["interval_cm"], **_comparison(candidate, reference, coupled_metrics)}
         for reference, candidate in zip(ordered_coupled, ordered_coupled[1:])
     ]
+    finest_coupled_reference = ordered_coupled[0]
+    finest_coupled_comparisons = [
+        {
+            "candidate_interval_cm": candidate["interval_cm"],
+            "reference_interval_cm": finest_coupled_reference["interval_cm"],
+            **_comparison(candidate, finest_coupled_reference, coupled_metrics),
+        }
+        for candidate in ordered_coupled[1:]
+    ]
     ordered_coupled_timestep = sorted(
         coupled_timestep, key=lambda row: row["dt_days"]
     )
@@ -696,11 +763,30 @@ def run_studies(include_target_benchmark: bool) -> dict:
             ordered_coupled_timestep, ordered_coupled_timestep[1:]
         )
     ]
-    passing_grid = [interval for interval in GRID_INTERVALS_CM[:-1] if all(row["passes_5_percent"] for row in grid_comparisons if row["candidate_interval_cm"] == interval) and all(row["passes_5_percent"] for row in coupled_comparisons if row["candidate_interval_cm"] == interval)]
-    selected_dt = select_solver_timestep(
-        timestep_comparisons, coupled_timestep_comparisons
+    finest_coupled_timestep_reference = ordered_coupled_timestep[0]
+    finest_coupled_timestep_comparisons = [
+        {
+            "candidate_dt_days": candidate["dt_days"],
+            "reference_dt_days": finest_coupled_timestep_reference["dt_days"],
+            **compare_coupled_timestep_convergence(
+                candidate,
+                finest_coupled_timestep_reference,
+            ),
+        }
+        for candidate in ordered_coupled_timestep[1:]
+    ]
+    selected_grid = select_spatial_interval(
+        grid_comparisons,
+        coupled_comparisons,
+        finest_grid_comparisons,
+        finest_coupled_comparisons,
     )
-    selected_grid = max(passing_grid) if passing_grid else min(GRID_INTERVALS_CM)
+    selected_dt = select_solver_timestep(
+        timestep_comparisons,
+        coupled_timestep_comparisons,
+        finest_timestep_comparisons,
+        finest_coupled_timestep_comparisons,
+    )
     reduced_benchmark = benchmark_environment(qualification_config(selected_grid, selected_dt, 1.0))
     deep_soil = run_deep_soil_scenario(selected_grid, selected_dt)
     target_benchmark = None
@@ -750,11 +836,15 @@ def run_studies(include_target_benchmark: bool) -> dict:
         "coupled_grid_scenarios": coupled,
         "coupled_timestep_scenarios": coupled_timestep,
         "timestep_comparisons": timestep_comparisons,
+        "finest_timestep_comparisons": finest_timestep_comparisons,
         "grid_comparisons": grid_comparisons,
+        "finest_grid_comparisons": finest_grid_comparisons,
         "coupled_grid_comparisons": coupled_comparisons,
+        "finest_coupled_grid_comparisons": finest_coupled_comparisons,
         "coupled_timestep_comparisons": coupled_timestep_comparisons,
+        "finest_coupled_timestep_comparisons": finest_coupled_timestep_comparisons,
         "deep_soil": deep_soil,
-        "selection": {"grid_interval_cm": selected_grid, "dt_days": selected_dt, "grid_had_passing_candidate": bool(passing_grid), "dt_had_passing_candidate": selected_dt > min(TIMESTEPS_DAYS), "deep_soil_passes": deep_soil["passes"], "timestep_basis": "fixed_geometry_soil_solver"},
+        "selection": {"grid_interval_cm": selected_grid, "dt_days": selected_dt, "grid_had_passing_candidate": selected_grid > min(GRID_INTERVALS_CM), "dt_had_passing_candidate": selected_dt > min(TIMESTEPS_DAYS), "deep_soil_passes": deep_soil["passes"], "spatial_basis": "next-smaller-and-finest-grid", "timestep_basis": "next-smaller-and-finest-timestep"},
         "benchmarks": {"reduced": reduced_benchmark, "target": target_benchmark},
     }
 
@@ -772,7 +862,7 @@ def render_markdown(results: dict) -> str:
         f"Grid had a passing coarser candidate: `{selection['grid_had_passing_candidate']}`; timestep had a passing larger candidate: `{selection['dt_had_passing_candidate']}`.",
         f"Deep-soil confinement and extended-P balance pass: `{selection['deep_soil_passes']}`.",
         "",
-        "The numerical timestep selection requires 5% next-smaller agreement for both fixed-geometry soil observables and coupled trajectories under a fixed 1-day policy decision interval. Candidates that do not divide that interval cannot resolve the declared policy schedule and are ineligible. Grid convergence continues to include coupled endpoint pools. This is numerical qualification, not empirical validation.",
+        "Numerical timestep and spatial selection both require 5% agreement with the next-smaller discretisation and the finest tested discretisation. Timestep comparisons cover fixed-geometry soil observables and coupled trajectories under a fixed 1-day policy decision interval; candidates that do not divide that interval are ineligible. Grid convergence includes coupled endpoint pools. This is numerical qualification, not empirical validation.",
         "",
         "## Balance and diagnostic ranges",
         "",
@@ -798,8 +888,8 @@ def render_markdown(results: dict) -> str:
         "",
         "## Timestep convergence",
         "",
-        "| Candidate day | Reference day | Worst fixed-soil solver change | Coupled fixed-policy change | Solver pass |",
-        "|---:|---:|---:|---:|:---:|",
+        "| Candidate day | Next-smaller ref day | Worst fixed-soil change | Coupled fixed-policy change | Finest ref day | Worst fixed-soil change | Coupled fixed-policy change | Pass |",
+        "|---:|---:|---:|---:|---:|---:|---:|:---:|",
     ])
     for dt in TIMESTEPS_DAYS[1:]:
         rows = [row for row in results["timestep_comparisons"] if row["candidate_dt_days"] == dt]
@@ -811,21 +901,61 @@ def render_markdown(results: dict) -> str:
             ),
             None,
         )
-        passed = coupled_row is not None and all(row["passes_5_percent"] for row in rows) and coupled_row["passes_5_percent"]
-        coupled_change = f"{coupled_row['maximum_change']:.3%}" if coupled_row else "ineligible"
-        lines.append(f"| {dt:g} | {rows[0]['reference_dt_days']:g} | {max(row['maximum_change'] for row in rows):.3%} | {coupled_change} | {'yes' if passed else 'no'} |")
+        finest_rows = [
+            row
+            for row in results["finest_timestep_comparisons"]
+            if row["candidate_dt_days"] == dt
+        ]
+        finest_coupled_row = next(
+            (
+                row
+                for row in results["finest_coupled_timestep_comparisons"]
+                if row["candidate_dt_days"] == dt
+            ),
+            None,
+        )
+        passed = (
+            coupled_row is not None
+            and finest_coupled_row is not None
+            and all(row["passes_5_percent"] for row in rows)
+            and coupled_row["passes_5_percent"]
+            and all(row["passes_5_percent"] for row in finest_rows)
+            and finest_coupled_row["passes_5_percent"]
+        )
+        lines.append(
+            f"| {dt:g} | {rows[0]['reference_dt_days']:g} | "
+            f"{max(row['maximum_change'] for row in rows):.3%} | "
+            f"{coupled_row['maximum_change']:.3%} | "
+            f"{finest_rows[0]['reference_dt_days']:g} | "
+            f"{max(row['maximum_change'] for row in finest_rows):.3%} | "
+            f"{finest_coupled_row['maximum_change']:.3%} | {'yes' if passed else 'no'} |"
+        )
     lines.extend([
         "",
         "## Grid convergence",
         "",
-        "| Candidate cm | Reference cm | Worst fixed-soil change | Coupled change | Pass |",
-        "|---:|---:|---:|---:|:---:|",
+        "| Candidate cm | Next-smaller ref cm | Worst fixed-soil change | Coupled change | Finest ref cm | Worst fixed-soil change | Coupled change | Pass |",
+        "|---:|---:|---:|---:|---:|---:|---:|:---:|",
     ])
-    for interval in (0.05, 0.1):
+    for interval in sorted(GRID_INTERVALS_CM)[1:]:
         fixed_rows = [row for row in results["grid_comparisons"] if row["candidate_interval_cm"] == interval]
         coupled_row = next(row for row in results["coupled_grid_comparisons"] if row["candidate_interval_cm"] == interval)
-        passed = all(row["passes_5_percent"] for row in fixed_rows) and coupled_row["passes_5_percent"]
-        lines.append(f"| {interval:g} | {fixed_rows[0]['reference_interval_cm']:g} | {max(row['maximum_change'] for row in fixed_rows):.3%} | {coupled_row['maximum_change']:.3%} | {'yes' if passed else 'no'} |")
+        finest_fixed_rows = [row for row in results["finest_grid_comparisons"] if row["candidate_interval_cm"] == interval]
+        finest_coupled_row = next(row for row in results["finest_coupled_grid_comparisons"] if row["candidate_interval_cm"] == interval)
+        passed = (
+            all(row["passes_5_percent"] for row in fixed_rows)
+            and coupled_row["passes_5_percent"]
+            and all(row["passes_5_percent"] for row in finest_fixed_rows)
+            and finest_coupled_row["passes_5_percent"]
+        )
+        lines.append(
+            f"| {interval:g} | {fixed_rows[0]['reference_interval_cm']:g} | "
+            f"{max(row['maximum_change'] for row in fixed_rows):.3%} | "
+            f"{coupled_row['maximum_change']:.3%} | "
+            f"{finest_fixed_rows[0]['reference_interval_cm']:g} | "
+            f"{max(row['maximum_change'] for row in finest_fixed_rows):.3%} | "
+            f"{finest_coupled_row['maximum_change']:.3%} | {'yes' if passed else 'no'} |"
+        )
     deep_soil = results["deep_soil"]
     lines.extend([
         "",

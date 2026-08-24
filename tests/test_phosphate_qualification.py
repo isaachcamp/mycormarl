@@ -353,6 +353,74 @@ def test_solver_timestep_selection_requires_coupled_convergence():
     assert select_solver_timestep(fixed_comparisons, coupled_comparisons) == pytest.approx(0.2)
 
 
+def test_solver_timestep_selection_requires_finest_timestep_agreement():
+    """Adjacent-timestep agreement alone cannot qualify a larger timestep."""
+    candidates = (0.025, 0.05, 0.1, 0.2)
+    next_fixed = [
+        {"candidate_dt_days": dt_days, "passes_5_percent": True}
+        for dt_days in candidates
+    ]
+    next_coupled = [
+        {"candidate_dt_days": dt_days, "passes_5_percent": True}
+        for dt_days in candidates
+    ]
+    finest_fixed = [
+        {
+            "candidate_dt_days": dt_days,
+            "passes_5_percent": dt_days == 0.025,
+        }
+        for dt_days in candidates
+    ]
+    finest_coupled = [
+        {
+            "candidate_dt_days": dt_days,
+            "passes_5_percent": dt_days == 0.025,
+        }
+        for dt_days in candidates
+    ]
+
+    assert select_solver_timestep(
+        next_fixed,
+        next_coupled,
+        finest_fixed,
+        finest_coupled,
+    ) == pytest.approx(0.025)
+
+
+def test_spatial_selection_requires_next_and_finest_grid_agreement():
+    """An adjacent-grid coincidence cannot qualify a coarse spatial grid."""
+    intervals = (0.05, 0.1, 0.2, 0.4)
+    next_fixed = [
+        {"candidate_interval_cm": interval, "passes_5_percent": True}
+        for interval in intervals
+    ]
+    next_coupled = [
+        {"candidate_interval_cm": interval, "passes_5_percent": True}
+        for interval in intervals
+    ]
+    finest_fixed = [
+        {
+            "candidate_interval_cm": interval,
+            "passes_5_percent": interval == 0.05,
+        }
+        for interval in intervals
+    ]
+    finest_coupled = [
+        {
+            "candidate_interval_cm": interval,
+            "passes_5_percent": interval == 0.05,
+        }
+        for interval in intervals
+    ]
+
+    assert _SCRIPT_MODULE.select_spatial_interval(
+        next_fixed,
+        next_coupled,
+        finest_fixed,
+        finest_coupled,
+    ) == pytest.approx(0.05)
+
+
 def test_coupled_timestep_convergence_keeps_residual_pools_diagnostic():
     """Residual pools cannot dominate the coupled numerical convergence gate."""
     reference = {

@@ -1,33 +1,33 @@
 {
   "benchmarks": {
     "reduced": {
-      "cached_geometry_bytes": 8168,
-      "cell_count": 400,
-      "compile_and_first_step_seconds": 0.13544900016859174,
-      "estimated_core_working_array_bytes": 41843,
+      "cached_geometry_bytes": 32328,
+      "cell_count": 1600,
+      "compile_and_first_step_seconds": 0.13931187498383224,
+      "estimated_core_working_array_bytes": 166803,
       "full_annual_projection": {
-        "runtime_hours": 0.00012082186876796185,
-        "runtime_seconds": 0.4349587275646627,
+        "runtime_hours": 0.0005575545164497776,
+        "runtime_seconds": 2.0071962592191994,
         "steps_per_year": 14600
       },
-      "full_compile_and_first_step_seconds": 0.19628612487576902,
+      "full_compile_and_first_step_seconds": 0.4226269170176238,
       "grid_shape": [
-        20,
-        20
+        40,
+        40
       ],
       "soil_annual_projection": {
-        "runtime_hours": 0.00012355067883618176,
-        "runtime_seconds": 0.44478244381025434,
+        "runtime_hours": 0.0002387032721243385,
+        "runtime_seconds": 0.8593317796476185,
         "steps_per_year": 14600
       },
       "soil_substeps": 1,
-      "state_array_bytes": 4875,
+      "state_array_bytes": 19275,
       "temporary_array_dtype_bytes": 4,
-      "temporary_array_estimate_bytes": 28800,
+      "temporary_array_estimate_bytes": 115200,
       "temporary_array_estimate_count": 18,
       "timing_repeats": 20,
-      "warmed_full_seconds_per_step": 2.9791693668812515e-05,
-      "warmed_seconds_per_step": 3.046455094590783e-05
+      "warmed_full_seconds_per_step": 0.00013747919583693147,
+      "warmed_seconds_per_step": 5.885834107175469e-05
     },
     "target": null
   },
@@ -512,9 +512,149 @@
       "maximum_change": 0.04347832396711109,
       "passes_5_percent": true,
       "reference_interval_cm": 0.05
+    },
+    {
+      "candidate_interval_cm": 0.2,
+      "changes": {
+        "final_soil_micromol": 2.4204692238172838e-05,
+        "fungus_biomass_g": 0.0002888356456482837,
+        "fungus_depth_cm": 0.0,
+        "fungus_p_pool_mg": 0.00042951450035796457,
+        "fungus_radius_cm": 0.0,
+        "fungus_uptake_micromol": 9.060526656016691e-05,
+        "fungus_uptake_share": 0.0005446974450053137,
+        "plant_biomass_g": 2.7813881864289447e-05,
+        "plant_p_pool_mg": 0.002122081334654022,
+        "plant_uptake_micromol": 0.020360212630764995,
+        "plant_uptake_share": 0.0198968330543827,
+        "root_depth_cm": 0.0,
+        "root_radius_cm": 0.0,
+        "total_uptake_micromol": 0.0004543396560949586
+      },
+      "maximum_change": 0.020360212630764995,
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.1
+    },
+    {
+      "candidate_interval_cm": 0.4,
+      "changes": {
+        "final_soil_micromol": 0.00035156079806638224,
+        "fungus_biomass_g": 0.002499557055350832,
+        "fungus_depth_cm": 0.20000004768371582,
+        "fungus_p_pool_mg": 0.005675003631443916,
+        "fungus_radius_cm": 0.20000004768371582,
+        "fungus_uptake_micromol": 0.006419654916064482,
+        "fungus_uptake_share": 0.00024199197673931337,
+        "plant_biomass_g": 0.0006757260876801616,
+        "plant_p_pool_mg": 0.005050034745070716,
+        "plant_uptake_micromol": 0.01538334872900163,
+        "plant_uptake_share": 0.008662369764585892,
+        "root_depth_cm": 0.0,
+        "root_radius_cm": 0.0,
+        "total_uptake_micromol": 0.006663259348105062
+      },
+      "maximum_change": 0.20000004768371582,
+      "passes_5_percent": false,
+      "reference_interval_cm": 0.2
     }
   ],
   "coupled_grid_scenarios": [
+    {
+      "actions": {
+        "fungus": [
+          0.25,
+          1.0,
+          0.0,
+          0.0
+        ],
+        "plant": [
+          0.25,
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "decision_interval_days": 1.0,
+      "dt_days": 0.025,
+      "final_extended_p_mg": 0.2249446768133413,
+      "final_soil_micromol": 5.710909843444824,
+      "fungus_biomass_g": 0.0007186582661233842,
+      "fungus_depth_cm": 1.2000000476837158,
+      "fungus_maintenance_loss_mg": 0.0,
+      "fungus_mortality_loss_mg": 0.0,
+      "fungus_p_pool_mg": 0.0065413969568908215,
+      "fungus_radius_cm": 1.2000000476837158,
+      "fungus_reproduction_export_mg": 0.0,
+      "fungus_uptake_micromol": 0.29504050873219967,
+      "fungus_uptake_share": 0.9725877937338098,
+      "horizon_days": 2.0,
+      "initial_extended_p_mg": 0.22494467273991717,
+      "initial_soil_micromol": 6.014266014099121,
+      "interval_cm": 0.4,
+      "plant_biomass_g": 0.021109819412231445,
+      "plant_maintenance_loss_mg": 0.0,
+      "plant_mortality_loss_mg": 0.0,
+      "plant_p_pool_mg": 4.9591359129408374e-05,
+      "plant_reproduction_export_mg": 0.0,
+      "plant_uptake_micromol": 0.008315661922097206,
+      "plant_uptake_share": 0.027412206266190283,
+      "relative_extended_p_balance_error": 1.8108560101323678e-08,
+      "root_depth_cm": 2.0,
+      "root_radius_cm": 1.2000000476837158,
+      "timing": {
+        "numerical_timestep_days": 0.025,
+        "policy_decision_interval_days": 1.0
+      },
+      "total_uptake_micromol": 0.3033561706542969
+    },
+    {
+      "actions": {
+        "fungus": [
+          0.25,
+          1.0,
+          0.0,
+          0.0
+        ],
+        "plant": [
+          0.25,
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "decision_interval_days": 1.0,
+      "dt_days": 0.025,
+      "final_extended_p_mg": 0.22494469549105947,
+      "final_soil_micromol": 5.712918281555176,
+      "fungus_biomass_g": 0.0007204590947367251,
+      "fungus_depth_cm": 1.0,
+      "fungus_maintenance_loss_mg": 0.0,
+      "fungus_mortality_loss_mg": 0.0,
+      "fungus_p_pool_mg": 0.006504483986645937,
+      "fungus_radius_cm": 1.0,
+      "fungus_reproduction_export_mg": 0.0,
+      "fungus_uptake_micromol": 0.2931585321202874,
+      "fungus_uptake_share": 0.9728232091452087,
+      "horizon_days": 2.0,
+      "initial_extended_p_mg": 0.22494468750937593,
+      "initial_soil_micromol": 6.014266490936279,
+      "interval_cm": 0.2,
+      "plant_biomass_g": 0.02109556458890438,
+      "plant_maintenance_loss_mg": 0.0,
+      "plant_mortality_loss_mg": 0.0,
+      "plant_p_pool_mg": 4.9342179408995435e-05,
+      "plant_reproduction_export_mg": 0.0,
+      "plant_uptake_micromol": 0.008189677260816097,
+      "plant_uptake_share": 0.027176790854791265,
+      "relative_extended_p_balance_error": 3.5482871921552725e-08,
+      "root_depth_cm": 2.0,
+      "root_radius_cm": 1.2000000476837158,
+      "timing": {
+        "numerical_timestep_days": 0.025,
+        "policy_decision_interval_days": 1.0
+      },
+      "total_uptake_micromol": 0.3013482093811035
+    },
     {
       "actions": {
         "fungus": [
@@ -1160,48 +1300,708 @@
     "depth_band_losses": [
       {
         "end_depth_cm": 10.0,
-        "final_micromol": 28.54806900024414,
-        "initial_micromol": 30.07132339477539,
-        "loss_percent": 5.06547176036789,
+        "final_micromol": 28.549213409423828,
+        "initial_micromol": 30.071311950683594,
+        "loss_percent": 5.061629980614014,
         "start_depth_cm": 0.0
       },
       {
         "end_depth_cm": 25.0,
-        "final_micromol": 45.08536911010742,
+        "final_micromol": 45.08537673950195,
         "initial_micromol": 45.10697937011719,
-        "loss_percent": 0.04790890525487538,
+        "loss_percent": 0.047891991254785396,
         "start_depth_cm": 10.0
       },
       {
         "end_depth_cm": 50.0,
-        "final_micromol": 75.16191864013672,
-        "initial_micromol": 75.17826843261719,
-        "loss_percent": 0.021748030144007884,
+        "final_micromol": 75.16199493408203,
+        "initial_micromol": 75.17835235595703,
+        "loss_percent": 0.02175815425902169,
         "start_depth_cm": 25.0
       },
       {
         "end_depth_cm": 75.0,
-        "final_micromol": 75.17239379882812,
-        "initial_micromol": 75.17828369140625,
-        "loss_percent": 0.007834566431846173,
+        "final_micromol": 75.1724624633789,
+        "initial_micromol": 75.17835235595703,
+        "loss_percent": 0.00783455927610296,
         "start_depth_cm": 50.0
       },
       {
         "end_depth_cm": 100.0,
-        "final_micromol": 75.17620849609375,
-        "initial_micromol": 75.17833709716797,
-        "loss_percent": 0.0028314021783529663,
+        "final_micromol": 75.17622375488281,
+        "initial_micromol": 75.17835235595703,
+        "loss_percent": 0.002831401603669334,
         "start_depth_cm": 75.0
       }
     ],
     "dt_days": 0.025,
     "duration_days": 2.0,
-    "interval_cm": 0.1,
+    "interval_cm": 0.05,
     "max_fungal_density_outside_colony": 0.0,
     "max_fungal_uptake_request_outside_colony_micromol": 0.0,
     "passes": true,
-    "relative_extended_p_balance_error": 8.916148192162009e-08
+    "relative_extended_p_balance_error": 7.409861280104115e-08
   },
+  "finest_coupled_grid_comparisons": [
+    {
+      "candidate_interval_cm": 0.05,
+      "changes": {
+        "final_soil_micromol": 0.00014243736888623496,
+        "fungus_biomass_g": 0.00045132413761414156,
+        "fungus_depth_cm": 0.0,
+        "fungus_p_pool_mg": 0.0030727223759997473,
+        "fungus_radius_cm": 0.0,
+        "fungus_uptake_micromol": 0.0028444404461893647,
+        "fungus_uptake_share": 0.00019717073697493484,
+        "plant_biomass_g": 0.00012437813141145433,
+        "plant_p_pool_mg": 0.002330772599597829,
+        "plant_uptake_micromol": 0.004683557555788986,
+        "plant_uptake_share": 0.007350812753617106,
+        "root_depth_cm": 0.0,
+        "root_radius_cm": 0.022222201029459637,
+        "total_uptake_micromol": 0.0026477917762702478
+      },
+      "maximum_change": 0.022222201029459637,
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.1,
+      "changes": {
+        "final_soil_micromol": 0.0003301274071372644,
+        "fungus_biomass_g": 0.0010043357534467768,
+        "fungus_depth_cm": 0.0,
+        "fungus_p_pool_mg": 0.0073071894792852525,
+        "fungus_radius_cm": 0.0,
+        "fungus_uptake_micromol": 0.006730515947998931,
+        "fungus_uptake_share": 0.0005383647396504928,
+        "plant_biomass_g": 0.0002717075148931557,
+        "plant_p_pool_mg": 0.005313065004185087,
+        "plant_uptake_micromol": 0.013751186592998895,
+        "plant_uptake_share": 0.020071022987668413,
+        "root_depth_cm": 0.0,
+        "root_radius_cm": 0.06666670905219184,
+        "total_uptake_micromol": 0.0061954866399003185
+      },
+      "maximum_change": 0.06666670905219184,
+      "passes_5_percent": false,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.2,
+      "changes": {
+        "final_soil_micromol": 0.0003059147242668024,
+        "fungus_biomass_g": 0.0012934614870608548,
+        "fungus_depth_cm": 0.0,
+        "fungus_p_pool_mg": 0.006880813522765504,
+        "fungus_radius_cm": 0.0,
+        "fungus_uptake_micromol": 0.0068205113943675426,
+        "fungus_uptake_share": 0.0010827689387576378,
+        "plant_biomass_g": 0.00024390119026958718,
+        "plant_p_pool_mg": 0.00320225842560625,
+        "plant_uptake_micromol": 0.034391376306722676,
+        "plant_uptake_share": 0.04036720583566743,
+        "root_depth_cm": 0.0,
+        "root_radius_cm": 0.06666670905219184,
+        "total_uptake_micromol": 0.005743961839074673
+      },
+      "maximum_change": 0.06666670905219184,
+      "passes_5_percent": false,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.4,
+      "changes": {
+        "final_soil_micromol": 4.5753621424183325e-05,
+        "fungus_biomass_g": 0.0012093286490757846,
+        "fungus_depth_cm": 0.20000004768371582,
+        "fungus_p_pool_mg": 0.001244858533050571,
+        "fungus_radius_cm": 0.20000004768371582,
+        "fungus_uptake_micromol": 0.00044464180780598596,
+        "fungus_uptake_share": 0.0013244988941011092,
+        "plant_biomass_g": 0.00043166008701349303,
+        "plant_p_pool_mg": 0.0018316048031524592,
+        "plant_uptake_micromol": 0.05030377957072094,
+        "plant_uptake_share": 0.04937925126356502,
+        "root_depth_cm": 0.0,
+        "root_radius_cm": 0.06666670905219184,
+        "total_uptake_micromol": 0.0008810240016110154
+      },
+      "maximum_change": 0.20000004768371582,
+      "passes_5_percent": false,
+      "reference_interval_cm": 0.025
+    }
+  ],
+  "finest_coupled_timestep_comparisons": [
+    {
+      "affects_numerical_timestep_selection": true,
+      "balance_checks": {
+        "candidate": true,
+        "reference": true
+      },
+      "candidate_dt_days": 0.025,
+      "changes": {
+        "final_soil_micromol": 0.0015951281177371548,
+        "fungus_biomass_g": 0.005327893292965803,
+        "fungus_depth_cm": 0.0,
+        "fungus_radius_cm": 0.0,
+        "fungus_uptake_micromol": 0.03194720418103092,
+        "fungus_uptake_share": 0.0006760767816057804,
+        "plant_biomass_g": 0.0017947826579236248,
+        "plant_uptake_micromol": 0.006412541076837919,
+        "plant_uptake_share": 0.024084808652763155,
+        "root_depth_cm": 0.0,
+        "root_radius_cm": 0.0,
+        "total_uptake_micromol": 0.03125
+      },
+      "classification": "coupled_timestep_convergence",
+      "criteria": {
+        "absolute_metric_floor": 1e-10,
+        "diagnostic_metrics": [
+          "plant_p_pool_mg",
+          "fungus_p_pool_mg"
+        ],
+        "maximum_relative_p_balance_error": 1e-05,
+        "relative_tolerance": 0.05,
+        "reported_relative_metrics": [
+          "plant_uptake_micromol",
+          "fungus_uptake_micromol",
+          "total_uptake_micromol",
+          "final_soil_micromol",
+          "plant_uptake_share",
+          "fungus_uptake_share",
+          "plant_biomass_g",
+          "fungus_biomass_g",
+          "root_radius_cm",
+          "root_depth_cm",
+          "fungus_radius_cm",
+          "fungus_depth_cm"
+        ]
+      },
+      "diagnostic_changes": {
+        "fungus_p_pool_mg": 0.028495282657505023,
+        "plant_p_pool_mg": 1.0360625169476259
+      },
+      "maximum_change": 0.03194720418103092,
+      "maximum_diagnostic_change": 1.0360625169476259,
+      "maximum_relative_p_balance_error": 1e-05,
+      "passes_5_percent": true,
+      "provenance": {
+        "candidate_dt_days": 0.025,
+        "horizon_days": 2.0,
+        "interval_cm": 0.1,
+        "policy_decision_interval_days": 1.0,
+        "reference_dt_days": 0.0125
+      },
+      "reference_dt_days": 0.0125,
+      "within_5_percent": true
+    },
+    {
+      "affects_numerical_timestep_selection": true,
+      "balance_checks": {
+        "candidate": true,
+        "reference": true
+      },
+      "candidate_dt_days": 0.05,
+      "changes": {
+        "final_soil_micromol": 0.0049997125069477484,
+        "fungus_biomass_g": 0.01996897688556985,
+        "fungus_depth_cm": 0.0,
+        "fungus_radius_cm": 0.0,
+        "fungus_uptake_micromol": 0.10009380536587331,
+        "fungus_uptake_share": 0.0019535730319199507,
+        "plant_biomass_g": 0.005357014911114472,
+        "plant_uptake_micromol": 0.021537342261439038,
+        "plant_uptake_share": 0.06959480630474985,
+        "root_depth_cm": 0.0,
+        "root_radius_cm": 0.0,
+        "total_uptake_micromol": 0.09794888203949431
+      },
+      "classification": "coupled_timestep_convergence",
+      "criteria": {
+        "absolute_metric_floor": 1e-10,
+        "diagnostic_metrics": [
+          "plant_p_pool_mg",
+          "fungus_p_pool_mg"
+        ],
+        "maximum_relative_p_balance_error": 1e-05,
+        "relative_tolerance": 0.05,
+        "reported_relative_metrics": [
+          "plant_uptake_micromol",
+          "fungus_uptake_micromol",
+          "total_uptake_micromol",
+          "final_soil_micromol",
+          "plant_uptake_share",
+          "fungus_uptake_share",
+          "plant_biomass_g",
+          "fungus_biomass_g",
+          "root_radius_cm",
+          "root_depth_cm",
+          "fungus_radius_cm",
+          "fungus_depth_cm"
+        ]
+      },
+      "diagnostic_changes": {
+        "fungus_p_pool_mg": 0.09057209195429393,
+        "plant_p_pool_mg": 3.2414131715537886
+      },
+      "maximum_change": 0.10009380536587331,
+      "maximum_diagnostic_change": 3.2414131715537886,
+      "maximum_relative_p_balance_error": 1e-05,
+      "passes_5_percent": false,
+      "provenance": {
+        "candidate_dt_days": 0.05,
+        "horizon_days": 2.0,
+        "interval_cm": 0.1,
+        "policy_decision_interval_days": 1.0,
+        "reference_dt_days": 0.0125
+      },
+      "reference_dt_days": 0.0125,
+      "within_5_percent": false
+    },
+    {
+      "affects_numerical_timestep_selection": true,
+      "balance_checks": {
+        "candidate": true,
+        "reference": true
+      },
+      "candidate_dt_days": 0.1,
+      "changes": {
+        "final_soil_micromol": 0.012623028276816644,
+        "fungus_biomass_g": 0.06609140444264908,
+        "fungus_depth_cm": 0.10000002384185791,
+        "fungus_radius_cm": 0.10000002384185791,
+        "fungus_uptake_micromol": 0.2527258273332214,
+        "fungus_uptake_share": 0.004352859567239709,
+        "plant_biomass_g": 0.012059807217874585,
+        "plant_uptake_micromol": 0.05388089994184431,
+        "plant_uptake_share": 0.15506787486521745,
+        "root_depth_cm": 0.0,
+        "root_radius_cm": 0.0,
+        "total_uptake_micromol": 0.24729652073973463
+      },
+      "classification": "coupled_timestep_convergence",
+      "criteria": {
+        "absolute_metric_floor": 1e-10,
+        "diagnostic_metrics": [
+          "plant_p_pool_mg",
+          "fungus_p_pool_mg"
+        ],
+        "maximum_relative_p_balance_error": 1e-05,
+        "relative_tolerance": 0.05,
+        "reported_relative_metrics": [
+          "plant_uptake_micromol",
+          "fungus_uptake_micromol",
+          "total_uptake_micromol",
+          "final_soil_micromol",
+          "plant_uptake_share",
+          "fungus_uptake_share",
+          "plant_biomass_g",
+          "fungus_biomass_g",
+          "root_radius_cm",
+          "root_depth_cm",
+          "fungus_radius_cm",
+          "fungus_depth_cm"
+        ]
+      },
+      "diagnostic_changes": {
+        "fungus_p_pool_mg": 0.23510574979521842,
+        "plant_p_pool_mg": 8.350212623362733
+      },
+      "maximum_change": 0.2527258273332214,
+      "maximum_diagnostic_change": 8.350212623362733,
+      "maximum_relative_p_balance_error": 1e-05,
+      "passes_5_percent": false,
+      "provenance": {
+        "candidate_dt_days": 0.1,
+        "horizon_days": 2.0,
+        "interval_cm": 0.1,
+        "policy_decision_interval_days": 1.0,
+        "reference_dt_days": 0.0125
+      },
+      "reference_dt_days": 0.0125,
+      "within_5_percent": false
+    },
+    {
+      "affects_numerical_timestep_selection": true,
+      "balance_checks": {
+        "candidate": true,
+        "reference": true
+      },
+      "candidate_dt_days": 0.2,
+      "changes": {
+        "final_soil_micromol": 0.030745923640178696,
+        "fungus_biomass_g": 0.22495730909418257,
+        "fungus_depth_cm": 0.10000002384185791,
+        "fungus_radius_cm": 0.10000002384185791,
+        "fungus_uptake_micromol": 0.6154841208778983,
+        "fungus_uptake_share": 0.00820282478627842,
+        "plant_biomass_g": 0.022172244292122327,
+        "plant_uptake_micromol": 0.13410376003419275,
+        "plant_uptake_share": 0.29222045596718443,
+        "root_depth_cm": 0.0,
+        "root_radius_cm": 0.0,
+        "total_uptake_micromol": 0.6023404033016404
+      },
+      "classification": "coupled_timestep_convergence",
+      "criteria": {
+        "absolute_metric_floor": 1e-10,
+        "diagnostic_metrics": [
+          "plant_p_pool_mg",
+          "fungus_p_pool_mg"
+        ],
+        "maximum_relative_p_balance_error": 1e-05,
+        "relative_tolerance": 0.05,
+        "reported_relative_metrics": [
+          "plant_uptake_micromol",
+          "fungus_uptake_micromol",
+          "total_uptake_micromol",
+          "final_soil_micromol",
+          "plant_uptake_share",
+          "fungus_uptake_share",
+          "plant_biomass_g",
+          "fungus_biomass_g",
+          "root_radius_cm",
+          "root_depth_cm",
+          "fungus_radius_cm",
+          "fungus_depth_cm"
+        ]
+      },
+      "diagnostic_changes": {
+        "fungus_p_pool_mg": 0.6008730472087829,
+        "plant_p_pool_mg": 22.53436796121142
+      },
+      "maximum_change": 0.6154841208778983,
+      "maximum_diagnostic_change": 22.53436796121142,
+      "maximum_relative_p_balance_error": 1e-05,
+      "passes_5_percent": false,
+      "provenance": {
+        "candidate_dt_days": 0.2,
+        "horizon_days": 2.0,
+        "interval_cm": 0.1,
+        "policy_decision_interval_days": 1.0,
+        "reference_dt_days": 0.0125
+      },
+      "reference_dt_days": 0.0125,
+      "within_5_percent": false
+    }
+  ],
+  "finest_grid_comparisons": [
+    {
+      "candidate_interval_cm": 0.05,
+      "changes": {
+        "final_soil_micromol": 4.765321421724116e-07,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 3.786021970834094e-06
+      },
+      "maximum_change": 3.786021970834094e-06,
+      "mode": "root_only",
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.1,
+      "changes": {
+        "final_soil_micromol": 1.5884404739080385e-07,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 6.5804667588940855e-06
+      },
+      "maximum_change": 6.5804667588940855e-06,
+      "mode": "root_only",
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.2,
+      "changes": {
+        "final_soil_micromol": 4.765321421724116e-07,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 8.834051265335026e-06
+      },
+      "maximum_change": 8.834051265335026e-06,
+      "mode": "root_only",
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.4,
+      "changes": {
+        "final_soil_micromol": 0.0003475507756910788,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.20000724752777274
+      },
+      "maximum_change": 0.20000724752777274,
+      "mode": "root_only",
+      "passes_5_percent": false,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.05,
+      "changes": {
+        "final_soil_micromol": 0.0016950762482082103,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.0020788495162486487
+      },
+      "maximum_change": 0.0020788495162486487,
+      "mode": "fungus_only",
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.1,
+      "changes": {
+        "final_soil_micromol": 0.003150383687661549,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.003864435464960743
+      },
+      "maximum_change": 0.003864435464960743,
+      "mode": "fungus_only",
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.2,
+      "changes": {
+        "final_soil_micromol": 0.004009507279415575,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.004918331929651914
+      },
+      "maximum_change": 0.004918331929651914,
+      "mode": "fungus_only",
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.4,
+      "changes": {
+        "final_soil_micromol": 0.16652051707165433,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.20426346271692078
+      },
+      "maximum_change": 0.20426346271692078,
+      "mode": "fungus_only",
+      "passes_5_percent": false,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.05,
+      "changes": {
+        "final_soil_micromol": 0.001718112937367341,
+        "fungus_uptake_share": 3.1070252987055514e-08,
+        "root_uptake_share": 3.3349822766577536e-06,
+        "total_uptake_micromol": 0.0020976894182750806
+      },
+      "maximum_change": 0.0020976894182750806,
+      "mode": "mixed",
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.1,
+      "changes": {
+        "final_soil_micromol": 0.0031934082849044334,
+        "fungus_uptake_share": 3.312347035283485e-08,
+        "root_uptake_share": 3.5553681050891596e-06,
+        "total_uptake_micromol": 0.003898858315606492
+      },
+      "maximum_change": 0.003898858315606492,
+      "mode": "mixed",
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.2,
+      "changes": {
+        "final_soil_micromol": 0.004064075573891837,
+        "fungus_uptake_share": 3.3955625022547725e-08,
+        "root_uptake_share": 3.644688949914041e-06,
+        "total_uptake_micromol": 0.004962061121984312
+      },
+      "maximum_change": 0.004962061121984312,
+      "mode": "mixed",
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.025
+    },
+    {
+      "candidate_interval_cm": 0.4,
+      "changes": {
+        "final_soil_micromol": 0.16736247452110053,
+        "fungus_uptake_share": 3.4420960718636485e-08,
+        "root_uptake_share": 3.694636589011254e-06,
+        "total_uptake_micromol": 0.20430135730398927
+      },
+      "maximum_change": 0.20430135730398927,
+      "mode": "mixed",
+      "passes_5_percent": false,
+      "reference_interval_cm": 0.025
+    }
+  ],
+  "finest_timestep_comparisons": [
+    {
+      "candidate_dt_days": 0.025,
+      "changes": {
+        "final_soil_micromol": 3.176879433930915e-07,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 1.1177977653183075e-05
+      },
+      "maximum_change": 1.1177977653183075e-05,
+      "mode": "root_only",
+      "passes_5_percent": true,
+      "reference_dt_days": 0.0125
+    },
+    {
+      "candidate_dt_days": 0.05,
+      "changes": {
+        "final_soil_micromol": 3.176879433930915e-07,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 3.254233816795739e-05
+      },
+      "maximum_change": 3.254233816795739e-05,
+      "mode": "root_only",
+      "passes_5_percent": true,
+      "reference_dt_days": 0.0125
+    },
+    {
+      "candidate_dt_days": 0.1,
+      "changes": {
+        "final_soil_micromol": 3.176879433930915e-07,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 7.581192908369268e-05
+      },
+      "maximum_change": 7.581192908369268e-05,
+      "mode": "root_only",
+      "passes_5_percent": true,
+      "reference_dt_days": 0.0125
+    },
+    {
+      "candidate_dt_days": 0.2,
+      "changes": {
+        "final_soil_micromol": 3.176879433930915e-07,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.00016217082095310102
+      },
+      "maximum_change": 0.00016217082095310102,
+      "mode": "root_only",
+      "passes_5_percent": true,
+      "reference_dt_days": 0.0125
+    },
+    {
+      "candidate_dt_days": 0.025,
+      "changes": {
+        "final_soil_micromol": 0.0015102868685549049,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.0018732589905503512
+      },
+      "maximum_change": 0.0018732589905503512,
+      "mode": "fungus_only",
+      "passes_5_percent": true,
+      "reference_dt_days": 0.0125
+    },
+    {
+      "candidate_dt_days": 0.05,
+      "changes": {
+        "final_soil_micromol": 0.004546474877567635,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.005636616059832503
+      },
+      "maximum_change": 0.005636616059832503,
+      "mode": "fungus_only",
+      "passes_5_percent": true,
+      "reference_dt_days": 0.0125
+    },
+    {
+      "candidate_dt_days": 0.1,
+      "changes": {
+        "final_soil_micromol": 0.010676294226171727,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.013233552778897258
+      },
+      "maximum_change": 0.013233552778897258,
+      "mode": "fungus_only",
+      "passes_5_percent": true,
+      "reference_dt_days": 0.0125
+    },
+    {
+      "candidate_dt_days": 0.2,
+      "changes": {
+        "final_soil_micromol": 0.023145364717160357,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.028689865197724825
+      },
+      "maximum_change": 0.028689865197724825,
+      "mode": "fungus_only",
+      "passes_5_percent": true,
+      "reference_dt_days": 0.0125
+    },
+    {
+      "candidate_dt_days": 0.025,
+      "changes": {
+        "final_soil_micromol": 0.0015121603040657422,
+        "fungus_uptake_share": 1.7259692125875025e-07,
+        "root_uptake_share": 1.8525592439731075e-05,
+        "total_uptake_micromol": 0.0018649785925155245
+      },
+      "maximum_change": 0.0018649785925155245,
+      "mode": "mixed",
+      "passes_5_percent": true,
+      "reference_dt_days": 0.0125
+    },
+    {
+      "candidate_dt_days": 0.05,
+      "changes": {
+        "final_soil_micromol": 0.004548826835788593,
+        "fungus_uptake_share": 4.982989317026889e-07,
+        "root_uptake_share": 5.348463262951118e-05,
+        "total_uptake_micromol": 0.005610732300023953
+      },
+      "maximum_change": 0.005610732300023953,
+      "mode": "mixed",
+      "passes_5_percent": true,
+      "reference_dt_days": 0.0125
+    },
+    {
+      "candidate_dt_days": 0.1,
+      "changes": {
+        "final_soil_micromol": 0.01067757299814438,
+        "fungus_uptake_share": 1.1807762163205487e-06,
+        "root_uptake_share": 0.00012673794409245824,
+        "total_uptake_micromol": 0.013170906501734529
+      },
+      "maximum_change": 0.013170906501734529,
+      "mode": "mixed",
+      "passes_5_percent": true,
+      "reference_dt_days": 0.0125
+    },
+    {
+      "candidate_dt_days": 0.2,
+      "changes": {
+        "final_soil_micromol": 0.023134753459083744,
+        "fungus_uptake_share": 2.6453327069575523e-06,
+        "root_uptake_share": 0.0002839352826482466,
+        "total_uptake_micromol": 0.028537000611111793
+      },
+      "maximum_change": 0.028537000611111793,
+      "mode": "mixed",
+      "passes_5_percent": true,
+      "reference_dt_days": 0.0125
+    }
+  ],
   "grid_comparisons": [
     {
       "candidate_interval_cm": 0.05,
@@ -1230,6 +2030,32 @@
       "reference_interval_cm": 0.05
     },
     {
+      "candidate_interval_cm": 0.2,
+      "changes": {
+        "final_soil_micromol": 3.1768804431875293e-07,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 2.2535993361764603e-06
+      },
+      "maximum_change": 2.2535993361764603e-06,
+      "mode": "root_only",
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.1
+    },
+    {
+      "candidate_interval_cm": 0.4,
+      "changes": {
+        "final_soil_micromol": 0.00034707407815695243,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.20000018028835315
+      },
+      "maximum_change": 0.20000018028835315,
+      "mode": "root_only",
+      "passes_5_percent": false,
+      "reference_interval_cm": 0.2
+    },
+    {
       "candidate_interval_cm": 0.05,
       "changes": {
         "final_soil_micromol": 0.0016950762482082103,
@@ -1256,6 +2082,32 @@
       "reference_interval_cm": 0.05
     },
     {
+      "candidate_interval_cm": 0.2,
+      "changes": {
+        "final_soil_micromol": 0.0008564255227574333,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.0010579849793668325
+      },
+      "maximum_change": 0.0010579849793668325,
+      "mode": "fungus_only",
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.1
+    },
+    {
+      "candidate_interval_cm": 0.4,
+      "changes": {
+        "final_soil_micromol": 0.16186202283342718,
+        "fungus_uptake_share": 0.0,
+        "root_uptake_share": 0.0,
+        "total_uptake_micromol": 0.20033042229974635
+      },
+      "maximum_change": 0.20033042229974635,
+      "mode": "fungus_only",
+      "passes_5_percent": false,
+      "reference_interval_cm": 0.2
+    },
+    {
       "candidate_interval_cm": 0.05,
       "changes": {
         "final_soil_micromol": 0.001718112937367341,
@@ -1280,9 +2132,93 @@
       "mode": "mixed",
       "passes_5_percent": true,
       "reference_interval_cm": 0.05
+    },
+    {
+      "candidate_interval_cm": 0.2,
+      "changes": {
+        "final_soil_micromol": 0.0008678957435295831,
+        "fungus_uptake_share": 8.321546972767246e-10,
+        "root_uptake_share": 8.932052725752768e-08,
+        "total_uptake_micromol": 0.0010673643085881402
+      },
+      "maximum_change": 0.0010673643085881402,
+      "mode": "mixed",
+      "passes_5_percent": true,
+      "reference_interval_cm": 0.1
+    },
+    {
+      "candidate_interval_cm": 0.4,
+      "changes": {
+        "final_soil_micromol": 0.16263742814807153,
+        "fungus_uptake_share": 4.653357118895252e-10,
+        "root_uptake_share": 4.994745705426816e-08,
+        "total_uptake_micromol": 0.20033336257185916
+      },
+      "maximum_change": 0.20033336257185916,
+      "mode": "mixed",
+      "passes_5_percent": false,
+      "reference_interval_cm": 0.2
     }
   ],
   "grid_scenarios": [
+    {
+      "capped_demand_fraction": 0.0,
+      "cell_count": 25,
+      "concentration_um": 1.0,
+      "diffusion_cfl_seconds": 10359306.0,
+      "dt_days": 0.025,
+      "final_soil_micromol": 6.005927085876465,
+      "fungus_uptake_micromol": 0.0,
+      "fungus_uptake_share": 0.0,
+      "horizon_days": 2.0,
+      "hyphal_density_cm_cm3": 0.0,
+      "initial_soil_micromol": 6.014266014099121,
+      "interval_cm": 0.4,
+      "maximum_continuous_weight": 0.0,
+      "mean_continuous_weight": 0.0,
+      "mean_fungus_surface_ratio": null,
+      "mean_root_surface_ratio": 0.1394239519536495,
+      "minimum_fungus_surface_ratio": null,
+      "minimum_root_surface_ratio": 0.13941901922225952,
+      "mode": "root_only",
+      "reference_time_days": 1.0,
+      "relative_p_balance_error": 7.536548386619245e-09,
+      "root_density_cm_cm3": 1.0,
+      "root_uptake_micromol": 0.008338882895849425,
+      "root_uptake_share": 1.0,
+      "soil_substeps": 1,
+      "total_uptake_micromol": 0.008338882895849425,
+      "transition_exponent": 2.0
+    },
+    {
+      "capped_demand_fraction": 0.0,
+      "cell_count": 100,
+      "concentration_um": 1.0,
+      "diffusion_cfl_seconds": 2589825.75,
+      "dt_days": 0.025,
+      "final_soil_micromol": 6.003843307495117,
+      "fungus_uptake_micromol": 0.0,
+      "fungus_uptake_share": 0.0,
+      "horizon_days": 2.0,
+      "hyphal_density_cm_cm3": 0.0,
+      "initial_soil_micromol": 6.014266490936279,
+      "interval_cm": 0.2,
+      "maximum_continuous_weight": 0.0,
+      "mean_continuous_weight": 0.0,
+      "mean_fungus_surface_ratio": null,
+      "mean_root_surface_ratio": 0.13942395186424256,
+      "minimum_fungus_surface_ratio": null,
+      "minimum_root_surface_ratio": 0.13941901922225952,
+      "mode": "root_only",
+      "reference_time_days": 1.0,
+      "relative_p_balance_error": 7.025423944061777e-08,
+      "root_density_cm_cm3": 1.0,
+      "root_uptake_micromol": 0.010423605968880223,
+      "root_uptake_share": 1.0,
+      "soil_substeps": 1,
+      "total_uptake_micromol": 0.010423605968880223,
+      "transition_exponent": 2.0
+    },
     {
       "capped_demand_fraction": 0.0,
       "cell_count": 400,
@@ -1372,6 +2308,64 @@
     },
     {
       "capped_demand_fraction": 0.0,
+      "cell_count": 25,
+      "concentration_um": 1.0,
+      "diffusion_cfl_seconds": 10359306.0,
+      "dt_days": 0.025,
+      "final_soil_micromol": 3.8649580478668213,
+      "fungus_uptake_micromol": 2.1493074512451518,
+      "fungus_uptake_share": 1.0,
+      "horizon_days": 2.0,
+      "hyphal_density_cm_cm3": 2000.0,
+      "initial_soil_micromol": 6.014266014099121,
+      "interval_cm": 0.4,
+      "maximum_continuous_weight": 0.8378024697303772,
+      "mean_continuous_weight": 0.837802505493164,
+      "mean_fungus_surface_ratio": 0.5136047464609146,
+      "mean_root_surface_ratio": null,
+      "minimum_fungus_surface_ratio": 0.5069864988327026,
+      "minimum_root_surface_ratio": null,
+      "mode": "fungus_only",
+      "reference_time_days": 1.0,
+      "relative_p_balance_error": 8.562759725454777e-08,
+      "root_density_cm_cm3": 0.0,
+      "root_uptake_micromol": 0.0,
+      "root_uptake_share": 0.0,
+      "soil_substeps": 1,
+      "total_uptake_micromol": 2.1493074512451518,
+      "transition_exponent": 2.0
+    },
+    {
+      "capped_demand_fraction": 0.0,
+      "cell_count": 100,
+      "concentration_um": 1.0,
+      "diffusion_cfl_seconds": 2589825.75,
+      "dt_days": 0.025,
+      "final_soil_micromol": 3.3265206813812256,
+      "fungus_uptake_micromol": 2.68774442742499,
+      "fungus_uptake_share": 1.0,
+      "horizon_days": 2.0,
+      "hyphal_density_cm_cm3": 2000.0,
+      "initial_soil_micromol": 6.014266490936279,
+      "interval_cm": 0.2,
+      "maximum_continuous_weight": 0.8378024697303772,
+      "mean_continuous_weight": 0.8378028106689454,
+      "mean_fungus_surface_ratio": 0.5136084713935852,
+      "mean_root_surface_ratio": null,
+      "minimum_fungus_surface_ratio": 0.5069864392280579,
+      "minimum_root_surface_ratio": null,
+      "mode": "fungus_only",
+      "reference_time_days": 1.0,
+      "relative_p_balance_error": 2.298085836094393e-07,
+      "root_density_cm_cm3": 0.0,
+      "root_uptake_micromol": 0.0,
+      "root_uptake_share": 0.0,
+      "soil_substeps": 1,
+      "total_uptake_micromol": 2.68774442742499,
+      "transition_exponent": 2.0
+    },
+    {
+      "capped_demand_fraction": 0.0,
       "cell_count": 400,
       "concentration_um": 1.0,
       "diffusion_cfl_seconds": 647456.25,
@@ -1455,6 +2449,64 @@
       "root_uptake_share": 0.0,
       "soil_substeps": 1,
       "total_uptake_micromol": 2.701028984522482,
+      "transition_exponent": 2.0
+    },
+    {
+      "capped_demand_fraction": 0.0,
+      "cell_count": 25,
+      "concentration_um": 1.0,
+      "diffusion_cfl_seconds": 10359306.0,
+      "dt_days": 0.025,
+      "final_soil_micromol": 3.859302282333374,
+      "fungus_uptake_micromol": 2.1350717807653736,
+      "fungus_uptake_share": 0.9907694940719775,
+      "horizon_days": 2.0,
+      "hyphal_density_cm_cm3": 2000.0,
+      "initial_soil_micromol": 6.014266014099121,
+      "interval_cm": 0.4,
+      "maximum_continuous_weight": 0.8378024697303772,
+      "mean_continuous_weight": 0.837802505493164,
+      "mean_fungus_surface_ratio": 0.5135435682535171,
+      "mean_root_surface_ratio": 0.1377596452832222,
+      "minimum_fungus_surface_ratio": 0.5069347620010376,
+      "minimum_root_surface_ratio": 0.13690344989299774,
+      "mode": "mixed",
+      "reference_time_days": 1.0,
+      "relative_p_balance_error": 9.154596476408286e-08,
+      "root_density_cm_cm3": 1.0,
+      "root_uptake_micromol": 0.019891400418588744,
+      "root_uptake_share": 0.009230505928022478,
+      "soil_substeps": 1,
+      "total_uptake_micromol": 2.1549631811839625,
+      "transition_exponent": 2.0
+    },
+    {
+      "capped_demand_fraction": 0.0,
+      "cell_count": 100,
+      "concentration_um": 1.0,
+      "diffusion_cfl_seconds": 2589825.75,
+      "dt_days": 0.025,
+      "final_soil_micromol": 3.3194375038146973,
+      "fungus_uptake_micromol": 2.669952304907505,
+      "fungus_uptake_share": 0.9907694945330179,
+      "horizon_days": 2.0,
+      "hyphal_density_cm_cm3": 2000.0,
+      "initial_soil_micromol": 6.014266490936279,
+      "interval_cm": 0.2,
+      "maximum_continuous_weight": 0.8378024697303772,
+      "mean_continuous_weight": 0.8378028106689454,
+      "mean_fungus_surface_ratio": 0.513547281742096,
+      "mean_root_surface_ratio": 0.13776011908054353,
+      "minimum_fungus_surface_ratio": 0.5069347023963928,
+      "minimum_root_surface_ratio": 0.13690343499183655,
+      "mode": "mixed",
+      "reference_time_days": 1.0,
+      "relative_p_balance_error": 3.437827162515075e-07,
+      "root_density_cm_cm3": 1.0,
+      "root_uptake_micromol": 0.02487461461320674,
+      "root_uptake_share": 0.009230505466982203,
+      "soil_substeps": 1,
+      "total_uptake_micromol": 2.6948269195207115,
       "transition_exponent": 2.0
     },
     {
@@ -1564,7 +2616,7 @@
       "root_density_cm_cm3": 1.0
     },
     "float_precision": "JAX default float32",
-    "generated_at": "2026-08-24T10:37:18+0200",
+    "generated_at": "2026-08-24T12:04:58+0200",
     "horizon_days": 2.0,
     "jax_backend": "cpu",
     "jax_devices": [
@@ -1579,8 +2631,9 @@
     "dt_days": 0.025,
     "dt_had_passing_candidate": true,
     "grid_had_passing_candidate": true,
-    "grid_interval_cm": 0.1,
-    "timestep_basis": "fixed_geometry_soil_solver"
+    "grid_interval_cm": 0.05,
+    "spatial_basis": "next-smaller-and-finest-grid",
+    "timestep_basis": "next-smaller-and-finest-timestep"
   },
   "timestep_comparisons": [
     {
