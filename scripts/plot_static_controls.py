@@ -9,6 +9,10 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.ticker import FixedLocator, FixedFormatter
+
+
+_P_MAJOR_TICKS = (0.1, 0.5, 1.0, 5.0, 10.0)
 
 
 def summarise(entries: list[dict]) -> list[dict[str, float]]:
@@ -56,7 +60,7 @@ def plot(records: list[dict[str, float]], output: Path) -> None:
     delta_axis.axhline(1, color="#555555", linewidth=0.8, zorder=0)
     delta_axis.scatter(p, delta_am, color="#2878b5", s=54, zorder=2)
     delta_axis.plot(p, delta_am, color="#2878b5", linewidth=1.1, zorder=1)
-    delta_axis.set_ylabel(r"Paired median $\Delta_{AM}$ (mixed / plant-only)")
+    delta_axis.set_ylabel(r"$\Delta_{AM}$ (mixed / plant-only)")
     delta_axis.set_title("Static controls: mycorrhizal plant biomass ratio")
     delta_axis.grid(axis="y", color="#dddddd", linewidth=0.6)
 
@@ -65,10 +69,14 @@ def plot(records: list[dict[str, float]], output: Path) -> None:
     biomass_axis.scatter(p, plant_only, color="#d95f02", marker="s", s=46, label="Plant-only")
     biomass_axis.plot(p, plant_only, color="#d95f02", linewidth=1.1)
     biomass_axis.set_xscale("log")
-    biomass_axis.set_xticks(p, [f"{value:g}" for value in p])
+    biomass_axis.xaxis.set_major_locator(FixedLocator(_P_MAJOR_TICKS))
+    biomass_axis.xaxis.set_major_formatter(
+        FixedFormatter([f"{value:g}" for value in _P_MAJOR_TICKS])
+    )
+    biomass_axis.tick_params(axis="x", which="minor", length=3)
     biomass_axis.set_xlabel("Initial solution P (µM)")
-    biomass_axis.set_ylabel("Median final plant biomass (g)")
-    biomass_axis.set_title("Median final plant biomass")
+    biomass_axis.set_ylabel("Final plant biomass (g)")
+    biomass_axis.set_title("Final plant biomass")
     biomass_axis.grid(axis="y", color="#dddddd", linewidth=0.6)
     biomass_axis.legend(frameon=False)
 

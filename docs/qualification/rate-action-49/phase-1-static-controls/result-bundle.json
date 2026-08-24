@@ -1,0 +1,1591 @@
+{
+  "completion": {
+    "completed": 26,
+    "requested": 26
+  },
+  "control_format": "mycormarl-static-controls",
+  "control_format_version": 1,
+  "entries": [
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.028465380892157555,
+        "plant": 0.024269038811326027
+      },
+      "c_pools": {
+        "fungus": 2.8861519240308553e-05,
+        "plant": 0.010585377924144268
+      },
+      "cumulative_carbon_fixed": 0.06939167529344559,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0591416172683239,
+        "plant": 0.004214543383568525
+      },
+      "cumulative_growth": {
+        "fungus": 0.027495017275214195,
+        "plant": 0.01426903810352087
+      },
+      "initial_p_micromolar": 0.1,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": 2.563319867476821e-07,
+      "p_loss_or_export": 3.8525802665390074e-05,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 3.8525802665390074e-05,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.00017631423543207347,
+        "plant": 3.975878280471079e-05
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 18.269384384155273,
+      "soil_inventory_initial": 18.332740783691406,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.023221762850880623,
+        "plant_c_out": 0.0387878492474556
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0591416172683239,
+        "plant": 0.004214543383568525
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.11015737801790237,
+        "plant": 0.3000631332397461
+      },
+      "c_pools": {
+        "fungus": 0.00028411427047103643,
+        "plant": 0.06248847022652626
+      },
+      "cumulative_carbon_fixed": 0.36123135685920715,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.6500791907310486,
+        "plant": 0.06284607201814651
+      },
+      "cumulative_growth": {
+        "fungus": 0.10927172005176544,
+        "plant": 0.29006320238113403
+      },
+      "initial_p_micromolar": 0.3,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": -8.34872480481863e-07,
+      "p_loss_or_export": 0.00014864880358800292,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.00014864880358800292,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.011551166884601116,
+        "plant": 0.0024001854471862316
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 54.2852897644043,
+      "soil_inventory_initial": 54.99821472167969,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.4964752495288849,
+        "plant_c_out": 0.10781882703304291
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.6500791907310486,
+        "plant": 0.06284607201814651
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.20977365970611572,
+        "plant": 1.0279548168182373
+      },
+      "c_pools": {
+        "fungus": 0.0007104427786543965,
+        "plant": 0.14028039574623108
+      },
+      "cumulative_carbon_fixed": 0.9235106706619263,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 1.995666742324829,
+        "plant": 0.29458847641944885
+      },
+      "cumulative_growth": {
+        "fungus": 0.20894163846969604,
+        "plant": 1.01795494556427
+      },
+      "initial_p_micromolar": 0.5,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": 4.59479633718729e-06,
+      "p_loss_or_export": 0.00021838059183210135,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.00021838059183210135,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.05264952778816223,
+        "plant": 0.011508865281939507
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 89.37342071533203,
+      "soil_inventory_initial": 91.66368103027344,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 1.6713930368423462,
+        "plant_c_out": 0.18405841290950775
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 1.995666742324829,
+        "plant": 0.29458847641944885
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.2682678997516632,
+        "plant": 1.7066264152526855
+      },
+      "c_pools": {
+        "fungus": 0.000999831361696124,
+        "plant": 0.1909215897321701
+      },
+      "cumulative_carbon_fixed": 1.3845070600509644,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 3.1350972652435303,
+        "plant": 0.5853077173233032
+      },
+      "cumulative_growth": {
+        "fungus": 0.26746299862861633,
+        "plant": 1.6966265439987183
+      },
+      "initial_p_micromolar": 0.625,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": -1.0340154403820634e-05,
+      "p_loss_or_export": 0.0002535811217967421,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0002535811217967421,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.09390876442193985,
+        "plant": 0.021267365664243698
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 110.85921478271484,
+      "soil_inventory_initial": 114.57960510253906,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 2.6934821605682373,
+        "plant_c_out": 0.22679466009140015
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 3.1350972652435303,
+        "plant": 0.5853077173233032
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.32002755999565125,
+        "plant": 2.5295848846435547
+      },
+      "c_pools": {
+        "fungus": 0.0012786901788786054,
+        "plant": 0.2386438250541687
+      },
+      "cumulative_carbon_fixed": 1.907288908958435,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 4.4284515380859375,
+        "plant": 1.0035076141357422
+      },
+      "cumulative_growth": {
+        "fungus": 0.3192460536956787,
+        "plant": 2.519584894180298
+      },
+      "initial_p_micromolar": 0.75,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": -2.7289381250739098e-05,
+      "p_loss_or_export": 0.0002841202076524496,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0002841202076524496,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.14530573785305023,
+        "plant": 0.03402934595942497
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 132.06353759765625,
+      "soil_inventory_initial": 137.49546813964844,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 3.868126153945923,
+        "plant_c_out": 0.2635372281074524
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 4.4284515380859375,
+        "plant": 1.0035076141357422
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.3637508749961853,
+        "plant": 3.468873977661133
+      },
+      "c_pools": {
+        "fungus": 0.0015328144654631615,
+        "plant": 0.2813400328159332
+      },
+      "cumulative_carbon_fixed": 2.474356174468994,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 5.809922695159912,
+        "plant": 1.5564303398132324
+      },
+      "cumulative_growth": {
+        "fungus": 0.3629898130893707,
+        "plant": 3.458874464035034
+      },
+      "initial_p_micromolar": 0.875,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": 2.3408123524859548e-05,
+      "p_loss_or_export": 0.0003106703225057572,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0003106703225057572,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.20399625599384308,
+        "plant": 0.049434367567300797
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 153.0451202392578,
+      "soil_inventory_initial": 160.4114990234375,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 5.134045124053955,
+        "plant_c_out": 0.29372939467430115
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 5.809922695159912,
+        "plant": 1.5564303398132324
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.39910292625427246,
+        "plant": 4.497290134429932
+      },
+      "c_pools": {
+        "fungus": 0.0017542213900014758,
+        "plant": 0.31792178750038147
+      },
+      "cumulative_carbon_fixed": 3.0706279277801514,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 7.221410751342773,
+        "plant": 2.2461602687835693
+      },
+      "cumulative_growth": {
+        "fungus": 0.39835959672927856,
+        "plant": 4.487290382385254
+      },
+      "initial_p_micromolar": 1.0,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": 3.7105841329321265e-05,
+      "p_loss_or_export": 0.0003336890658829361,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0003336890658829361,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.26707008481025696,
+        "plant": 0.06703361868858337
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 173.85975646972656,
+      "soil_inventory_initial": 183.32736206054688,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 6.436469078063965,
+        "plant_c_out": 0.31741467118263245
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 7.221410751342773,
+        "plant": 2.2461602687835693
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.4263516962528229,
+        "plant": 5.590529918670654
+      },
+      "c_pools": {
+        "fungus": 0.001939435489475727,
+        "plant": 0.3480086922645569
+      },
+      "cumulative_carbon_fixed": 3.683833360671997,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 8.615806579589844,
+        "plant": 3.071169137954712
+      },
+      "cumulative_growth": {
+        "fungus": 0.4256236255168915,
+        "plant": 5.580530166625977
+      },
+      "initial_p_micromolar": 1.125,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": -3.804167499765754e-05,
+      "p_loss_or_export": 0.0003535234718583524,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0003535234718583524,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.3325875997543335,
+        "plant": 0.08645753562450409
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 194.556396484375,
+      "soil_inventory_initial": 206.2433319091797,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 7.729898929595947,
+        "plant_c_out": 0.33499422669410706
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 8.615806579589844,
+        "plant": 3.071169137954712
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.4460855722427368,
+        "plant": 6.7277069091796875
+      },
+      "c_pools": {
+        "fungus": 0.002087859669700265,
+        "plant": 0.37166452407836914
+      },
+      "cumulative_carbon_fixed": 4.304202556610107,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 9.954971313476562,
+        "plant": 4.027282238006592
+      },
+      "cumulative_growth": {
+        "fungus": 0.44537055492401123,
+        "plant": 6.717706680297852
+      },
+      "initial_p_micromolar": 1.25,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": -2.059084363281727e-05,
+      "p_loss_or_export": 0.00037040491588413715,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.00037040491588413715,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.3980056345462799,
+        "plant": 0.1072593703866005
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 215.17698669433594,
+      "soil_inventory_initial": 229.15921020507812,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 8.977985382080078,
+        "plant_c_out": 0.3470402657985687
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 9.954971313476562,
+        "plant": 4.027282238006592
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.4669782519340515,
+        "plant": 9.044968605041504
+      },
+      "c_pools": {
+        "fungus": 0.0023352233693003654,
+        "plant": 0.4086958169937134
+      },
+      "cumulative_carbon_fixed": 5.5366950035095215,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 12.37533950805664,
+        "plant": 6.254408836364746
+      },
+      "cumulative_growth": {
+        "fungus": 0.46628281474113464,
+        "plant": 9.034968376159668
+      },
+      "initial_p_micromolar": 1.5,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": -0.00014244744670577347,
+      "p_loss_or_export": 0.0003959404130000621,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0003959404130000621,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.5282403230667114,
+        "plant": 0.14820446074008942
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 256.361328125,
+      "soil_inventory_initial": 274.9909362792969,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 11.240931510925293,
+        "plant_c_out": 0.3576190173625946
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 12.37533950805664,
+        "plant": 6.254408836364746
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.40340283513069153,
+        "plant": 20.66050148010254
+      },
+      "c_pools": {
+        "fungus": 0.0029332968406379223,
+        "plant": 0.4708416163921356
+      },
+      "cumulative_carbon_fixed": 11.397466659545898,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 20.32947540283203,
+        "plant": 21.548845291137695
+      },
+      "cumulative_growth": {
+        "fungus": 0.4027222990989685,
+        "plant": 20.650501251220703
+      },
+      "initial_p_micromolar": 3.0,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": -0.0003544628561940044,
+      "p_loss_or_export": 0.00041531361057423055,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.00041531361057423055,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 1.333305835723877,
+        "plant": 0.37247246503829956
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 508.10394287109375,
+      "soil_inventory_initial": 549.9818725585938,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 18.472640991210938,
+        "plant_c_out": 0.28220152854919434
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 20.32947540283203,
+        "plant": 21.548845291137695
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.1832304298877716,
+        "plant": 26.061120986938477
+      },
+      "c_pools": {
+        "fungus": 0.00367387174628675,
+        "plant": 0.501520037651062
+      },
+      "cumulative_carbon_fixed": 13.969049453735352,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 12.904170989990234,
+        "plant": 39.72454071044922
+      },
+      "cumulative_growth": {
+        "fungus": 0.18254992365837097,
+        "plant": 26.05112075805664
+      },
+      "initial_p_micromolar": 5.0,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": 1.5561148757115006e-05,
+      "p_loss_or_export": 0.00041531524038873613,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.00041531524038873613,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 1.8352622985839844,
+        "plant": 0.5379776358604431
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 864.0081176757812,
+      "soil_inventory_initial": 916.6368408203125,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 10.831583023071289,
+        "plant_c_out": 0.12355969101190567
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 12.904170989990234,
+        "plant": 39.72454071044922
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.12090100347995758,
+        "plant": 27.23089027404785
+      },
+      "c_pools": {
+        "fungus": 0.00067451864015311,
+        "plant": 0.11888369917869568
+      },
+      "cumulative_carbon_fixed": 14.035001754760742,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 20.129833221435547,
+        "plant": 78.40218353271484
+      },
+      "cumulative_growth": {
+        "fungus": 0.12022049725055695,
+        "plant": 27.220890045166016
+      },
+      "initial_p_micromolar": 10.0,
+      "initial_solution_p_profiled": true,
+      "mode": "mixed",
+      "p_accounting_residual": -0.00042312903678976,
+      "p_loss_or_export": 0.00041531524038873613,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.00041531524038873613,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 1.0432701110839844,
+        "plant": 45.0681266784668
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 1734.7423095703125,
+      "soil_inventory_initial": 1833.273681640625,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 18.930294036865234,
+        "plant_c_out": 0.0885295495390892
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 20.129833221435547,
+        "plant": 78.40218353271484
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 0.011739094741642475
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 0.03451411426067352
+      },
+      "cumulative_carbon_fixed": 0.0443384125828743,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 0.0033437074162065983
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 0.00173921138048172
+      },
+      "initial_p_micromolar": 0.1,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": 2.002343535423279e-06,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 4.424824510351755e-06
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 18.329395294189453,
+      "soil_inventory_initial": 18.332740783691406,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 0.0033437074162065983
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 0.016197053715586662
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 0.03937225788831711
+      },
+      "cumulative_carbon_fixed": 0.05271337926387787,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 0.011916817165911198
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 0.006197056733071804
+      },
+      "initial_p_micromolar": 0.3,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": -7.325783371925354e-06,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 1.8468534108251333e-05
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 54.986305236816406,
+      "soil_inventory_initial": 54.99821472167969,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 0.011916817165911198
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 0.022395486012101173
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 0.04524030163884163
+      },
+      "cumulative_carbon_fixed": 0.06323923170566559,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 0.02384238876402378
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 0.012395504862070084
+      },
+      "initial_p_micromolar": 0.5,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": 7.146969437599182e-06,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 4.301004810258746e-05
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 91.63983154296875,
+      "soil_inventory_initial": 91.66368103027344,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 0.02384238876402378
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 0.027458423748612404
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 0.049519892781972885
+      },
+      "cumulative_carbon_fixed": 0.0711902305483818,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 0.03358655050396919
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 0.017458420246839523
+      },
+      "initial_p_micromolar": 0.625,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": -2.487190067768097e-05,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 6.640450010308996e-05
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 114.5460433959961,
+      "soil_inventory_initial": 114.57960510253906,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 0.03358655050396919
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 0.03370075672864914
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 0.05434766039252281
+      },
+      "cumulative_carbon_fixed": 0.08042821288108826,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 0.04560400918126106
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 0.023700743913650513
+      },
+      "initial_p_micromolar": 0.75,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": -2.5993213057518005e-05,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 9.854088420979679e-05
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 137.44989013671875,
+      "soil_inventory_initial": 137.49546813964844,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 0.04560400918126106
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 0.041403595358133316
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 0.059797272086143494
+      },
+      "cumulative_carbon_fixed": 0.09118827432394028,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 0.06043705344200134
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 0.031403522938489914
+      },
+      "initial_p_micromolar": 0.875,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": 1.8129125237464905e-05,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 0.00014229399675969034
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 160.35104370117188,
+      "soil_inventory_initial": 160.4114990234375,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 0.06043705344200134
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 0.05091263726353645
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 0.06595125794410706
+      },
+      "cumulative_carbon_fixed": 0.10374940186738968,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 0.07875371724367142
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 0.04091272130608559
+      },
+      "initial_p_micromolar": 1.0,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": -3.030523657798767e-06,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 0.00020137851242907345
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 183.2486114501953,
+      "soil_inventory_initial": 183.32736206054688,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 0.07875371724367142
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 0.0626549944281578
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 0.07290235906839371
+      },
+      "cumulative_carbon_fixed": 0.11844469606876373,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 0.10137802362442017
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 0.052655044943094254
+      },
+      "initial_p_micromolar": 1.125,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": -1.4064833521842957e-05,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 0.0002806120610330254
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 206.1419677734375,
+      "soil_inventory_initial": 206.2433319091797,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 0.10137802362442017
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 0.07715640962123871
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 0.08075399696826935
+      },
+      "cumulative_carbon_fixed": 0.13566932082176208,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 0.1293264925479889
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 0.06715632975101471
+      },
+      "initial_p_micromolar": 1.25,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": -3.878585994243622e-05,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 0.0003862144367303699
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 229.02992248535156,
+      "soil_inventory_initial": 229.15921020507812,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 0.1293264925479889
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 0.11718174815177917
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 0.09962476044893265
+      },
+      "cumulative_carbon_fixed": 0.17968517541885376,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 0.20649991929531097
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 0.10718166828155518
+      },
+      "initial_p_micromolar": 1.5,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": -4.8471614718437195e-05,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 0.000710930849891156
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 274.78448486328125,
+      "soil_inventory_initial": 274.9909362792969,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 0.20649991929531097
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 1.457486629486084
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 0.3654595911502838
+      },
+      "cumulative_carbon_fixed": 1.1926367282867432,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 2.7973744869232178
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 1.4474868774414062
+      },
+      "initial_p_micromolar": 3.0,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": -7.232837378978729e-05,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 0.018200360238552094
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 547.1845703125,
+      "soil_inventory_initial": 549.9818725585938,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 2.7973744869232178
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 21.004037857055664
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 2.310791015625
+      },
+      "cumulative_carbon_fixed": 13.532909393310547,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 40.523353576660156
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 20.994035720825195
+      },
+      "initial_p_micromolar": 5.0,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": 0.00019517727196216583,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 0.2148124724626541
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 876.11328125,
+      "soil_inventory_initial": 916.6368408203125,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 40.523353576660156
+      }
+    },
+    {
+      "biological_deaths": {
+        "fungus": 0,
+        "plant": 0
+      },
+      "biomass": {
+        "fungus": 0.0,
+        "plant": 28.994792938232422
+      },
+      "c_pools": {
+        "fungus": 0.0,
+        "plant": 0.12739361822605133
+      },
+      "cumulative_carbon_fixed": 14.826766967773438,
+      "cumulative_direct_p_uptake_mg": {
+        "fungus": 0.0,
+        "plant": 80.83131408691406
+      },
+      "cumulative_growth": {
+        "fungus": 0.0,
+        "plant": 28.984792709350586
+      },
+      "initial_p_micromolar": 10.0,
+      "initial_solution_p_profiled": true,
+      "mode": "plant-only",
+      "p_accounting_residual": -0.00022443942725658417,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "fungus_maintenance": 0.0,
+        "fungus_mortality": 0.0,
+        "fungus_reproduction": 0.0,
+        "plant_maintenance": 0.0,
+        "plant_mortality": 0.0,
+        "plant_reproduction": 0.0
+      },
+      "p_pools": {
+        "fungus": 0.0,
+        "plant": 25.18059730529785
+      },
+      "rejection_reasons": [],
+      "seed": 0,
+      "soil_inventory_final": 1752.4425048828125,
+      "soil_inventory_initial": 1833.273681640625,
+      "status": "completed",
+      "steps": 4800,
+      "terminated": true,
+      "transfers": {
+        "fungus_p_out": 0.0,
+        "plant_c_out": 0.0
+      },
+      "uniform_initial_p": false,
+      "uptake": {
+        "fungus": 0.0,
+        "plant": 80.83131408691406
+      }
+    }
+  ],
+  "execution_identity": "025c433804a4d67e14bc018d782ef56a4e9e06ca7cfc71a2a3d431a679add087",
+  "format": "mycormarl-study-result",
+  "format_version": 2,
+  "manifest": {
+    "evaluation": {
+      "episodes": 1,
+      "protocol": "latent-location"
+    },
+    "horizon": {
+      "days": 120.0,
+      "timestep_days": 0.025
+    },
+    "initial_p_micromolar": [
+      0.1,
+      0.3,
+      0.5,
+      0.625,
+      0.75,
+      0.875,
+      1.0,
+      1.125,
+      1.25,
+      1.5,
+      3.0,
+      5.0,
+      10.0
+    ],
+    "model": {
+      "environment": {
+        "depth_interval_cm": 0.1,
+        "initial_solution_p_depth_profile": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            5.0,
+            1.0
+          ],
+          [
+            15.0,
+            0.345
+          ],
+          [
+            30.0,
+            0.17
+          ],
+          [
+            60.0,
+            0.103
+          ],
+          [
+            100.0,
+            0.069
+          ]
+        ],
+        "radial_interval_cm": 0.1,
+        "soil_depth_cm": 60.0,
+        "soil_radius_cm": 20.0
+      },
+      "species": {
+        "fungus": {},
+        "plant": {}
+      }
+    },
+    "modes": [
+      "mixed",
+      "plant-only"
+    ],
+    "output": {
+      "directory": "outputs/rate-action-49",
+      "identity": "phase-1-static-controls-growth-only-13p"
+    },
+    "schema_version": 1,
+    "seeds": [
+      0
+    ],
+    "stage": "static-controls",
+    "static_policy": {
+      "fungus": [
+        1.203973,
+        6.907755,
+        0.0,
+        0.0
+      ],
+      "plant": [
+        0.051293,
+        6.907755,
+        0.0,
+        0.0
+      ]
+    },
+    "training": {
+      "checkpoint_interval_timesteps": 1,
+      "total_timesteps": 1
+    }
+  },
+  "provenance": {
+    "actor_interface_version": "two-head-latent-v1",
+    "dependency_lock_sha256": "ede9da69229b285ceb5ffe48e5d13f1b8e787394db16f31c39bb35b7aa4f1f0a",
+    "environment_state_schema_version": "state-v2",
+    "execution_kind": "contract-fixture",
+    "git_commit": "35b8a4520718638e3b9742c80985df6a8a36295b",
+    "git_dirty": false,
+    "jax_version": "0.9.0",
+    "jaxlib_version": "0.9.0",
+    "manifest_schema_version": 1,
+    "mycormarl_version": "0.1.0",
+    "numerical_timestep_days": 0.025,
+    "policy_decision_interval_days": 0.025,
+    "python_version": "3.12.9",
+    "result_format_version": 2
+  },
+  "random_streams": {
+    "derivation_version": "named-prng-v1",
+    "stream_names": [
+      "plant_initialization",
+      "fungal_initialization",
+      "policy_action_sampling",
+      "environment_variation",
+      "minibatch_ordering"
+    ]
+  },
+  "status": "complete",
+  "study_identity": "c356f2e2e27c0c461e11f7b8271eea7d04b4be564dfea8bba9d2182b6cf751b0"
+}
