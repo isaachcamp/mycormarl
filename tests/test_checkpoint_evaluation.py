@@ -2,6 +2,7 @@
 
 import jax
 from flax import serialization
+from flax.core import freeze, unfreeze
 
 from mycormarl.algos.ppo import ActorCritic
 from mycormarl.checkpoint_evaluation import (
@@ -106,7 +107,12 @@ def test_checkpoint_evaluation_and_artifact_preserve_the_complete_trace(tmp_path
             "actor_interface_version": "two-head-latent-v1",
             "environment_state_schema_version": "state-v2",
         },
-        "runner_state": {"0": {agent: {"params": parameters[agent]} for agent in (PLANT, FUNGUS)}},
+        "runner_state": {
+            "0": {
+                agent: {"params": serialization.to_state_dict(parameters[agent])}
+                for agent in (PLANT, FUNGUS)
+            }
+        },
     }))
 
     result = evaluate_checkpoint(checkpoint, environment, episodes=1, seed=8)
@@ -115,6 +121,46 @@ def test_checkpoint_evaluation_and_artifact_preserve_the_complete_trace(tmp_path
 
     assert artifact.exists()
     assert '"protocol": "latent-location"' in artifact.read_text(encoding="utf-8")
+
+
+def test_checkpoint_evaluation_reconstructs_the_saved_actor_activation(tmp_path):
+    """Checkpoint evaluation must not apply tanh-trained weights with ReLU."""
+    environment = _environment()
+    actor = ActorCritic(activation="tanh")
+    observations, _ = environment.reset(jax.random.PRNGKey(0))
+    parameters = {
+        agent: actor.init(jax.random.PRNGKey(index + 1), observations[agent])
+        for index, agent in enumerate((PLANT, FUNGUS))
+    }
+    for agent in (PLANT, FUNGUS):
+        mutable = unfreeze(parameters[agent])
+        mutable["params"]["trade_head"]["kernel"] = (
+            mutable["params"]["trade_head"]["kernel"] * 3.0 + 1.0
+        )
+        parameters[agent] = freeze(mutable)
+    checkpoint = tmp_path / "checkpoint.msgpack"
+    checkpoint.write_bytes(serialization.msgpack_serialize({
+        "format": "mycormarl-ppo-checkpoint",
+        "format_version": 1,
+        "metadata": {
+            "actor_interface_version": "two-head-latent-v1",
+            "environment_state_schema_version": "state-v2",
+            "actor_configuration": {"activation": "tanh"},
+        },
+        "runner_state": {
+            "0": {
+                agent: {"params": serialization.to_state_dict(parameters[agent])}
+                for agent in (PLANT, FUNGUS)
+            }
+        },
+    }))
+
+    expected = evaluate_policy_parameters(
+        environment, parameters, episodes=1, seed=8, actor=actor,
+    )
+    actual = evaluate_checkpoint(checkpoint, environment, episodes=1, seed=8)
+
+    assert actual == expected
 
 
 def test_checkpoint_summary_artifact_includes_final_biomass_for_post_analysis(tmp_path):

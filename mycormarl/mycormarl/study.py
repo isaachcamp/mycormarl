@@ -950,6 +950,11 @@ def _training_config(manifest: dict[str, Any], timesteps: int) -> PPOConfig:
     )
 
 
+def _actor_configuration(config: PPOConfig) -> dict[str, str]:
+    """Persist every actor setting that changes checkpoint execution."""
+    return {"activation": config.ACTIVATION}
+
+
 def _training_diagnostics(chunks: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
     """Summarise PPO optimizer health since the preceding saved checkpoint."""
     fields = ("total_loss", "value_loss", "actor_loss", "approx_kl", "latent_entropy")
@@ -1115,6 +1120,7 @@ def _run_condition_training(
             "transitions": transitions,
             "named_random_streams": streams.to_dict(),
             "manifest": manifest,
+            "actor_configuration": _actor_configuration(config),
             "actor_interface_version": ACTOR_INTERFACE_VERSION,
             "environment_state_schema_version": ENVIRONMENT_STATE_SCHEMA_VERSION,
         }
@@ -1326,6 +1332,7 @@ def _run_single_condition_training(
             "transitions": transitions,
             "named_random_streams": streams.to_dict(),
             "manifest": manifest,
+            "actor_configuration": _actor_configuration(config),
             "actor_interface_version": ACTOR_INTERFACE_VERSION,
             "environment_state_schema_version": ENVIRONMENT_STATE_SCHEMA_VERSION,
         }
@@ -1354,6 +1361,7 @@ def _run_single_condition_training(
         "transitions": transitions,
         "named_random_streams": streams.to_dict(),
         "manifest": manifest,
+        "actor_configuration": _actor_configuration(config),
         "actor_interface_version": ACTOR_INTERFACE_VERSION,
         "environment_state_schema_version": ENVIRONMENT_STATE_SCHEMA_VERSION,
     }

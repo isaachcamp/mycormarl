@@ -51,6 +51,25 @@ class SampledPolicyEvaluation:
 
 
 CheckpointEvaluation = LatentLocationEvaluation | SampledPolicyEvaluation
+_LEGACY_ACTOR_CONFIGURATION = {"activation": "tanh"}
+
+
+def _actor_from_checkpoint_metadata(metadata: Mapping[str, Any]) -> ActorCritic:
+    """Reconstruct the actor architecture that produced checkpoint parameters.
+
+    Phase-1 checkpoints written before actor settings were persisted used the
+    production PPO default, ``tanh``. Keeping that compatibility path explicit
+    avoids silently evaluating them with the module's unrelated ReLU default.
+    """
+    configuration = metadata.get("actor_configuration")
+    if configuration is None:
+        configuration = _LEGACY_ACTOR_CONFIGURATION
+    if not isinstance(configuration, Mapping):
+        raise ValueError("training checkpoint actor configuration is invalid")
+    activation = configuration.get("activation")
+    if activation not in {"relu", "tanh"}:
+        raise ValueError("training checkpoint actor activation is unsupported")
+    return ActorCritic(activation=activation)
 
 
 def _plain(value: Any) -> Any:
@@ -241,19 +260,19 @@ def _scan_episode(
     return initial_state, trajectory, final_carry[0]
 
 
-_SUMMARY_RUNNERS: dict[tuple[int, EvaluationProtocol], Any] = {}
+_SUMMARY_RUNNERS: dict[tuple[BaseMycorMarl, EvaluationProtocol, str], Any] = {}
 
 
 def _compiled_summary_runner(
-    environment: BaseMycorMarl, protocol: EvaluationProtocol
+    environment: BaseMycorMarl,
+    protocol: EvaluationProtocol,
+    actor: ActorCritic,
 ) -> Any:
     """Cache the compiled summary rollout for repeated checkpoints."""
-    cache_key = (id(environment), protocol)
+    cache_key = (environment, protocol, actor.activation)
     runner = _SUMMARY_RUNNERS.get(cache_key)
     if runner is not None:
         return runner
-    actor = ActorCritic()
-
     def run(parameters: Mapping[str, Any], key: jax.Array):
         key, reset_key = jax.random.split(key)
         observations, state = environment.reset(reset_key)
@@ -284,6 +303,7 @@ def evaluate_policy_parameters(
     episodes: int,
     protocol: EvaluationProtocol = "latent-location",
     seed: int = 0,
+    actor: ActorCritic | None = None,
 ) -> CheckpointEvaluation:
     """Evaluate production actor parameters in the production environment."""
     if protocol not in ("latent-location", "sampled-policy"):
@@ -293,7 +313,7 @@ def evaluate_policy_parameters(
     if set(parameters) != {PLANT, FUNGUS}:
         raise ValueError("parameters must contain exactly plant and fungus actors")
 
-    actor = ActorCritic()
+    actor = ActorCritic() if actor is None else actor
     key = jax.random.PRNGKey(seed)
     result_episodes = []
     for _ in range(episodes):
@@ -375,6 +395,7 @@ def evaluate_policy_summary(
     episodes: int,
     protocol: EvaluationProtocol = "latent-location",
     seed: int = 0,
+    actor: ActorCritic | None = None,
 ) -> dict[str, Any]:
     """Evaluate only stopping metrics without materialising a full trace."""
     if protocol not in ("latent-location", "sampled-policy"):
@@ -384,10 +405,11 @@ def evaluate_policy_summary(
     if set(parameters) != {PLANT, FUNGUS}:
         raise ValueError("parameters must contain exactly plant and fungus actors")
 
+    actor = ActorCritic() if actor is None else actor
     key = jax.random.PRNGKey(seed)
     episode_metrics = []
     for _ in range(episodes):
-        runner = _compiled_summary_runner(environment, protocol)
+        runner = _compiled_summary_runner(environment, protocol, actor)
         key, trajectory, final_state = runner(parameters, key)
         actions, rewards, done_flags = trajectory
         done_flags = jnp.asarray(done_flags, dtype=bool)
@@ -472,7 +494,12 @@ def evaluate_checkpoint(
     except (KeyError, TypeError) as error:
         raise ValueError("training checkpoint does not contain actor parameters") from error
     return evaluate_policy_parameters(
-        environment, parameters, episodes=episodes, protocol=protocol, seed=seed
+        environment,
+        parameters,
+        episodes=episodes,
+        protocol=protocol,
+        seed=seed,
+        actor=_actor_from_checkpoint_metadata(metadata),
     )
 
 
@@ -503,5 +530,10 @@ def evaluate_checkpoint_summary(
     except (KeyError, TypeError) as error:
         raise ValueError("training checkpoint does not contain actor parameters") from error
     return evaluate_policy_summary(
-        environment, parameters, episodes=episodes, protocol=protocol, seed=seed
+        environment,
+        parameters,
+        episodes=episodes,
+        protocol=protocol,
+        seed=seed,
+        actor=_actor_from_checkpoint_metadata(metadata),
     )
