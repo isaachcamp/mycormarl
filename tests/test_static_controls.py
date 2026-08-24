@@ -81,6 +81,7 @@ def test_rate_action_qualification_static_controls_use_declared_trade_and_alloca
         "fungus": [1.203973, 6.907755, 0.0, 0.0],
     }
     assert manifest["seeds"] == [0]
+    assert manifest["output"]["identity"] == "phase-1-static-controls-growth-only-13p"
     assert manifest["initial_p_micromolar"] == [
         0.1,
         0.3,
