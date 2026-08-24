@@ -69,6 +69,19 @@ def test_static_controls_accept_independent_nonnegative_per_day_rates():
     assert result["status"] == "complete"
 
 
+def test_rate_action_qualification_static_controls_use_declared_trade_and_allocation_rates():
+    manifest_path = (
+        _REPOSITORY_ROOT
+        / "docs/qualification/rate-action-49/manifests/static-controls.json"
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert manifest["static_policy"] == {
+        "plant": [0.051293, 4.144653, 2.763102, 0.0],
+        "fungus": [1.203973, 4.144653, 2.763102, 0.0],
+    }
+
+
 def test_static_controls_emit_the_common_study_result_bundle(tmp_path, monkeypatch):
     monkeypatch.setattr(
         study_module,
