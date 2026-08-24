@@ -24,6 +24,18 @@ A physical action is valid by construction before it reaches the environment.
 renormalise it. PPO produces physical actions through its latent transforms;
 non-policy callers use the shared public action-construction helper.
 
+### Rate action (accepted successor contract)
+
+The planned replacement for the Physical action. It will command non-negative
+first-order **per-day** rates for trade, growth, reproduction, and storage.
+Growth, reproduction, and storage compete as pool outflow hazards rather than
+as a simplex; storage initially means retention in the existing free pool, not
+a new compartment. Newly acquired soil P, photosynthate, and received trade
+are eligible for the held rate during subsequent numerical substeps.
+
+This contract is not implemented yet. Until its migration is complete,
+**Physical action** retains its current fraction-and-simplex meaning.
+
 ### Transition
 
 A stable, typed JAX PyTree produced by `BaseMycorMarl` for one agent during a
