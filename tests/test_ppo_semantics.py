@@ -223,6 +223,41 @@ def test_rollout_carries_per_species_transition_validity():
     assert fungus_metrics.biological_rate_actor_valid_fraction == 0.0
 
 
+def test_critic_target_normalization_is_per_agent_and_ignores_absent_partners():
+    """The plant-only rollout advances only the operational plant critic scale."""
+    environment = BaseMycorMarl(
+        EnvConfig(
+            max_steps=2,
+            dt=0.05,
+            consumer_mode="plant-only",
+            soil_radius_cm=0.2,
+            soil_depth_cm=0.2,
+            radial_interval_cm=0.1,
+            depth_interval_cm=0.1,
+        ),
+        SpeciesParams(plant=PlantTraits(), fungus=FungusTraits()),
+    )
+
+    output = jax.jit(
+        make_train(
+            environment,
+            PPOConfig(
+                TOTAL_TIMESTEPS=2,
+                NUM_STEPS=2,
+                NUM_ENVS=1,
+                NUM_MINIBATCHES=1,
+                UPDATE_EPOCHS=1,
+                LR=0.0,
+                DISCOUNT_HALF_LIFE_DAYS=30.0,
+            ),
+        )
+    )(jax.random.PRNGKey(8))
+    train_states = output["runner_state"][0]
+
+    assert train_states[PLANT].critic_normalizer.count == 2
+    assert train_states[FUNGUS].critic_normalizer.count == 0
+
+
 def test_undiscounted_training_rejects_indefinitely_viable_configured_consumer():
     environment = BaseMycorMarl(
         EnvConfig(

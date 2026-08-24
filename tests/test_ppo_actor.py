@@ -226,3 +226,90 @@ def test_resumed_training_anneals_learning_rate_over_the_global_budget():
             assert jnp.isclose(
                 output["metrics"][agent].learning_rate[-1], expected_rate
             )
+
+
+def test_critic_normalization_is_resumable_and_exposes_finite_scales():
+    """Chunking a fixed random stream preserves each agent's critic scale."""
+    environment = _small_environment()
+    full_config = PPOConfig(
+        TOTAL_TIMESTEPS=4,
+        NUM_STEPS=2,
+        NUM_ENVS=1,
+        NUM_MINIBATCHES=1,
+        UPDATE_EPOCHS=1,
+        LR=0.0,
+        DISCOUNT_HALF_LIFE_DAYS=30.0,
+    )
+    chunk_config = PPOConfig(
+        TOTAL_TIMESTEPS=4,
+        RUN_TIMESTEPS=2,
+        NUM_STEPS=2,
+        NUM_ENVS=1,
+        NUM_MINIBATCHES=1,
+        UPDATE_EPOCHS=1,
+        LR=0.0,
+        DISCOUNT_HALF_LIFE_DAYS=30.0,
+    )
+
+    full = jax.jit(make_train(environment, full_config))(jax.random.PRNGKey(12))
+    first = jax.jit(make_train(environment, chunk_config))(jax.random.PRNGKey(12))
+    resumed = jax.jit(make_train(
+        environment, chunk_config, initial_runner_state=first["runner_state"],
+    ))(jax.random.PRNGKey(12))
+
+    for agent in (PLANT, FUNGUS):
+        full_state = full["runner_state"][0][agent]
+        resumed_state = resumed["runner_state"][0][agent]
+        assert jax.tree.all(
+            jax.tree.map(
+                lambda left, right: jnp.allclose(left, right, rtol=1e-5, atol=1e-8),
+                full_state.critic_normalizer,
+                resumed_state.critic_normalizer,
+            )
+        )
+        metrics = full["metrics"][agent]
+        for value in (
+            metrics.raw_return_mean,
+            metrics.normalized_return_mean,
+            metrics.raw_critic_mean,
+            metrics.normalized_critic_mean,
+            metrics.critic_target_scale,
+        ):
+            assert jnp.all(jnp.isfinite(value))
+
+
+def test_per_agent_critic_normalization_stays_finite_for_widely_scaled_rewards():
+    """Mixed agents retain finite independent critic scales despite a 10^6 pool gap."""
+    environment = BaseMycorMarl(
+        EnvConfig(
+            max_steps=2,
+            dt=0.05,
+            soil_radius_cm=0.2,
+            soil_depth_cm=0.2,
+            radial_interval_cm=0.1,
+            depth_interval_cm=0.1,
+        ),
+        SpeciesParams(
+            plant=PlantTraits(initial_c_pool=1_000.0, initial_p_pool=1_000.0),
+            fungus=FungusTraits(initial_c_pool=0.001, initial_p_pool=0.001),
+        ),
+    )
+    output = jax.jit(make_train(
+        environment,
+        PPOConfig(
+            TOTAL_TIMESTEPS=2,
+            NUM_STEPS=2,
+            NUM_ENVS=1,
+            NUM_MINIBATCHES=1,
+            UPDATE_EPOCHS=1,
+            LR=0.0,
+            DISCOUNT_HALF_LIFE_DAYS=30.0,
+        ),
+    ))(jax.random.PRNGKey(21))
+
+    plant_metrics = output["metrics"][PLANT]
+    fungus_metrics = output["metrics"][FUNGUS]
+    assert abs(plant_metrics.raw_return_mean) > abs(fungus_metrics.raw_return_mean) * 100
+    for metrics in (plant_metrics, fungus_metrics):
+        assert jnp.all(jnp.isfinite(metrics.critic_target_scale))
+        assert jnp.all(jnp.isfinite(metrics.normalized_return_mean))

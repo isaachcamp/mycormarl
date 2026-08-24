@@ -8,6 +8,7 @@ import jax.numpy as jnp
 import flax.linen as nn
 from flax.linen.initializers import constant
 from flax.training.train_state import TrainState
+from flax import struct
 import optax
 
 from mycormarl.environments.base_mycor import FUNGUS, PLANT
@@ -169,6 +170,75 @@ class PPOConfig:
     LR: float = 2.5e-4
     PLANT_INITIAL_TRADE: float = 0.05
     FUNGUS_INITIAL_TRADE: float = 0.75
+    NORMALIZE_CRITIC_TARGETS: bool = True
+
+
+@struct.dataclass
+class CriticNormalizer:
+    """Per-policy running moments for valid raw return targets."""
+
+    count: jax.Array
+    mean: jax.Array
+    mean_square: jax.Array
+
+
+class IPPOTrainState(TrainState):
+    """Independent PPO optimizer state plus its critic return scale."""
+
+    critic_normalizer: CriticNormalizer
+
+
+def initial_critic_normalizer() -> CriticNormalizer:
+    """Create an empty running return summary with a finite fallback scale."""
+    zero = jnp.asarray(0.0, dtype=jnp.float32)
+    return CriticNormalizer(count=zero, mean=zero, mean_square=zero)
+
+
+def update_critic_normalizer(
+    normalizer: CriticNormalizer,
+    targets: jax.Array,
+    valid: jax.Array,
+) -> CriticNormalizer:
+    """Merge valid raw targets into one agent's running moments."""
+    valid = jnp.asarray(valid, dtype=bool)
+    weights = valid.astype(targets.dtype)
+    batch_count = jnp.sum(weights)
+    total_count = normalizer.count + batch_count
+    batch_sum = jnp.sum(jnp.where(valid, targets, 0.0))
+    batch_square_sum = jnp.sum(jnp.where(valid, jnp.square(targets), 0.0))
+    mean = (normalizer.count * normalizer.mean + batch_sum) / jnp.maximum(
+        total_count, 1.0
+    )
+    mean_square = (
+        normalizer.count * normalizer.mean_square + batch_square_sum
+    ) / jnp.maximum(total_count, 1.0)
+    return CriticNormalizer(
+        count=total_count,
+        mean=jnp.where(batch_count > 0.0, mean, normalizer.mean),
+        mean_square=jnp.where(
+            batch_count > 0.0, mean_square, normalizer.mean_square
+        ),
+    )
+
+
+def critic_normalizer_scale(normalizer: CriticNormalizer) -> jax.Array:
+    """Return a finite scale without inventing variance for one sample."""
+    variance = jnp.maximum(
+        normalizer.mean_square - jnp.square(normalizer.mean), 0.0
+    )
+    return jnp.where(normalizer.count > 1.0, jnp.sqrt(variance + 1e-8), 1.0)
+
+
+def normalize_critic_values(
+    values: jax.Array, normalizer: CriticNormalizer
+) -> jax.Array:
+    return (values - normalizer.mean) / critic_normalizer_scale(normalizer)
+
+
+def denormalize_critic_values(
+    values: jax.Array, normalizer: CriticNormalizer
+) -> jax.Array:
+    return values * critic_normalizer_scale(normalizer) + normalizer.mean
 
 
 class ActorCritic(nn.Module):
@@ -257,6 +327,11 @@ class PPOUpdateMetrics(NamedTuple):
     critic_valid_fraction: jnp.ndarray
     biological_rate_actor_valid_fraction: jnp.ndarray
     trade_actor_valid_fraction: jnp.ndarray
+    raw_return_mean: jnp.ndarray
+    normalized_return_mean: jnp.ndarray
+    raw_critic_mean: jnp.ndarray
+    normalized_critic_mean: jnp.ndarray
+    critic_target_scale: jnp.ndarray
 
 
 def batchify(
@@ -351,6 +426,14 @@ def make_train(
     def linear_schedule(count):
         return config.LR * jnp.maximum(0.0, 1.0 - count / total_optimizer_steps)
 
+    def critic_output_to_raw(
+        values: jax.Array, normalizer: CriticNormalizer
+    ) -> jax.Array:
+        """Keep the raw-target ablation on the pre-normalization critic scale."""
+        if config.NORMALIZE_CRITIC_TARGETS:
+            return denormalize_critic_values(values, normalizer)
+        return values
+
     def train(rng):
         """
         Main training function for PPO. 
@@ -391,15 +474,17 @@ def make_train(
             init_x = jnp.zeros((1, env.observation_spaces[PLANT].shape[0]))
             plant_tx = optax.adam(learning_rate=linear_schedule)
             fungus_tx = optax.adam(learning_rate=linear_schedule)
-            plant_train_state = TrainState.create(
+            plant_train_state = IPPOTrainState.create(
                 apply_fn=plant_policy.apply,
                 params=plant_policy.init(plant_rng, init_x),
                 tx=plant_tx,
+                critic_normalizer=initial_critic_normalizer(),
             )
-            fungus_train_state = TrainState.create(
+            fungus_train_state = IPPOTrainState.create(
                 apply_fn=fungus_policy.apply,
                 params=fungus_policy.init(fungus_rng, init_x),
-                tx=fungus_tx
+                tx=fungus_tx,
+                critic_normalizer=initial_critic_normalizer(),
             )
             train_state = {PLANT: plant_train_state, FUNGUS: fungus_train_state}
             environment_rng, _rng = jax.random.split(environment_rng)
@@ -531,7 +616,10 @@ def make_train(
                     latent_trade_action=plant_latent_trade,
                     latent_biological_rate_action=plant_latent_biological_rate,
                     rate_action=plant_rate_action,
-                    value=jnp.array(plant_value),
+                    value=critic_output_to_raw(
+                        jnp.array(plant_value),
+                        train_state[PLANT].critic_normalizer,
+                    ),
                     reward=reward[PLANT].reshape((config.NUM_ENVS,)),
                     trade_log_probability=plant_trade_log_probability,
                     biological_rate_log_probability=plant_biological_rate_log_probability,
@@ -550,7 +638,10 @@ def make_train(
                     latent_trade_action=fungus_latent_trade,
                     latent_biological_rate_action=fungus_latent_biological_rate,
                     rate_action=fungus_rate_action,
-                    value=jnp.array(fungus_value),
+                    value=critic_output_to_raw(
+                        jnp.array(fungus_value),
+                        train_state[FUNGUS].critic_normalizer,
+                    ),
                     reward=reward[FUNGUS].reshape((config.NUM_ENVS,)),
                     trade_log_probability=fungus_trade_log_probability,
                     biological_rate_log_probability=fungus_biological_rate_log_probability,
@@ -587,6 +678,12 @@ def make_train(
             _, fungus_bootstrap_values = fungus_policy.apply(
                 train_state[FUNGUS].params, fungus_traj.bootstrap_observation
             )
+            plant_bootstrap_values = critic_output_to_raw(
+                plant_bootstrap_values, train_state[PLANT].critic_normalizer
+            )
+            fungus_bootstrap_values = critic_output_to_raw(
+                fungus_bootstrap_values, train_state[FUNGUS].critic_normalizer
+            )
             plant_advantages, plant_targets = calculate_gae(
                 rewards=plant_traj.reward,
                 values=plant_traj.value,
@@ -608,6 +705,23 @@ def make_train(
                 gae_lambda=config.GAE_LAMBDA,
             )
 
+            train_state = {
+                PLANT: train_state[PLANT].replace(
+                    critic_normalizer=update_critic_normalizer(
+                        train_state[PLANT].critic_normalizer,
+                        plant_targets,
+                        plant_traj.critic_valid,
+                    )
+                ),
+                FUNGUS: train_state[FUNGUS].replace(
+                    critic_normalizer=update_critic_normalizer(
+                        train_state[FUNGUS].critic_normalizer,
+                        fungus_targets,
+                        fungus_traj.critic_valid,
+                    )
+                ),
+            }
+
             # UPDATE NETWORK
             def _update_epoch(update_state, unused):
                 def _update_minibatch(agent_train_state, batch_info):
@@ -623,6 +737,9 @@ def make_train(
                         # RERUN NETWORK
                         policy_parameters, value = agent_train_state.apply_fn(
                             params, traj_batch.obs
+                        )
+                        value = critic_output_to_raw(
+                            value, agent_train_state.critic_normalizer
                         )
                         trade_log_probability = normal_log_probability(
                             traj_batch.latent_trade_action,
@@ -642,6 +759,17 @@ def make_train(
                         value_pred_clipped = traj_batch.value + (
                             value - traj_batch.value
                         ).clip(-config.CLIP_EPS, config.CLIP_EPS)
+                        if config.NORMALIZE_CRITIC_TARGETS:
+                            value = normalize_critic_values(
+                                value, agent_train_state.critic_normalizer
+                            )
+                            value_pred_clipped = normalize_critic_values(
+                                value_pred_clipped,
+                                agent_train_state.critic_normalizer,
+                            )
+                            targets = normalize_critic_values(
+                                targets, agent_train_state.critic_normalizer
+                            )
                         value_losses = jnp.square(value - targets)
                         value_losses_clipped = jnp.square(value_pred_clipped - targets)
                         value_loss = 0.5 * masked_mean(
@@ -789,7 +917,7 @@ def make_train(
             }
             rngs = (rngs[0], rngs[1], update_fungus_state[-1])
 
-            def _metrics(trajectory, loss_info, state):
+            def _metrics(trajectory, targets, loss_info, state):
                 total_loss, value_loss, actor_loss, approx_kl, latent_entropy = loss_info
                 sample_count = trajectory.critic_valid.size
                 critic_count = jnp.sum(trajectory.critic_valid)
@@ -797,6 +925,7 @@ def make_train(
                     trajectory.biological_rate_actor_valid
                 )
                 trade_count = jnp.sum(trajectory.trade_actor_valid)
+                normalizer = state.critic_normalizer
                 return PPOUpdateMetrics(
                     total_loss=total_loss,
                     value_loss=value_loss,
@@ -812,10 +941,27 @@ def make_train(
                         allocation_count / sample_count
                     ),
                     trade_actor_valid_fraction=trade_count / sample_count,
+                    raw_return_mean=masked_mean(targets, trajectory.critic_valid),
+                    normalized_return_mean=masked_mean(
+                        normalize_critic_values(targets, normalizer),
+                        trajectory.critic_valid,
+                    ),
+                    raw_critic_mean=masked_mean(
+                        trajectory.value, trajectory.critic_valid
+                    ),
+                    normalized_critic_mean=masked_mean(
+                        normalize_critic_values(trajectory.value, normalizer),
+                        trajectory.critic_valid,
+                    ),
+                    critic_target_scale=critic_normalizer_scale(normalizer),
                 )
 
-            plant_metrics = _metrics(plant_traj, plant_loss_info, train_state[PLANT])
-            fungus_metrics = _metrics(fungus_traj, fungus_loss_info, train_state[FUNGUS])
+            plant_metrics = _metrics(
+                plant_traj, plant_targets, plant_loss_info, train_state[PLANT]
+            )
+            fungus_metrics = _metrics(
+                fungus_traj, fungus_targets, fungus_loss_info, train_state[FUNGUS]
+            )
 
             runner_state = (train_state, env_state, last_obs, rngs)
             return runner_state, (
