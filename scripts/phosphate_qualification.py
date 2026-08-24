@@ -19,7 +19,7 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
-from mycormarl.actions import physical_action
+from mycormarl.actions import rate_action
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.environments.policy_interval import PolicyIntervalMycorMarl
 from mycormarl.fungus.traits import FungusTraits
@@ -326,8 +326,8 @@ def run_coupled_scenario(
 
     initial_extended_p_mg = extended_p_mg(state)
     actions = {
-        PLANT: physical_action(0.25, 1.0, 0.0, 0.0),
-        FUNGUS: physical_action(0.25, 1.0, 0.0, 0.0),
+        PLANT: rate_action(0.25, 1.0, 0.0, 0.0),
+        FUNGUS: rate_action(0.25, 1.0, 0.0, 0.0),
     }
     for step_index in range(round(decisions)):
         _, state, _, _, _ = env.step_env(
@@ -619,8 +619,8 @@ def benchmark_environment(config: EnvConfig, repeats: int = 20) -> dict:
     soil_projection = annual_runtime_projection(config.dt, warmed_seconds)
     _, full_state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: physical_action(0.25, 1.0, 0.0, 0.0),
-        FUNGUS: physical_action(0.25, 1.0, 0.0, 0.0),
+        PLANT: rate_action(0.25, 1.0, 0.0, 0.0),
+        FUNGUS: rate_action(0.25, 1.0, 0.0, 0.0),
     }
     key = jax.random.PRNGKey(1)
     compiled_full_step = jax.jit(
@@ -1012,7 +1012,7 @@ def render_markdown(results: dict) -> str:
             else "- After biomass-consistent pool initialisation, coupled grids remain sensitive to quantised root/fungal extents; the selected grid is the finest-tested fallback rather than demonstrated spatial convergence."
         ),
         "- The coupled fixture uses 0.01 g plant biomass and 0.0001 g living external fungal biomass; each free C/P pool starts at one structural-biomass equivalent and automatic maintenance costs are disabled.",
-        "- Coupled Physical actions are fixed at `[trade=0.25, growth=1, reproduction=0, reserve=0]` and held for a fixed 1-day policy interval. Their timestep comparisons now isolate numerical resolution and are required for timestep selection.",
+        "- Coupled Rate actions are fixed at `[trade=0.25, growth=1, reproduction=0, storage=0] d^-1` and held for a fixed 1-day policy interval. Their timestep comparisons now isolate numerical resolution and are required for timestep selection.",
         "- Annual runtime is projected from both warmed soil-only and deterministic full-environment steps. MARL training, learned-policy inference, output, and accelerator transfer costs are excluded.",
         "- The complete machine-readable tables and exact platform metadata are in `phosphate-numerical-qualification.json`.",
     ])

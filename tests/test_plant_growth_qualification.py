@@ -14,7 +14,7 @@ def test_high_p_qualification_reports_all_fixed_kleaf_cases():
         "trade": 0.0,
         "growth": 1.0,
         "reproduction": 0.0,
-        "reserve": 0.0,
+        "storage": 0.0,
     }
     assert tuple(result["cases"]) == (
         "kleaf_0.300",

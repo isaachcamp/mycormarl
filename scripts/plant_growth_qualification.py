@@ -19,7 +19,7 @@ def _summary(result: dict) -> str:
         f"- Status: `{result['status']}`",
         f"- Selected reference kleaf: `{result['selected_kleaf']:.2f}`",
         "- Mode: `plant-only` high-P vegetative control",
-        "- Policy: trade=0, growth=1, reproduction=0, reserve=0",
+        "- Rate policy (d⁻¹): trade=0, growth=1, reproduction=0, storage=0",
         "",
         "## Candidate comparison",
         "",

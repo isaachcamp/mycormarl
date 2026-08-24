@@ -1,0 +1,9 @@
+{
+  "schema_version": 1, "stage": "domain-qualification",
+  "model": {"environment": {"soil_radius_cm": 20.0, "soil_depth_cm": 100.0, "radial_interval_cm": 0.1, "depth_interval_cm": 0.1, "initial_solution_p_depth_profile": [[0.0, 1.0], [5.0, 1.0], [15.0, 0.345], [30.0, 0.170], [60.0, 0.103], [100.0, 0.069]]}, "species": {"plant": {}, "fungus": {}}},
+  "horizon": {"days": 120.0, "timestep_days": 0.025}, "modes": ["mixed", "plant-only"], "initial_p_micromolar": [1.0], "seeds": [0],
+  "static_policy": {"plant": [0.2, 1.0, 0.0, 0.0], "fungus": [0.2, 1.0, 0.0, 0.0]},
+  "domain_qualification": {"initial_p_scenario": "semi-natural-siberian-grassland-relative-v1", "direct_plant_uptake_relative_tolerance": 0.05, "candidates": [{"name": "5-cm", "soil_radius_cm": 20.0, "soil_depth_cm": 5.0}, {"name": "10-cm", "soil_radius_cm": 20.0, "soil_depth_cm": 10.0}, {"name": "20-cm", "soil_radius_cm": 20.0, "soil_depth_cm": 20.0}, {"name": "30-cm", "soil_radius_cm": 20.0, "soil_depth_cm": 30.0}, {"name": "40-cm", "soil_radius_cm": 20.0, "soil_depth_cm": 40.0}, {"name": "60-cm", "soil_radius_cm": 20.0, "soil_depth_cm": 60.0}, {"name": "80-cm", "soil_radius_cm": 20.0, "soil_depth_cm": 80.0}, {"name": "100-cm-reference", "soil_radius_cm": 20.0, "soil_depth_cm": 100.0}]},
+  "training": {"total_timesteps": 1, "checkpoint_interval_timesteps": 1}, "evaluation": {"protocol": "latent-location", "episodes": 1},
+  "output": {"directory": "outputs/rate-action-49", "identity": "profile-depth-domain-qualification"}
+}

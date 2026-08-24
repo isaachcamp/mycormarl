@@ -143,7 +143,7 @@ def run_plant_growth_qualification(
     return {
         "stage": "plant-growth-qualification",
         "selected_kleaf": selected_kleaf,
-        "policy": {"consumer_mode": "plant-only", "trade": 0.0, "growth": 1.0, "reproduction": 0.0, "reserve": 0.0},
+        "policy": {"consumer_mode": "plant-only", "trade": 0.0, "growth": 1.0, "reproduction": 0.0, "storage": 0.0},
         "horizon_days": 120,
         "timestep_days": timestep_days,
         "cases": cases,

@@ -1,0 +1,594 @@
+{
+  "analytical_carbon_only": {
+    "effective_fixation_g_c_per_g_dm_day": 0.034,
+    "net_carbon_rate_g_c_per_g_dm_day": 0.027000000000000003,
+    "sustained_rgr_per_day": 0.06716417910447761,
+    "upper_bound_endpoint_g_dm": 31.377611677935402
+  },
+  "cases": {
+    "kleaf_0.300": {
+      "amass": 0.05,
+      "biomass_g_dm": {
+        "100": 0.07308642042484904,
+        "120": 0.10880459402462458,
+        "40": 0.022151598380234592,
+        "60": 0.032977339083615914,
+        "80": 0.049093743682448565
+      },
+      "cap_contact": false,
+      "checkpoints": {
+        "100": {
+          "biomass_g_dm": 0.07308642042484904,
+          "free_pool_change_g_c": 2.5657407659318393e-05,
+          "gross_fixation_g_c": 0.04757879680288941,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.0221923983844407,
+          "structural_growth_c_g": 0.02536074101078934,
+          "windowed_rgr_per_day": 0.019895548781224424
+        },
+        "120": {
+          "biomass_g_dm": 0.10880459402462458,
+          "free_pool_change_g_c": 3.905172275923422e-05,
+          "gross_fixation_g_c": 0.07451476446882022,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.03475626594816179,
+          "structural_growth_c_g": 0.039719446797899204,
+          "windowed_rgr_per_day": 0.019895548781224452
+        },
+        "40": {
+          "biomass_g_dm": 0.022151598380234592,
+          "free_pool_change_g_c": 6.556849392587972e-06,
+          "gross_fixation_g_c": 0.009167574128494435,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.004276074730247525,
+          "structural_growth_c_g": 0.004884942548854315,
+          "windowed_rgr_per_day": null
+        },
+        "60": {
+          "biomass_g_dm": 0.032977339083615914,
+          "free_pool_change_g_c": 1.0616502156355971e-05,
+          "gross_fixation_g_c": 0.017331535836431867,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.008084029022661893,
+          "structural_growth_c_g": 0.009236890311613595,
+          "windowed_rgr_per_day": 0.019895548781224508
+        },
+        "80": {
+          "biomass_g_dm": 0.049093743682448565,
+          "free_pool_change_g_c": 1.6660153880918214e-05,
+          "gross_fixation_g_c": 0.029485319454526593,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.013752974340301307,
+          "structural_growth_c_g": 0.015715684960344343,
+          "windowed_rgr_per_day": 0.019895548781224418
+        }
+      },
+      "effective_fixation_g_c_per_g_dm_day": 0.015,
+      "free_pool_change_g_c": 3.905172275923422e-05,
+      "gross_fixation_g_c": 0.07451476446882022,
+      "initial_pool_contribution_g_c": 1.8023437500000002e-06,
+      "kleaf": 0.3,
+      "maintenance_g_c": 0.03475626594816179,
+      "material_growth_scale_mismatch": true,
+      "p_uptake_mg": 0.19477640423839865,
+      "realized_limitation": "carbon",
+      "status": "failed",
+      "structural_growth_c_g": 0.039719446797899204
+    },
+    "kleaf_0.450": {
+      "amass": 0.05,
+      "biomass_g_dm": {
+        "100": 0.4712957846807451,
+        "120": 1.0186757133153526,
+        "40": 0.046673069686764906,
+        "60": 0.10088085678081994,
+        "80": 0.21804752361763333
+      },
+      "cap_contact": false,
+      "checkpoints": {
+        "100": {
+          "biomass_g_dm": 0.4712957846807451,
+          "free_pool_change_g_c": 0.0002633538788829191,
+          "gross_fixation_g_c": 0.26945351500387255,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.08374925568333001,
+          "structural_growth_c_g": 0.18544090544165898,
+          "windowed_rgr_per_day": 0.03853864262935803
+        },
+        "120": {
+          "biomass_g_dm": 1.0186757133153526,
+          "free_pool_change_g_c": 0.000571255088739886,
+          "gross_fixation_g_c": 0.5891840906976025,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.18312519885609066,
+          "structural_growth_c_g": 0.40548763675277116,
+          "windowed_rgr_per_day": 0.038538642629357925
+        },
+        "40": {
+          "biomass_g_dm": 0.046673069686764906,
+          "free_pool_change_g_c": 2.450360169880526e-05,
+          "gross_fixation_g_c": 0.021426764267298063,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.006659686651519759,
+          "structural_growth_c_g": 0.014742574014079484,
+          "windowed_rgr_per_day": null
+        },
+        "60": {
+          "biomass_g_dm": 0.10088085678081994,
+          "free_pool_change_g_c": 5.499548193921122e-05,
+          "gross_fixation_g_c": 0.053090122874359685,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.01650102296653079,
+          "structural_growth_c_g": 0.03653410442588964,
+          "windowed_rgr_per_day": 0.03853864262935793
+        },
+        "80": {
+          "biomass_g_dm": 0.21804752361763333,
+          "free_pool_change_g_c": 0.00012090173203491875,
+          "gross_fixation_g_c": 0.12152844857858305,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.03777244235225936,
+          "structural_growth_c_g": 0.08363510449428842,
+          "windowed_rgr_per_day": 0.03853864262935799
+        }
+      },
+      "effective_fixation_g_c_per_g_dm_day": 0.022500000000000003,
+      "free_pool_change_g_c": 0.000571255088739886,
+      "gross_fixation_g_c": 0.5891840906976025,
+      "initial_pool_contribution_g_c": 1.8023437500000002e-06,
+      "kleaf": 0.45,
+      "maintenance_g_c": 0.18312519885609066,
+      "material_growth_scale_mismatch": true,
+      "p_uptake_mg": 1.964728639427427,
+      "realized_limitation": "carbon",
+      "status": "failed",
+      "structural_growth_c_g": 0.40548763675277116
+    },
+    "kleaf_0.500": {
+      "amass": 0.05,
+      "biomass_g_dm": {
+        "100": 0.87705876674675,
+        "120": 2.1465035371628107,
+        "40": 0.05983013053880543,
+        "60": 0.14642757327063097,
+        "80": 0.3583651585052021
+      },
+      "cap_contact": false,
+      "checkpoints": {
+        "100": {
+          "biomass_g_dm": 0.87705876674675,
+          "free_pool_change_g_c": 0.0005464117292167187,
+          "gross_fixation_g_c": 0.4846559731628183,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.13555193720140854,
+          "structural_growth_c_g": 0.34855762423219333,
+          "windowed_rgr_per_day": 0.044751076828871125
+        },
+        "120": {
+          "biomass_g_dm": 2.1465035371628107,
+          "free_pool_change_g_c": 0.001339814710726757,
+          "gross_fixation_g_c": 1.1942227062932982,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.3340084696431195,
+          "structural_growth_c_g": 0.8588744219394522,
+          "windowed_rgr_per_day": 0.044751076828870966
+        },
+        "40": {
+          "biomass_g_dm": 0.05983013053880543,
+          "free_pool_change_g_c": 3.56438315867534e-05,
+          "gross_fixation_g_c": 0.027859216715753136,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.007791860407566597,
+          "structural_growth_c_g": 0.020031712476599826,
+          "windowed_rgr_per_day": null
+        },
+        "60": {
+          "biomass_g_dm": 0.14642757327063097,
+          "free_pool_change_g_c": 8.976723329414436e-05,
+          "gross_fixation_g_c": 0.07626357897606309,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.021329927287975323,
+          "structural_growth_c_g": 0.05484388445479366,
+          "windowed_rgr_per_day": 0.044751076828871125
+        },
+        "80": {
+          "biomass_g_dm": 0.3583651585052021,
+          "free_pool_change_g_c": 0.0002222282240657514,
+          "gross_fixation_g_c": 0.19472785838946996,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.05446283644631332,
+          "structural_growth_c_g": 0.14004279371909129,
+          "windowed_rgr_per_day": 0.04475107682887099
+        }
+      },
+      "effective_fixation_g_c_per_g_dm_day": 0.025,
+      "free_pool_change_g_c": 0.001339814710726757,
+      "gross_fixation_g_c": 1.1942227062932982,
+      "initial_pool_contribution_g_c": 1.8023437500000002e-06,
+      "kleaf": 0.5,
+      "maintenance_g_c": 0.3340084696431195,
+      "material_growth_scale_mismatch": true,
+      "p_uptake_mg": 4.154469080340924,
+      "realized_limitation": "carbon",
+      "status": "failed",
+      "structural_growth_c_g": 0.8588744219394522
+    },
+    "kleaf_0.600": {
+      "amass": 0.05,
+      "biomass_g_dm": {
+        "100": 3.036500277918555,
+        "120": 9.527350439874487,
+        "40": 0.09830528825146251,
+        "60": 0.3084435519652127,
+        "80": 0.9677752483219213
+      },
+      "cap_contact": false,
+      "checkpoints": {
+        "100": {
+          "biomass_g_dm": 3.036500277918555,
+          "free_pool_change_g_c": 0.002275625208438917,
+          "gross_fixation_g_c": 1.5892162165866044,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.3702874796549046,
+          "structural_growth_c_g": 1.216653111723259,
+          "windowed_rgr_per_day": 0.057173051401545695
+        },
+        "120": {
+          "biomass_g_dm": 9.527350439874487,
+          "free_pool_change_g_c": 0.007143762829905866,
+          "gross_fixation_g_c": 4.997547526085825,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 1.1644288864263803,
+          "structural_growth_c_g": 3.825974876829538,
+          "windowed_rgr_per_day": 0.057173051401545896
+        },
+        "40": {
+          "biomass_g_dm": 0.09830528825146251,
+          "free_pool_change_g_c": 7.197896618859688e-05,
+          "gross_fixation_g_c": 0.04637641489282498,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.010805710049548488,
+          "structural_growth_c_g": 0.03549872587708789,
+          "windowed_rgr_per_day": null
+        },
+        "60": {
+          "biomass_g_dm": 0.3084435519652127,
+          "free_pool_change_g_c": 0.00022958266397390958,
+          "gross_fixation_g_c": 0.1567195603466033,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.03651566979261346,
+          "structural_growth_c_g": 0.11997430789001565,
+          "windowed_rgr_per_day": 0.05717305140154564
+        },
+        "80": {
+          "biomass_g_dm": 0.9677752483219213,
+          "free_pool_change_g_c": 0.0007240814362414412,
+          "gross_fixation_g_c": 0.5029332007737372,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.11718346951208186,
+          "structural_growth_c_g": 0.38502564982541254,
+          "windowed_rgr_per_day": 0.05717305140154579
+        }
+      },
+      "effective_fixation_g_c_per_g_dm_day": 0.03,
+      "free_pool_change_g_c": 0.007143762829905866,
+      "gross_fixation_g_c": 4.997547526085825,
+      "initial_pool_contribution_g_c": 1.8023437500000002e-06,
+      "kleaf": 0.6,
+      "maintenance_g_c": 1.1644288864263803,
+      "material_growth_scale_mismatch": true,
+      "p_uptake_mg": 18.466062425989737,
+      "realized_limitation": "carbon",
+      "status": "failed",
+      "structural_growth_c_g": 3.825974876829538
+    },
+    "kleaf_0.650": {
+      "amass": 0.05,
+      "biomass_g_dm": {
+        "100": 5.6491465834502534,
+        "120": 20.06859858568466,
+        "40": 0.1260028118702127,
+        "60": 0.4476251084542445,
+        "80": 1.5901886215448913
+      },
+      "cap_contact": false,
+      "checkpoints": {
+        "100": {
+          "biomass_g_dm": 5.6491465834502534,
+          "free_pool_change_g_c": 0.004588181599053332,
+          "gross_fixation_g_c": 2.893823269355033,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.6222981612089801,
+          "structural_growth_c_g": 2.2669369265470043,
+          "windowed_rgr_per_day": 0.06338259237370063
+        },
+        "120": {
+          "biomass_g_dm": 20.06859858568466,
+          "free_pool_change_g_c": 0.016303986350868795,
+          "gross_fixation_g_c": 10.293387717604595,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 2.213527099808493,
+          "structural_growth_c_g": 8.063556631445225,
+          "windowed_rgr_per_day": 0.06338259237370059
+        },
+        "40": {
+          "biomass_g_dm": 0.1260028118702127,
+          "free_pool_change_g_c": 0.00010062728464454782,
+          "gross_fixation_g_c": 0.05953675913108869,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.012803001474618722,
+          "structural_growth_c_g": 0.04663313037182539,
+          "windowed_rgr_per_day": null
+        },
+        "60": {
+          "biomass_g_dm": 0.4476251084542445,
+          "free_pool_change_g_c": 0.00036194540061907374,
+          "gross_fixation_g_c": 0.2245822068498228,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.048294967850597705,
+          "structural_growth_c_g": 0.17592529359860598,
+          "windowed_rgr_per_day": 0.06338259237370066
+        },
+        "80": {
+          "biomass_g_dm": 1.5901886215448913,
+          "free_pool_change_g_c": 0.0012902782550052244,
+          "gross_fixation_g_c": 0.810906316117122,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.17438021200107134,
+          "structural_growth_c_g": 0.6352358258610465,
+          "windowed_rgr_per_day": 0.06338259237370056
+        }
+      },
+      "effective_fixation_g_c_per_g_dm_day": 0.0325,
+      "free_pool_change_g_c": 0.016303986350868795,
+      "gross_fixation_g_c": 10.293387717604595,
+      "initial_pool_contribution_g_c": 1.8023437500000002e-06,
+      "kleaf": 0.65,
+      "maintenance_g_c": 2.213527099808493,
+      "material_growth_scale_mismatch": true,
+      "p_uptake_mg": 38.890333296318225,
+      "realized_limitation": "carbon",
+      "status": "failed",
+      "structural_growth_c_g": 8.063556631445225
+    },
+    "kleaf_0.675": {
+      "amass": 0.05,
+      "biomass_g_dm": {
+        "100": 7.704986989531952,
+        "120": 29.125317363863235,
+        "40": 0.1426512691323074,
+        "60": 0.5392304349742595,
+        "80": 2.03832369505835
+      },
+      "cap_contact": false,
+      "checkpoints": {
+        "100": {
+          "biomass_g_dm": 7.704986989531952,
+          "free_pool_change_g_c": 0.0064993327724175865,
+          "gross_fixation_g_c": 3.909369717556528,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.8094856149922584,
+          "structural_growth_c_g": 3.0933847697918506,
+          "windowed_rgr_per_day": 0.06648700141219342
+        },
+        "120": {
+          "biomass_g_dm": 29.125317363863235,
+          "free_pool_change_g_c": 0.02457273652575961,
+          "gross_fixation_g_c": 14.791754611169301,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 3.06282429437051,
+          "structural_growth_c_g": 11.704357580273035,
+          "windowed_rgr_per_day": 0.06648700141219357
+        },
+        "40": {
+          "biomass_g_dm": 0.1426512691323074,
+          "free_pool_change_g_c": 0.00011861200833038439,
+          "gross_fixation_g_c": 0.06740058981964189,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.013956167620123852,
+          "structural_growth_c_g": 0.05332581019118756,
+          "windowed_rgr_per_day": null
+        },
+        "60": {
+          "biomass_g_dm": 0.5392304349742595,
+          "free_pool_change_g_c": 0.00045322567950953146,
+          "gross_fixation_g_c": 0.2688786738669212,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.055674813327759455,
+          "structural_growth_c_g": 0.21275063485965195,
+          "windowed_rgr_per_day": 0.06648700141219363
+        },
+        "80": {
+          "biomass_g_dm": 2.03832369505835,
+          "free_pool_change_g_c": 0.0017180856177054834,
+          "gross_fixation_g_c": 1.0304780312328163,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.21337382020165252,
+          "structural_growth_c_g": 0.8153861254134568,
+          "windowed_rgr_per_day": 0.06648700141219344
+        }
+      },
+      "effective_fixation_g_c_per_g_dm_day": 0.03375,
+      "free_pool_change_g_c": 0.02457273652575961,
+      "gross_fixation_g_c": 14.791754611169301,
+      "initial_pool_contribution_g_c": 1.8023437500000002e-06,
+      "kleaf": 0.675,
+      "maintenance_g_c": 3.06282429437051,
+      "material_growth_scale_mismatch": false,
+      "p_uptake_mg": 56.43271068239131,
+      "realized_limitation": "carbon",
+      "status": "passed",
+      "structural_growth_c_g": 11.704357580273035
+    },
+    "kleaf_0.680": {
+      "amass": 0.05,
+      "biomass_g_dm": {
+        "100": 8.198387991494567,
+        "120": 31.377611677944238,
+        "40": 0.14623597279382863,
+        "60": 0.55968753521199,
+        "80": 2.142086732060859
+      },
+      "cap_contact": false,
+      "checkpoints": {
+        "100": {
+          "biomass_g_dm": 8.198387991494567,
+          "free_pool_change_g_c": 0.006966879792770383,
+          "gross_fixation_g_c": 4.152112595264912,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.8534137428913227,
+          "structural_growth_c_g": 3.291731972580816,
+          "windowed_rgr_per_day": 0.06710785430887281
+        },
+        "120": {
+          "biomass_g_dm": 31.377611677944238,
+          "free_pool_change_g_c": 0.02666921992625261,
+          "gross_fixation_g_c": 15.905653059338919,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 3.269203944879079,
+          "structural_growth_c_g": 12.609779894533576,
+          "windowed_rgr_per_day": 0.06710785430887274
+        },
+        "40": {
+          "biomass_g_dm": 0.14623597279382863,
+          "free_pool_change_g_c": 0.0001225505768747544,
+          "gross_fixation_g_c": 0.06908997747117286,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.014200565831179048,
+          "structural_growth_c_g": 0.05476686106311901,
+          "windowed_rgr_per_day": null
+        },
+        "60": {
+          "biomass_g_dm": 0.55968753521199,
+          "free_pool_change_g_c": 0.0004739844049301916,
+          "gross_fixation_g_c": 0.27873978000779986,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.05729140644764966,
+          "structural_growth_c_g": 0.22097438915522005,
+          "windowed_rgr_per_day": 0.06710785430887273
+        },
+        "80": {
+          "biomass_g_dm": 2.142086732060859,
+          "free_pool_change_g_c": 0.0018190237222517306,
+          "gross_fixation_g_c": 1.0811304571966138,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.22221256718589807,
+          "structural_growth_c_g": 0.8570988662884654,
+          "windowed_rgr_per_day": 0.06710785430887281
+        }
+      },
+      "effective_fixation_g_c_per_g_dm_day": 0.034,
+      "free_pool_change_g_c": 0.02666921992625261,
+      "gross_fixation_g_c": 15.905653059338919,
+      "initial_pool_contribution_g_c": 1.8023437500000002e-06,
+      "kleaf": 0.68,
+      "maintenance_g_c": 3.269203944879079,
+      "material_growth_scale_mismatch": false,
+      "p_uptake_mg": 60.79478542039681,
+      "realized_limitation": "carbon",
+      "status": "passed",
+      "structural_growth_c_g": 12.609779894533576
+    },
+    "kleaf_0.700": {
+      "amass": 0.05,
+      "biomass_g_dm": {
+        "100": 10.50873681001209,
+        "120": 42.268003400645156,
+        "40": 0.1614978928445673,
+        "60": 0.6495731701499678,
+        "80": 2.6126985061333112
+      },
+      "cap_contact": false,
+      "checkpoints": {
+        "100": {
+          "biomass_g_dm": 10.50873681001209,
+          "free_pool_change_g_c": 0.009193394708760579,
+          "gross_fixation_g_c": 5.284810391739843,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 1.055124799406216,
+          "structural_growth_c_g": 4.220492197624863,
+          "windowed_rgr_per_day": 0.06959116953549677
+        },
+        "120": {
+          "biomass_g_dm": 42.268003400645156,
+          "free_pool_change_g_c": 0.03698275297556451,
+          "gross_fixation_g_c": 21.271631211799775,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 4.24693109176484,
+          "structural_growth_c_g": 16.98771736705936,
+          "windowed_rgr_per_day": 0.06959116953549688
+        },
+        "40": {
+          "biomass_g_dm": 0.1614978928445673,
+          "free_pool_change_g_c": 0.0001395606562389964,
+          "gross_fixation_g_c": 0.07626900181063413,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.01522728823087902,
+          "structural_growth_c_g": 0.060902152923516084,
+          "windowed_rgr_per_day": null
+        },
+        "60": {
+          "biomass_g_dm": 0.6495731701499678,
+          "free_pool_change_g_c": 0.0005666265238812219,
+          "gross_fixation_g_c": 0.3219538945242395,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.0642788536000717,
+          "structural_growth_c_g": 0.2571084144002868,
+          "windowed_rgr_per_day": 0.06959116953549699
+        },
+        "80": {
+          "biomass_g_dm": 2.6126985061333112,
+          "free_pool_change_g_c": 0.0022843611928666475,
+          "gross_fixation_g_c": 1.3101421105248563,
+          "initial_pool_contribution_g_c": 1.7500000000000002e-06,
+          "maintenance_g_c": 0.2615729498663977,
+          "structural_growth_c_g": 1.0462847994655906,
+          "windowed_rgr_per_day": 0.06959116953549693
+        }
+      },
+      "effective_fixation_g_c_per_g_dm_day": 0.034999999999999996,
+      "free_pool_change_g_c": 0.03698275297556451,
+      "gross_fixation_g_c": 21.271631211799775,
+      "initial_pool_contribution_g_c": 1.8023437500000002e-06,
+      "kleaf": 0.7,
+      "maintenance_g_c": 4.24693109176484,
+      "material_growth_scale_mismatch": true,
+      "p_uptake_mg": 81.8844413428215,
+      "realized_limitation": "carbon",
+      "status": "failed",
+      "structural_growth_c_g": 16.98771736705936
+    }
+  },
+  "horizon_days": 120,
+  "policy": {
+    "consumer_mode": "plant-only",
+    "growth": 1.0,
+    "reproduction": 0.0,
+    "storage": 0.0,
+    "trade": 0.0
+  },
+  "reference": {
+    "favourable_trajectory_range_g_dm": [
+      25.0,
+      35.0
+    ],
+    "forto_biomass_g_dm": {
+      "100": 10.042,
+      "120": 23.26,
+      "40": 0.225,
+      "60": 0.836,
+      "80": 3.046
+    },
+    "forto_endpoint_g_dm": 23.26,
+    "rgr_windows_per_day": [
+      0.066,
+      0.065,
+      0.06,
+      0.042
+    ]
+  },
+  "selected_kleaf": 0.68,
+  "stage": "plant-growth-qualification",
+  "status": "failed",
+  "timestep_days": 0.025
+}
