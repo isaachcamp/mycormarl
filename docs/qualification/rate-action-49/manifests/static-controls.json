@@ -1,7 +1,7 @@
 {
   "schema_version": 1, "stage": "static-controls",
   "model": {"environment": {"soil_radius_cm": 20.0, "soil_depth_cm": 60.0, "radial_interval_cm": 0.1, "depth_interval_cm": 0.1, "initial_solution_p_depth_profile": [[0.0, 1.0], [5.0, 1.0], [15.0, 0.345], [30.0, 0.170], [60.0, 0.103], [100.0, 0.069]]}, "species": {"plant": {}, "fungus": {}}},
-  "horizon": {"days": 120.0, "timestep_days": 0.025}, "modes": ["mixed", "plant-only"], "initial_p_micromolar": [0.1, 0.3, 1.0, 3.0], "seeds": [0],
+  "horizon": {"days": 120.0, "timestep_days": 0.025}, "modes": ["mixed", "plant-only"], "initial_p_micromolar": [0.1, 0.3, 0.5, 0.625, 0.75, 0.875, 1.0, 1.125, 1.25, 1.5, 3.0, 5.0, 10.0], "seeds": [0],
   "training": {"total_timesteps": 1, "checkpoint_interval_timesteps": 1}, "evaluation": {"protocol": "latent-location", "episodes": 1},
   "static_policy": {"plant": [0.051293, 6.907755, 0.0, 0.0], "fungus": [1.203973, 6.907755, 0.0, 0.0]},
   "output": {"directory": "outputs/rate-action-49", "identity": "phase-1-static-controls-growth-only"}

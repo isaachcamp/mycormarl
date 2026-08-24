@@ -81,6 +81,21 @@ def test_rate_action_qualification_static_controls_use_declared_trade_and_alloca
         "fungus": [1.203973, 6.907755, 0.0, 0.0],
     }
     assert manifest["seeds"] == [0]
+    assert manifest["initial_p_micromolar"] == [
+        0.1,
+        0.3,
+        0.5,
+        0.625,
+        0.75,
+        0.875,
+        1.0,
+        1.125,
+        1.25,
+        1.5,
+        3.0,
+        5.0,
+        10.0,
+    ]
 
 
 def test_static_controls_emit_the_common_study_result_bundle(tmp_path, monkeypatch):
