@@ -21,6 +21,7 @@ import jax.numpy as jnp
 
 from mycormarl.actions import physical_action
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
+from mycormarl.environments.policy_interval import PolicyIntervalMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
@@ -37,10 +38,11 @@ from mycormarl.soil.phosphate_units import MICROMOL_P_TO_MG_P
 
 
 CONCENTRATIONS_UM = (0.1, 0.3, 1.0, 3.0, 10.0)
-TIMESTEPS_DAYS = (0.025, 0.05, 0.1, 0.2, 0.4)
+TIMESTEPS_DAYS = (0.0125, 0.025, 0.05, 0.1, 0.2)
 GRID_INTERVALS_CM = (0.1, 0.05, 0.025)
 MODES = ("root_only", "fungus_only", "mixed")
 HORIZON_DAYS = 2.0
+COUPLED_POLICY_DECISION_INTERVAL_DAYS = 1.0
 COUPLED_PLANT_INITIAL_BIOMASS_G = 0.01
 COUPLED_FUNGUS_INITIAL_BIOMASS_G = 0.0001
 DEEP_SOIL_DURATION_DAYS = 2.0
@@ -277,16 +279,33 @@ def _spatial_extents(env: BaseMycorMarl, density) -> dict[str, float]:
     }
 
 
-def run_coupled_scenario(interval_cm: float, dt_days: float) -> dict:
-    """Run a deterministic mixed biological trajectory for coupled outputs."""
-    env = BaseMycorMarl(
-        qualification_config(interval_cm, dt_days, 1.0),
+def run_coupled_scenario(
+    interval_cm: float,
+    dt_days: float,
+    decision_interval_days: float = COUPLED_POLICY_DECISION_INTERVAL_DAYS,
+) -> dict:
+    """Run coupled biology with a fixed policy schedule over numerical substeps."""
+    decisions = HORIZON_DAYS / decision_interval_days
+    if not math.isclose(decisions, round(decisions), rel_tol=0.0, abs_tol=1e-10):
+        raise ValueError("coupled horizon must contain an integer policy decision count")
+    numerical_substeps = decision_interval_days / dt_days
+    if not math.isclose(
+        numerical_substeps, round(numerical_substeps), rel_tol=0.0, abs_tol=1e-10
+    ):
+        raise ValueError("coupled decision interval must contain whole numerical timesteps")
+    numerical_env = BaseMycorMarl(
+        qualification_config(interval_cm, dt_days, 1.0).replace(
+            max_steps=round(HORIZON_DAYS / dt_days)
+        ),
         qualification_species(coupled=True),
+    )
+    env = PolicyIntervalMycorMarl(
+        numerical_env,
+        decision_interval_days=decision_interval_days,
+        max_episode_steps=round(decisions),
     )
     _, state = env.reset(jax.random.PRNGKey(0))
     initial_soil_micromol = float(jnp.sum(state.soil_labile_p))
-    plant_uptake_mg = 0.0
-    fungus_uptake_mg = 0.0
 
     def extended_p_mg(current_state) -> float:
         """Account for soil, free pools, structure, mortality, and exports."""
@@ -310,44 +329,29 @@ def run_coupled_scenario(interval_cm: float, dt_days: float) -> dict:
         PLANT: physical_action(0.25, 1.0, 0.0, 0.0),
         FUNGUS: physical_action(0.25, 1.0, 0.0, 0.0),
     }
-    for step_index in range(round(HORIZON_DAYS / dt_days)):
-        plant_p_before = float(state.plant_p_pool[0])
-        fungus_p_before = float(state.fungus_p_pool[0])
-        _, state, _, _, info = env.step_env(
+    for step_index in range(round(decisions)):
+        _, state, _, _, _ = env.step_env(
             jax.random.PRNGKey(step_index + 1), state, actions
         )
-        plant_p_cost_mg = float(
-            info[PLANT]["growth"][0] * env.species.plant.gamma_p
-            + info[PLANT]["maint_p_used"][0]
-            + info[PLANT]["reproduction_p"][0]
-        )
-        fungus_p_cost_mg = float(
-            info[FUNGUS]["growth"][0] * env.species.fungus.gamma_p
-            + info[FUNGUS]["maint_p_used"][0]
-            + info[FUNGUS]["reproduction_p"][0]
-        )
-        plant_uptake_mg += (
-            float(state.plant_p_pool[0])
-            - plant_p_before
-            + plant_p_cost_mg
-            - float(info[PLANT]["trade_in"][0])
-        )
-        fungus_uptake_mg += (
-            float(state.fungus_p_pool[0])
-            - fungus_p_before
-            + fungus_p_cost_mg
-            + float(info[FUNGUS]["trade_out"][0])
-        )
-    root_extent = _spatial_extents(env, state.root_length_density)
-    fungus_extent = _spatial_extents(env, state.hyphae_length_density)
+    root_extent = _spatial_extents(numerical_env, state.root_length_density)
+    fungus_extent = _spatial_extents(numerical_env, state.hyphae_length_density)
     final_extended_p_mg = extended_p_mg(state)
     final_soil_micromol = float(jnp.sum(state.soil_labile_p))
-    plant_uptake_micromol = plant_uptake_mg / MICROMOL_P_TO_MG_P
-    fungus_uptake_micromol = fungus_uptake_mg / MICROMOL_P_TO_MG_P
+    plant_uptake_micromol = float(
+        state.cumulative_direct_plant_p_uptake_micromol[0]
+    )
+    fungus_uptake_micromol = (
+        initial_soil_micromol - final_soil_micromol - plant_uptake_micromol
+    )
     total_uptake_micromol = plant_uptake_micromol + fungus_uptake_micromol
     return {
         "interval_cm": interval_cm,
         "dt_days": dt_days,
+        "decision_interval_days": decision_interval_days,
+        "timing": {
+            "numerical_timestep_days": dt_days,
+            "policy_decision_interval_days": decision_interval_days,
+        },
         "horizon_days": HORIZON_DAYS,
         "actions": {"plant": actions[PLANT].tolist(), "fungus": actions[FUNGUS].tolist()},
         "plant_biomass_g": float(state.plant_biomass[0]),
@@ -450,20 +454,22 @@ def _comparison(candidate: dict, reference: dict, metrics: tuple[str, ...]) -> d
     return {"changes": changes, "maximum_change": max(changes.values()), "passes_5_percent": all(value <= RELATIVE_TOLERANCE for value in changes.values())}
 
 
-def compare_coupled_action_frequency_sensitivity(
+def compare_coupled_timestep_convergence(
     candidate: dict,
     reference: dict,
 ) -> dict:
-    """Compare fixed-action trajectories whose decision frequency changes with dt."""
+    """Compare coupled trajectories with a fixed policy decision schedule."""
     if (
         candidate["horizon_days"] != reference["horizon_days"]
         or candidate["interval_cm"] != reference["interval_cm"]
     ):
         raise ValueError(
-            "action-frequency comparison requires the same horizon and grid interval"
+            "coupled timestep comparison requires the same horizon and grid interval"
         )
     if not candidate["dt_days"] > reference["dt_days"]:
         raise ValueError("candidate dt must be larger than reference dt")
+    if candidate["decision_interval_days"] != reference["decision_interval_days"]:
+        raise ValueError("coupled timestep comparison requires the same policy interval")
     comparison = _comparison(candidate, reference, COUPLED_ACTION_FREQUENCY_METRICS)
     diagnostic_changes = {
         metric: reference_relative_change(
@@ -481,8 +487,8 @@ def compare_coupled_action_frequency_sensitivity(
     passes = comparison["passes_5_percent"] and all(balance_checks.values())
     return {
         **comparison,
-        "classification": "action_frequency_sensitivity",
-        "affects_numerical_timestep_selection": False,
+        "classification": "coupled_timestep_convergence",
+        "affects_numerical_timestep_selection": True,
         "criteria": {
             "reported_relative_metrics": list(COUPLED_ACTION_FREQUENCY_METRICS),
             "diagnostic_metrics": list(COUPLED_ACTION_FREQUENCY_DIAGNOSTICS),
@@ -495,6 +501,7 @@ def compare_coupled_action_frequency_sensitivity(
         "provenance": {
             "candidate_dt_days": candidate["dt_days"],
             "reference_dt_days": reference["dt_days"],
+            "policy_decision_interval_days": candidate["decision_interval_days"],
             "horizon_days": candidate["horizon_days"],
             "interval_cm": candidate["interval_cm"],
         },
@@ -507,8 +514,10 @@ def compare_coupled_action_frequency_sensitivity(
     }
 
 
-def select_solver_timestep(timestep_comparisons: list[dict]) -> float:
-    """Select from fixed-geometry soil results, excluding action-frequency tests."""
+def select_solver_timestep(
+    timestep_comparisons: list[dict], coupled_timestep_comparisons: list[dict]
+) -> float:
+    """Select the largest timestep passing fixed-soil and coupled-dynamics gates."""
     passing = []
     for dt_days in TIMESTEPS_DAYS[1:]:
         rows = [
@@ -516,7 +525,17 @@ def select_solver_timestep(timestep_comparisons: list[dict]) -> float:
             for row in timestep_comparisons
             if row["candidate_dt_days"] == dt_days
         ]
-        if rows and all(row["passes_5_percent"] for row in rows):
+        coupled_rows = [
+            row
+            for row in coupled_timestep_comparisons
+            if row["candidate_dt_days"] == dt_days
+        ]
+        if (
+            rows
+            and coupled_rows
+            and all(row["passes_5_percent"] for row in rows)
+            and all(row["passes_5_percent"] for row in coupled_rows)
+        ):
             passing.append(dt_days)
     return max(passing) if passing else min(TIMESTEPS_DAYS)
 
@@ -623,7 +642,14 @@ def run_studies(include_target_benchmark: bool) -> dict:
     ]
     coupled = [run_coupled_scenario(interval, 0.025) for interval in GRID_INTERVALS_CM]
     coupled_timestep = [
-        run_coupled_scenario(0.1, dt_days) for dt_days in TIMESTEPS_DAYS
+        run_coupled_scenario(0.1, dt_days)
+        for dt_days in TIMESTEPS_DAYS
+        if math.isclose(
+            COUPLED_POLICY_DECISION_INTERVAL_DAYS / dt_days,
+            round(COUPLED_POLICY_DECISION_INTERVAL_DAYS / dt_days),
+            rel_tol=0.0,
+            abs_tol=1e-10,
+        )
     ]
     primary = ("total_uptake_micromol", "final_soil_micromol", "root_uptake_share", "fungus_uptake_share")
     timestep_comparisons = []
@@ -664,14 +690,16 @@ def run_studies(include_target_benchmark: bool) -> dict:
         {
             "candidate_dt_days": candidate["dt_days"],
             "reference_dt_days": reference["dt_days"],
-            **compare_coupled_action_frequency_sensitivity(candidate, reference),
+            **compare_coupled_timestep_convergence(candidate, reference),
         }
         for reference, candidate in zip(
             ordered_coupled_timestep, ordered_coupled_timestep[1:]
         )
     ]
     passing_grid = [interval for interval in GRID_INTERVALS_CM[:-1] if all(row["passes_5_percent"] for row in grid_comparisons if row["candidate_interval_cm"] == interval) and all(row["passes_5_percent"] for row in coupled_comparisons if row["candidate_interval_cm"] == interval)]
-    selected_dt = select_solver_timestep(timestep_comparisons)
+    selected_dt = select_solver_timestep(
+        timestep_comparisons, coupled_timestep_comparisons
+    )
     selected_grid = max(passing_grid) if passing_grid else min(GRID_INTERVALS_CM)
     reduced_benchmark = benchmark_environment(qualification_config(selected_grid, selected_dt, 1.0))
     deep_soil = run_deep_soil_scenario(selected_grid, selected_dt)
@@ -744,7 +772,7 @@ def render_markdown(results: dict) -> str:
         f"Grid had a passing coarser candidate: `{selection['grid_had_passing_candidate']}`; timestep had a passing larger candidate: `{selection['dt_had_passing_candidate']}`.",
         f"Deep-soil confinement and extended-P balance pass: `{selection['deep_soil_passes']}`.",
         "",
-        "The numerical timestep selection uses a 5% next-smaller comparison on fixed-geometry soil uptake, final inventory, and consumer shares. Coupled fixed-action trajectories are reported separately as action-frequency sensitivity diagnostics and do not select the numerical timestep because `dt` is also the policy decision interval until issue #24 is implemented. Grid convergence continues to include coupled endpoint pools. This is numerical qualification, not empirical validation.",
+        "The numerical timestep selection requires 5% next-smaller agreement for both fixed-geometry soil observables and coupled trajectories under a fixed 1-day policy decision interval. Candidates that do not divide that interval cannot resolve the declared policy schedule and are ineligible. Grid convergence continues to include coupled endpoint pools. This is numerical qualification, not empirical validation.",
         "",
         "## Balance and diagnostic ranges",
         "",
@@ -770,14 +798,22 @@ def render_markdown(results: dict) -> str:
         "",
         "## Timestep convergence",
         "",
-        "| Candidate day | Reference day | Worst fixed-soil solver change | Coupled action-frequency change | Solver pass |",
+        "| Candidate day | Reference day | Worst fixed-soil solver change | Coupled fixed-policy change | Solver pass |",
         "|---:|---:|---:|---:|:---:|",
     ])
     for dt in TIMESTEPS_DAYS[1:]:
         rows = [row for row in results["timestep_comparisons"] if row["candidate_dt_days"] == dt]
-        coupled_row = next(row for row in results["coupled_timestep_comparisons"] if row["candidate_dt_days"] == dt)
-        passed = all(row["passes_5_percent"] for row in rows)
-        lines.append(f"| {dt:g} | {rows[0]['reference_dt_days']:g} | {max(row['maximum_change'] for row in rows):.3%} | {coupled_row['maximum_change']:.3%} | {'yes' if passed else 'no'} |")
+        coupled_row = next(
+            (
+                row
+                for row in results["coupled_timestep_comparisons"]
+                if row["candidate_dt_days"] == dt
+            ),
+            None,
+        )
+        passed = coupled_row is not None and all(row["passes_5_percent"] for row in rows) and coupled_row["passes_5_percent"]
+        coupled_change = f"{coupled_row['maximum_change']:.3%}" if coupled_row else "ineligible"
+        lines.append(f"| {dt:g} | {rows[0]['reference_dt_days']:g} | {max(row['maximum_change'] for row in rows):.3%} | {coupled_change} | {'yes' if passed else 'no'} |")
     lines.extend([
         "",
         "## Grid convergence",
@@ -835,9 +871,9 @@ def render_markdown(results: dict) -> str:
         "- `T_ref` changes both the overlap weight and the sparse propagation radius, so its total-uptake response need not be monotonic; it remains a provisional model parameter rather than a numerical tuning control.",
         "- No scientific matrix row was inventory-capped. Coupled endpoint free-P pools remain reported in the JSON artifact as timestep-scaling diagnostics.",
         (
-            f"- {selection['dt_days']} day is the largest tested timestep that passed the fixed-geometry soil-solver gate."
+            f"- {selection['dt_days']} day is the largest tested timestep that passed both fixed-soil and coupled fixed-policy gates."
             if selection["dt_had_passing_candidate"]
-            else f"- No larger timestep passed the fixed-geometry soil-solver gate; {selection['dt_days']} day remains the finest tested fallback and does not itself demonstrate convergence without a smaller reference."
+            else f"- No larger eligible timestep passed both fixed-soil and coupled fixed-policy gates; {selection['dt_days']} day remains the finest tested fallback and does not itself demonstrate convergence without a smaller reference."
         ),
         "- Reduced-domain convergence retains a topsoil diffusion front but cannot reproduce every full-domain spatial scale.",
         (
@@ -846,7 +882,7 @@ def render_markdown(results: dict) -> str:
             else "- After biomass-consistent pool initialisation, coupled grids remain sensitive to quantised root/fungal extents; the selected grid is the finest-tested fallback rather than demonstrated spatial convergence."
         ),
         "- The coupled fixture uses 0.01 g plant biomass and 0.0001 g living external fungal biomass; each free C/P pool starts at one structural-biomass equivalent and automatic maintenance costs are disabled.",
-        "- Coupled Physical actions are fixed at `[trade=0.25, growth=1, reproduction=0, reserve=0]`. Their timestep comparisons change both numerical resolution and action frequency, so they remain diagnostics pending issue #24 and cannot establish solver convergence.",
+        "- Coupled Physical actions are fixed at `[trade=0.25, growth=1, reproduction=0, reserve=0]` and held for a fixed 1-day policy interval. Their timestep comparisons now isolate numerical resolution and are required for timestep selection.",
         "- Annual runtime is projected from both warmed soil-only and deterministic full-environment steps. MARL training, learned-policy inference, output, and accelerator transfer costs are excluded.",
         "- The complete machine-readable tables and exact platform metadata are in `phosphate-numerical-qualification.json`.",
     ])

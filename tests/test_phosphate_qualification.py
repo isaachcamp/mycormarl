@@ -39,8 +39,8 @@ run_fixed_soil_scenario = _SCRIPT_MODULE.run_fixed_soil_scenario
 run_coupled_scenario = _SCRIPT_MODULE.run_coupled_scenario
 run_deep_soil_scenario = _SCRIPT_MODULE.run_deep_soil_scenario
 qualification_species = _SCRIPT_MODULE.qualification_species
-compare_coupled_action_frequency_sensitivity = (
-    _SCRIPT_MODULE.compare_coupled_action_frequency_sensitivity
+compare_coupled_timestep_convergence = (
+    _SCRIPT_MODULE.compare_coupled_timestep_convergence
 )
 select_solver_timestep = _SCRIPT_MODULE.select_solver_timestep
 
@@ -279,7 +279,7 @@ def test_qualification_uptake_increases_across_concentration_range():
 
 def test_coupled_qualification_closes_extended_p_balance():
     """Soil, free pools, structure, mortality, and exports remain conservative."""
-    result = run_coupled_scenario(interval_cm=0.1, dt_days=0.4)
+    result = run_coupled_scenario(interval_cm=0.1, dt_days=0.1)
 
     assert result["relative_extended_p_balance_error"] <= 1e-5
     assert result["plant_uptake_micromol"] > 0.0
@@ -295,6 +295,16 @@ def test_coupled_qualification_closes_extended_p_balance():
         result["total_uptake_micromol"], rel=1e-5, abs=1e-6
     )
     assert result["final_soil_micromol"] >= 0.0
+
+
+def test_coupled_qualification_records_numerical_and_policy_timing():
+    """Coupled qualification records its fixed one-day policy cadence."""
+    result = run_coupled_scenario(interval_cm=0.1, dt_days=0.1)
+
+    assert result["timing"] == {
+        "numerical_timestep_days": 0.1,
+        "policy_decision_interval_days": 1.0,
+    }
 
 
 def test_coupled_qualification_pools_are_one_structural_biomass_equivalent():
@@ -313,8 +323,8 @@ def test_coupled_qualification_pools_are_one_structural_biomass_equivalent():
         )
 
 
-def test_solver_timestep_selection_ignores_coupled_action_frequency():
-    """Only fixed-geometry soil comparisons select the numerical timestep."""
+def test_solver_timestep_selection_requires_coupled_convergence():
+    """A numerical candidate is selectable only when coupled dynamics converge."""
     fixed_comparisons = [
         {"candidate_dt_days": 0.05, "passes_5_percent": True},
         {"candidate_dt_days": 0.05, "passes_5_percent": True},
@@ -324,24 +334,51 @@ def test_solver_timestep_selection_ignores_coupled_action_frequency():
         {"candidate_dt_days": 0.1, "passes_5_percent": True},
     ]
 
-    assert select_solver_timestep(fixed_comparisons) == pytest.approx(0.05)
+    coupled_comparisons = [
+        {"candidate_dt_days": 0.05, "passes_5_percent": True},
+        {"candidate_dt_days": 0.1, "passes_5_percent": False},
+    ]
+
+    assert select_solver_timestep(fixed_comparisons, coupled_comparisons) == pytest.approx(0.05)
+
+    fixed_comparisons = [
+        {"candidate_dt_days": dt_days, "passes_5_percent": True}
+        for dt_days in (0.05, 0.1, 0.2)
+    ]
+    coupled_comparisons = [
+        {"candidate_dt_days": dt_days, "passes_5_percent": True}
+        for dt_days in (0.05, 0.1, 0.2)
+    ]
+
+    assert select_solver_timestep(fixed_comparisons, coupled_comparisons) == pytest.approx(0.2)
 
 
-def test_coupled_action_frequency_sensitivity_keeps_residual_pools_diagnostic():
-    """Residual pools cannot dominate reported integrated-output sensitivity."""
-    reference = run_coupled_scenario(interval_cm=0.1, dt_days=0.4)
+def test_coupled_timestep_convergence_keeps_residual_pools_diagnostic():
+    """Residual pools cannot dominate the coupled numerical convergence gate."""
+    reference = {
+        "interval_cm": 0.1,
+        "dt_days": 0.05,
+        "decision_interval_days": 1.0,
+        "horizon_days": 2.0,
+        **{
+            metric: 1.0
+            for metric in _SCRIPT_MODULE.COUPLED_ACTION_FREQUENCY_METRICS
+            + _SCRIPT_MODULE.COUPLED_ACTION_FREQUENCY_DIAGNOSTICS
+        },
+        "relative_extended_p_balance_error": 0.0,
+    }
     candidate = {
         **reference,
-        "dt_days": 0.8,
+        "dt_days": 0.1,
         "plant_p_pool_mg": 2.0 * reference["plant_p_pool_mg"],
         "fungus_p_pool_mg": 2.0 * reference["fungus_p_pool_mg"],
     }
 
-    comparison = compare_coupled_action_frequency_sensitivity(candidate, reference)
+    comparison = compare_coupled_timestep_convergence(candidate, reference)
 
     assert comparison["passes_5_percent"] is True
-    assert comparison["classification"] == "action_frequency_sensitivity"
-    assert comparison["affects_numerical_timestep_selection"] is False
+    assert comparison["classification"] == "coupled_timestep_convergence"
+    assert comparison["affects_numerical_timestep_selection"] is True
     assert set(comparison["diagnostic_changes"]) == {
         "plant_p_pool_mg",
         "fungus_p_pool_mg",
@@ -358,10 +395,15 @@ def test_coupled_action_frequency_sensitivity_keeps_residual_pools_diagnostic():
     }
 
 
-def test_coupled_action_frequency_sensitivity_rejects_different_fixed_horizons():
-    """Action-frequency comparisons require the same horizon and grid."""
-    reference = run_coupled_scenario(interval_cm=0.1, dt_days=0.4)
-    candidate = {**reference, "dt_days": 0.8, "horizon_days": 4.0}
+def test_coupled_timestep_convergence_rejects_different_fixed_horizons():
+    """Coupled timestep comparisons require the same horizon and grid."""
+    reference = {
+        "interval_cm": 0.1,
+        "dt_days": 0.05,
+        "decision_interval_days": 1.0,
+        "horizon_days": 2.0,
+    }
+    candidate = {**reference, "dt_days": 0.1, "horizon_days": 4.0}
 
     with pytest.raises(ValueError, match="same horizon and grid interval"):
-        compare_coupled_action_frequency_sensitivity(candidate, reference)
+        compare_coupled_timestep_convergence(candidate, reference)
