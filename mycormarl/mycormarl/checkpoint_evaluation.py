@@ -12,7 +12,7 @@ from flax import serialization
 import jax
 import jax.numpy as jnp
 
-from mycormarl.algos.ppo import ActorCritic, latent_to_physical_action
+from mycormarl.algos.ppo import ActorCritic, latent_to_rate_action
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.policy_artifacts import (
     ACTOR_INTERFACE_VERSION,
@@ -223,12 +223,12 @@ def _actions(
         policy, _ = actor.apply(parameters[agent], observations[agent])
         if protocol == "latent-location":
             trade_latent = policy.trade_loc
-            allocation_latent = policy.allocation_loc
+            biological_rate_latent = policy.biological_rate_loc
         else:
-            key, trade_key, allocation_key = jax.random.split(key, 3)
+            key, trade_key, biological_rate_key = jax.random.split(key, 3)
             trade_latent = policy.trade_loc + jnp.exp(policy.trade_log_std) * jax.random.normal(trade_key, policy.trade_loc.shape)
-            allocation_latent = policy.allocation_loc + jnp.exp(policy.allocation_log_std) * jax.random.normal(allocation_key, policy.allocation_loc.shape)
-        actions[agent] = latent_to_physical_action(trade_latent, allocation_latent)
+            biological_rate_latent = policy.biological_rate_loc + jnp.exp(policy.biological_rate_log_std) * jax.random.normal(biological_rate_key, policy.biological_rate_loc.shape)
+        actions[agent] = latent_to_rate_action(trade_latent, biological_rate_latent)
     return actions, key
 
 

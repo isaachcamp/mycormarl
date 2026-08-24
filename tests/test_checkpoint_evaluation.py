@@ -187,7 +187,7 @@ def test_survivor_continues_after_partner_death_until_the_declared_horizon():
         ),
         SpeciesParams(
             PlantTraits(kappa_c=0.0, kappa_p=0.0),
-            FungusTraits(kappa_c=100.0, kappa_p=0.0),
+                FungusTraits(initial_c_pool=0.0, kappa_c=100.0, kappa_p=0.0),
         ),
     )
 

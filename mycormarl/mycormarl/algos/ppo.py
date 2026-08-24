@@ -20,15 +20,15 @@ class PolicyParameters(NamedTuple):
 
     trade_loc: jax.Array
     trade_log_std: jax.Array
-    allocation_loc: jax.Array
-    allocation_log_std: jax.Array
+    biological_rate_loc: jax.Array
+    biological_rate_log_std: jax.Array
 
 
 class PPOStepFields(NamedTuple):
     """Learning controls derived from one environment transition."""
 
     critic_valid: jax.Array
-    allocation_actor_valid: jax.Array
+    biological_rate_actor_valid: jax.Array
     trade_actor_valid: jax.Array
     terminated: jax.Array
     truncated: jax.Array
@@ -43,7 +43,7 @@ def transition_to_ppo_fields(transition: Transition) -> PPOStepFields:
     terminated = transition.operational_at_start & ~transition.operational_at_end
     return PPOStepFields(
         critic_valid=critic_valid,
-        allocation_actor_valid=transition.allocation_executed,
+        biological_rate_actor_valid=transition.allocation_executed,
         trade_actor_valid=transition.trade_executed,
         terminated=terminated,
         truncated=transition.truncated,
@@ -138,26 +138,16 @@ def normal_log_probability(
     return -0.5 * jnp.square(standardised) - log_std - 0.5 * jnp.log(2.0 * jnp.pi)
 
 
-def latent_to_physical_action(
+def latent_to_rate_action(
     trade_latent: jax.Array,
-    allocation_latent: jax.Array,
+    biological_rate_latent: jax.Array,
 ) -> jax.Array:
-    """Map three policy latents to ``[trade, growth, reproduction, reserve]``."""
+    """Map four policy latents to non-negative ``d^-1`` Rate actions."""
     trade_latent = jnp.asarray(trade_latent, dtype=jnp.float32)
-    allocation_latent = jnp.asarray(allocation_latent, dtype=jnp.float32)
-    first = allocation_latent[..., 0]
-    second = allocation_latent[..., 1]
-    allocation_logits = jnp.stack(
-        (
-            first / jnp.sqrt(2.0) + second / jnp.sqrt(6.0),
-            -first / jnp.sqrt(2.0) + second / jnp.sqrt(6.0),
-            -2.0 * second / jnp.sqrt(6.0),
-        ),
-        axis=-1,
-    )
-    allocation = jax.nn.softmax(allocation_logits, axis=-1)
-    trade = jax.nn.sigmoid(trade_latent)[..., None]
-    return jnp.concatenate((trade, allocation), axis=-1)
+    biological_rate_latent = jnp.asarray(biological_rate_latent, dtype=jnp.float32)
+    trade_rate = jax.nn.softplus(trade_latent)[..., None]
+    biological_rates = jax.nn.softplus(biological_rate_latent)
+    return jnp.concatenate((trade_rate, biological_rates), axis=-1)
 
 
 @dataclass(frozen=True)
@@ -199,25 +189,25 @@ class ActorCritic(nn.Module):
         trade_loc = nn.Dense(
             1,
             kernel_init=constant(0.0),
-            bias_init=constant(jnp.log(self.initial_trade / (1.0 - self.initial_trade))),
+            bias_init=constant(jnp.log(jnp.expm1(self.initial_trade))),
             name="trade_head",
         )(policy_features)[..., 0]
-        allocation_loc = nn.Dense(
-            2,
+        biological_rate_loc = nn.Dense(
+            3,
             kernel_init=constant(0.0),
             bias_init=constant(0.0),
-            name="allocation_head",
+            name="biological_rate_head",
         )(policy_features)
         trade_log_std = self.param("trade_log_std", constant(0.0), (1,))
-        allocation_log_std = self.param(
-            "allocation_log_std", constant(0.0), (2,)
+        biological_rate_log_std = self.param(
+            "biological_rate_log_std", constant(0.0), (3,)
         )
         policy = PolicyParameters(
             trade_loc=trade_loc,
             trade_log_std=jnp.broadcast_to(trade_log_std[0], trade_loc.shape),
-            allocation_loc=allocation_loc,
-            allocation_log_std=jnp.broadcast_to(
-                allocation_log_std, allocation_loc.shape
+            biological_rate_loc=biological_rate_loc,
+            biological_rate_log_std=jnp.broadcast_to(
+                biological_rate_log_std, biological_rate_loc.shape
             ),
         )
 
@@ -234,16 +224,16 @@ class Trajectory(NamedTuple):
     """PPO rollout fields for one policy, distinct from environment transitions."""
 
     latent_trade_action: jnp.ndarray
-    latent_allocation_action: jnp.ndarray
-    physical_action: jnp.ndarray
+    latent_biological_rate_action: jnp.ndarray
+    rate_action: jnp.ndarray
     value: jnp.ndarray
     reward: jnp.ndarray
     trade_log_probability: jnp.ndarray
-    allocation_log_probability: jnp.ndarray
+    biological_rate_log_probability: jnp.ndarray
     obs: jnp.ndarray
     info: dict
     critic_valid: jnp.ndarray
-    allocation_actor_valid: jnp.ndarray
+    biological_rate_actor_valid: jnp.ndarray
     trade_actor_valid: jnp.ndarray
     terminated: jnp.ndarray
     truncated: jnp.ndarray
@@ -262,10 +252,10 @@ class PPOUpdateMetrics(NamedTuple):
     approx_kl: jnp.ndarray
     latent_entropy: jnp.ndarray
     critic_valid_count: jnp.ndarray
-    allocation_actor_valid_count: jnp.ndarray
+    biological_rate_actor_valid_count: jnp.ndarray
     trade_actor_valid_count: jnp.ndarray
     critic_valid_fraction: jnp.ndarray
-    allocation_actor_valid_fraction: jnp.ndarray
+    biological_rate_actor_valid_fraction: jnp.ndarray
     trade_actor_valid_fraction: jnp.ndarray
 
 
@@ -333,7 +323,12 @@ def make_train(
     rollout_timesteps = config.NUM_STEPS * config.NUM_ENVS
     if config.TOTAL_TIMESTEPS < rollout_timesteps:
         raise ValueError("TOTAL_TIMESTEPS must contain at least one PPO update")
-    run_timesteps = config.TOTAL_TIMESTEPS if config.RUN_TIMESTEPS is None else config.RUN_TIMESTEPS
+    configured_run_timesteps = getattr(config, "RUN_TIMESTEPS", None)
+    run_timesteps = (
+        config.TOTAL_TIMESTEPS
+        if configured_run_timesteps is None
+        else configured_run_timesteps
+    )
     if run_timesteps < rollout_timesteps or run_timesteps % rollout_timesteps:
         raise ValueError("RUN_TIMESTEPS must contain whole PPO updates")
     for agent in env.agents:
@@ -374,11 +369,11 @@ def make_train(
         # same optimizer, environment, and named-RNG state.
         plant_policy = ActorCritic(
             activation=config.ACTIVATION,
-            initial_trade=config.PLANT_INITIAL_TRADE,
+            initial_trade=getattr(config, "PLANT_INITIAL_TRADE", 0.05),
         )
         fungus_policy = ActorCritic(
             activation=config.ACTIVATION,
-            initial_trade=config.FUNGUS_INITIAL_TRADE,
+            initial_trade=getattr(config, "FUNGUS_INITIAL_TRADE", 0.75),
         )
 
         if initial_runner_state is None:
@@ -455,12 +450,12 @@ def make_train(
                 ) * jax.random.normal(
                     plant_trade_rng, plant_policy_parameters.trade_loc.shape
                 )
-                plant_latent_allocation = (
-                    plant_policy_parameters.allocation_loc
-                    + jnp.exp(plant_policy_parameters.allocation_log_std)
+                plant_latent_biological_rate = (
+                    plant_policy_parameters.biological_rate_loc
+                    + jnp.exp(plant_policy_parameters.biological_rate_log_std)
                     * jax.random.normal(
                         plant_allocation_rng,
-                        plant_policy_parameters.allocation_loc.shape,
+                        plant_policy_parameters.biological_rate_loc.shape,
                     )
                 )
                 plant_trade_log_probability = normal_log_probability(
@@ -468,16 +463,16 @@ def make_train(
                     plant_policy_parameters.trade_loc,
                     plant_policy_parameters.trade_log_std,
                 )
-                plant_allocation_log_probability = jnp.sum(
+                plant_biological_rate_log_probability = jnp.sum(
                     normal_log_probability(
-                        plant_latent_allocation,
-                        plant_policy_parameters.allocation_loc,
-                        plant_policy_parameters.allocation_log_std,
+                        plant_latent_biological_rate,
+                        plant_policy_parameters.biological_rate_loc,
+                        plant_policy_parameters.biological_rate_log_std,
                     ),
                     axis=-1,
                 )
-                plant_physical_action = latent_to_physical_action(
-                    plant_latent_trade, plant_latent_allocation
+                plant_rate_action = latent_to_rate_action(
+                    plant_latent_trade, plant_latent_biological_rate
                 )
 
                 fungus_policy_parameters, fungus_value = fungus_policy.apply(
@@ -488,12 +483,12 @@ def make_train(
                 ) * jax.random.normal(
                     fungus_trade_rng, fungus_policy_parameters.trade_loc.shape
                 )
-                fungus_latent_allocation = (
-                    fungus_policy_parameters.allocation_loc
-                    + jnp.exp(fungus_policy_parameters.allocation_log_std)
+                fungus_latent_biological_rate = (
+                    fungus_policy_parameters.biological_rate_loc
+                    + jnp.exp(fungus_policy_parameters.biological_rate_log_std)
                     * jax.random.normal(
                         fungus_allocation_rng,
-                        fungus_policy_parameters.allocation_loc.shape,
+                        fungus_policy_parameters.biological_rate_loc.shape,
                     )
                 )
                 fungus_trade_log_probability = normal_log_probability(
@@ -501,21 +496,21 @@ def make_train(
                     fungus_policy_parameters.trade_loc,
                     fungus_policy_parameters.trade_log_std,
                 )
-                fungus_allocation_log_probability = jnp.sum(
+                fungus_biological_rate_log_probability = jnp.sum(
                     normal_log_probability(
-                        fungus_latent_allocation,
-                        fungus_policy_parameters.allocation_loc,
-                        fungus_policy_parameters.allocation_log_std,
+                        fungus_latent_biological_rate,
+                        fungus_policy_parameters.biological_rate_loc,
+                        fungus_policy_parameters.biological_rate_log_std,
                     ),
                     axis=-1,
                 )
-                fungus_physical_action = latent_to_physical_action(
-                    fungus_latent_trade, fungus_latent_allocation
+                fungus_rate_action = latent_to_rate_action(
+                    fungus_latent_trade, fungus_latent_biological_rate
                 )
 
                 # Unbatchify the actions to match the environment's expected input format
                 env_act = unbatchify(
-                    jnp.stack([plant_physical_action, fungus_physical_action]),
+                    jnp.stack([plant_rate_action, fungus_rate_action]),
                     env.agents, config.NUM_ENVS, config.NUM_ACTORS
                 )
 
@@ -534,16 +529,16 @@ def make_train(
                 # Collect Trajectory object
                 plant_trajectory = Trajectory(
                     latent_trade_action=plant_latent_trade,
-                    latent_allocation_action=plant_latent_allocation,
-                    physical_action=plant_physical_action,
+                    latent_biological_rate_action=plant_latent_biological_rate,
+                    rate_action=plant_rate_action,
                     value=jnp.array(plant_value),
                     reward=reward[PLANT].reshape((config.NUM_ENVS,)),
                     trade_log_probability=plant_trade_log_probability,
-                    allocation_log_probability=plant_allocation_log_probability,
+                    biological_rate_log_probability=plant_biological_rate_log_probability,
                     obs=plant_obs_batch,
                     info=info[PLANT],
                     critic_valid=plant_fields.critic_valid,
-                    allocation_actor_valid=plant_fields.allocation_actor_valid,
+                    biological_rate_actor_valid=plant_fields.biological_rate_actor_valid,
                     trade_actor_valid=plant_fields.trade_actor_valid,
                     terminated=plant_fields.terminated,
                     truncated=plant_fields.truncated,
@@ -553,16 +548,16 @@ def make_train(
                 )
                 fungus_trajectory = Trajectory(
                     latent_trade_action=fungus_latent_trade,
-                    latent_allocation_action=fungus_latent_allocation,
-                    physical_action=fungus_physical_action,
+                    latent_biological_rate_action=fungus_latent_biological_rate,
+                    rate_action=fungus_rate_action,
                     value=jnp.array(fungus_value),
                     reward=reward[FUNGUS].reshape((config.NUM_ENVS,)),
                     trade_log_probability=fungus_trade_log_probability,
-                    allocation_log_probability=fungus_allocation_log_probability,
+                    biological_rate_log_probability=fungus_biological_rate_log_probability,
                     obs=fungus_obs_batch,
                     info=info[FUNGUS],
                     critic_valid=fungus_fields.critic_valid,
-                    allocation_actor_valid=fungus_fields.allocation_actor_valid,
+                    biological_rate_actor_valid=fungus_fields.biological_rate_actor_valid,
                     trade_actor_valid=fungus_fields.trade_actor_valid,
                     terminated=fungus_fields.terminated,
                     truncated=fungus_fields.truncated,
@@ -634,11 +629,11 @@ def make_train(
                             policy_parameters.trade_loc,
                             policy_parameters.trade_log_std,
                         )
-                        allocation_log_probability = jnp.sum(
+                        biological_rate_log_probability = jnp.sum(
                             normal_log_probability(
-                                traj_batch.latent_allocation_action,
-                                policy_parameters.allocation_loc,
-                                policy_parameters.allocation_log_std,
+                                traj_batch.latent_biological_rate_action,
+                                policy_parameters.biological_rate_loc,
+                                policy_parameters.biological_rate_log_std,
                             ),
                             axis=-1,
                         )
@@ -655,13 +650,13 @@ def make_train(
                         )
 
                         # CALCULATE ACTOR LOSS
-                        log_probability = allocation_log_probability + jnp.where(
+                        log_probability = biological_rate_log_probability + jnp.where(
                             traj_batch.trade_actor_valid,
                             trade_log_probability,
                             0.0,
                         )
                         old_log_probability = (
-                            traj_batch.allocation_log_probability
+                            traj_batch.biological_rate_log_probability
                             + jnp.where(
                                 traj_batch.trade_actor_valid,
                                 traj_batch.trade_log_probability,
@@ -670,7 +665,7 @@ def make_train(
                         )
                         ratio = jnp.exp(log_probability - old_log_probability)
                         gae = masked_normalize(
-                            gae, traj_batch.allocation_actor_valid
+                            gae, traj_batch.biological_rate_actor_valid
                         )
                         loss_actor1 = ratio * gae
                         loss_actor2 = (
@@ -683,23 +678,23 @@ def make_train(
                         )
                         loss_actor = masked_mean(
                             -jnp.minimum(loss_actor1, loss_actor2),
-                            traj_batch.allocation_actor_valid,
+                            traj_batch.biological_rate_actor_valid,
                         )
                         approx_kl = masked_mean(
                             old_log_probability - log_probability,
-                            traj_batch.allocation_actor_valid,
+                            traj_batch.biological_rate_actor_valid,
                         )
                         normal_entropy = lambda log_std: jnp.sum(
                             log_std + 0.5 * (1.0 + jnp.log(2.0 * jnp.pi)), axis=-1
                         )
                         latent_entropy = masked_mean(
-                            normal_entropy(policy_parameters.allocation_log_std)
+                            normal_entropy(policy_parameters.biological_rate_log_std)
                             + jnp.where(
                                 traj_batch.trade_actor_valid,
                                 normal_entropy(policy_parameters.trade_log_std),
                                 0.0,
                             ),
-                            traj_batch.allocation_actor_valid,
+                            traj_batch.biological_rate_actor_valid,
                         )
                         total_loss = loss_actor + config.VF_COEF * value_loss
                         return total_loss, (value_loss, loss_actor, approx_kl, latent_entropy)
@@ -719,7 +714,7 @@ def make_train(
                         return state, (zero, zero, zero, zero, zero)
 
                     return jax.lax.cond(
-                        jnp.any(traj_batch.allocation_actor_valid),
+                        jnp.any(traj_batch.biological_rate_actor_valid),
                         _apply_update,
                         _skip_update,
                         agent_train_state,
@@ -799,7 +794,7 @@ def make_train(
                 sample_count = trajectory.critic_valid.size
                 critic_count = jnp.sum(trajectory.critic_valid)
                 allocation_count = jnp.sum(
-                    trajectory.allocation_actor_valid
+                    trajectory.biological_rate_actor_valid
                 )
                 trade_count = jnp.sum(trajectory.trade_actor_valid)
                 return PPOUpdateMetrics(
@@ -810,10 +805,10 @@ def make_train(
                     approx_kl=approx_kl,
                     latent_entropy=latent_entropy,
                     critic_valid_count=critic_count,
-                    allocation_actor_valid_count=allocation_count,
+                    biological_rate_actor_valid_count=allocation_count,
                     trade_actor_valid_count=trade_count,
                     critic_valid_fraction=critic_count / sample_count,
-                    allocation_actor_valid_fraction=(
+                    biological_rate_actor_valid_fraction=(
                         allocation_count / sample_count
                     ),
                     trade_actor_valid_fraction=trade_count / sample_count,

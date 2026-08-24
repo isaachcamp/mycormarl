@@ -54,7 +54,7 @@ def test_ordinary_transition_is_valid_for_both_actor_factors_and_critic():
     fields = transition_to_ppo_fields(_transition())
 
     assert fields.critic_valid
-    assert fields.allocation_actor_valid
+    assert fields.biological_rate_actor_valid
     assert fields.trade_actor_valid
     assert not fields.terminated
     assert fields.bootstrap_valid
@@ -73,7 +73,7 @@ def test_death_transition_keeps_critic_sample_but_rejects_unexecuted_action():
     )
 
     assert fields.critic_valid
-    assert not fields.allocation_actor_valid
+    assert not fields.biological_rate_actor_valid
     assert not fields.trade_actor_valid
     assert fields.terminated
     assert not fields.bootstrap_valid
@@ -91,7 +91,7 @@ def test_dead_or_absent_padding_is_invalid_for_all_learning():
     )
 
     assert not fields.critic_valid
-    assert not fields.allocation_actor_valid
+    assert not fields.biological_rate_actor_valid
     assert not fields.trade_actor_valid
     assert not fields.terminated
     assert not fields.bootstrap_valid
@@ -113,7 +113,7 @@ def test_cancelled_trade_does_not_mask_executed_allocation():
     fields = transition_to_ppo_fields(_transition(trade_executed=False))
 
     assert fields.critic_valid
-    assert fields.allocation_actor_valid
+    assert fields.biological_rate_actor_valid
     assert not fields.trade_actor_valid
 
 
@@ -203,10 +203,10 @@ def test_rollout_carries_per_species_transition_validity():
     assert plant.critic_valid.shape == (1, 2, 1)
     assert fungus.critic_valid.shape == (1, 2, 1)
     assert jnp.all(plant.critic_valid)
-    assert jnp.all(plant.allocation_actor_valid)
+    assert jnp.all(plant.biological_rate_actor_valid)
     assert not jnp.any(plant.trade_actor_valid)
     assert not jnp.any(fungus.critic_valid)
-    assert not jnp.any(fungus.allocation_actor_valid)
+    assert not jnp.any(fungus.biological_rate_actor_valid)
     assert not jnp.any(fungus.trade_actor_valid)
     train_states = output["runner_state"][0]
     assert train_states[PLANT].step == 1
@@ -214,13 +214,13 @@ def test_rollout_carries_per_species_transition_validity():
     plant_metrics = output["metrics"][PLANT]
     fungus_metrics = output["metrics"][FUNGUS]
     assert plant_metrics.critic_valid_count == 2
-    assert plant_metrics.allocation_actor_valid_count == 2
+    assert plant_metrics.biological_rate_actor_valid_count == 2
     assert plant_metrics.trade_actor_valid_count == 0
-    assert plant_metrics.allocation_actor_valid_fraction == 1.0
+    assert plant_metrics.biological_rate_actor_valid_fraction == 1.0
     assert fungus_metrics.critic_valid_count == 0
-    assert fungus_metrics.allocation_actor_valid_count == 0
+    assert fungus_metrics.biological_rate_actor_valid_count == 0
     assert fungus_metrics.trade_actor_valid_count == 0
-    assert fungus_metrics.allocation_actor_valid_fraction == 0.0
+    assert fungus_metrics.biological_rate_actor_valid_fraction == 0.0
 
 
 def test_undiscounted_training_rejects_indefinitely_viable_configured_consumer():
@@ -278,7 +278,7 @@ def test_rollout_distinguishes_death_transition_from_dead_padding():
     plant = output["trajectories"][0]
 
     assert jnp.array_equal(plant.critic_valid[0, :, 0], jnp.array([True, False]))
-    assert not jnp.any(plant.allocation_actor_valid)
+    assert not jnp.any(plant.biological_rate_actor_valid)
     assert not jnp.any(plant.trade_actor_valid)
     assert jnp.array_equal(plant.terminated[0, :, 0], jnp.array([True, False]))
     assert not jnp.any(plant.bootstrap_valid)

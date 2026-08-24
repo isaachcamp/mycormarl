@@ -6,7 +6,7 @@ import jax
 from mycormarl.algos.ppo import (
     ActorCritic,
     PPOConfig,
-    latent_to_physical_action,
+    latent_to_rate_action,
     make_train,
     normal_log_probability,
 )
@@ -34,57 +34,23 @@ def _small_environment():
     )
 
 
-def test_zero_latents_map_to_half_trade_and_uniform_allocation():
-    """The centred policy origin has the agreed biologically neutral action."""
-    action = latent_to_physical_action(
+def test_zero_latents_map_to_independent_nonnegative_per_day_rates():
+    action = latent_to_rate_action(
         trade_latent=jnp.array(0.0),
-        allocation_latent=jnp.array([0.0, 0.0]),
+        biological_rate_latent=jnp.zeros(3, dtype=jnp.float32),
     )
 
     assert action.dtype == jnp.float32
-    assert jnp.allclose(action, jnp.array([0.5, 1 / 3, 1 / 3, 1 / 3]))
+    assert jnp.allclose(action, jnp.full(4, jnp.log(2.0)))
 
 
-def test_allocation_transform_is_orthonormal_zero_sum_and_vectorised():
-    """The two latent allocation axes span the simplex symmetrically."""
-    actions = jax.jit(latent_to_physical_action)(
-        trade_latent=jnp.array([-100.0, 100.0]),
-        allocation_latent=jnp.eye(2, dtype=jnp.float32),
-    )
-    centred_log_allocations = jnp.log(actions[:, 1:]) - jnp.mean(
-        jnp.log(actions[:, 1:]), axis=-1, keepdims=True
-    )
-
-    assert actions.shape == (2, 4)
-    assert jnp.all(jnp.isfinite(actions))
-    assert jnp.allclose(
-        jnp.sum(centred_log_allocations, axis=-1), 0.0, atol=1e-6
-    )
-    assert jnp.allclose(
-        centred_log_allocations @ centred_log_allocations.T,
-        jnp.eye(2),
-        atol=1e-6,
-    )
-    assert jnp.allclose(
-        centred_log_allocations.T @ centred_log_allocations,
-        jnp.array(
-            [
-                [2 / 3, -1 / 3, -1 / 3],
-                [-1 / 3, 2 / 3, -1 / 3],
-                [-1 / 3, -1 / 3, 2 / 3],
-            ]
-        ),
-        atol=1e-6,
-    )
-
-
-def test_transformed_physical_actions_reach_the_environment_unchanged():
+def test_transformed_rate_actions_reach_the_environment_unchanged():
     """The environment observes and executes each transformed policy action exactly."""
     environment = _small_environment()
     _, state = environment.reset(jax.random.PRNGKey(1))
     actions = {
-        PLANT: latent_to_physical_action(0.25, jnp.array([0.5, -0.75])),
-        FUNGUS: latent_to_physical_action(-0.5, jnp.array([-0.25, 1.0])),
+        PLANT: latent_to_rate_action(0.25, jnp.array([0.5, -0.75, 0.0])),
+        FUNGUS: latent_to_rate_action(-0.5, jnp.array([-0.25, 1.0, 0.0])),
     }
 
     _, _, _, _, info = environment.step_env(
@@ -107,25 +73,23 @@ def test_actor_initialises_two_gaussian_heads_and_a_local_critic():
 
     assert policy.trade_loc.shape == (3,)
     assert policy.trade_log_std.shape == (3,)
-    assert policy.allocation_loc.shape == (3, 2)
-    assert policy.allocation_log_std.shape == (3, 2)
+    assert policy.biological_rate_loc.shape == (3, 3)
+    assert policy.biological_rate_log_std.shape == (3, 3)
     assert values.shape == (3,)
-    assert jnp.allclose(jax.nn.sigmoid(policy.trade_loc), 0.1)
-    assert jnp.allclose(policy.allocation_loc, 0.0)
+    assert jnp.allclose(jax.nn.softplus(policy.trade_loc), 0.1)
+    assert jnp.allclose(policy.biological_rate_loc, 0.0)
     assert jnp.allclose(policy.trade_log_std, 0.0)
-    assert jnp.allclose(policy.allocation_log_std, 0.0)
+    assert jnp.allclose(policy.biological_rate_log_std, 0.0)
 
 
-def test_actor_trade_head_can_be_preconditioned_at_requested_fraction():
-    """The zero-feature trade logit maps exactly to the configured prior."""
+def test_actor_trade_head_can_be_preconditioned_at_requested_per_day_rate():
+    """The zero-feature trade latent maps exactly to the configured rate."""
     observations = jnp.zeros((2, 5), dtype=jnp.float32)
     for initial_trade in (0.05, 0.75):
         actor_critic = ActorCritic(initial_trade=initial_trade)
         parameters = actor_critic.init(jax.random.PRNGKey(11), observations)
         policy, _ = actor_critic.apply(parameters, observations)
-        assert jnp.allclose(
-            jax.nn.sigmoid(policy.trade_loc), initial_trade
-        )
+        assert jnp.allclose(jax.nn.softplus(policy.trade_loc), initial_trade)
 
 
 def test_standard_normal_log_probability_matches_known_density():
@@ -159,28 +123,29 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
         (PLANT, FUNGUS), output["trajectories"], strict=True
     ):
         assert trajectory.latent_trade_action.shape == (1, 2, 2)
-        assert trajectory.latent_allocation_action.shape == (1, 2, 2, 2)
-        assert trajectory.physical_action.shape == (1, 2, 2, 4)
+        assert trajectory.latent_biological_rate_action.shape == (1, 2, 2, 3)
+        assert trajectory.rate_action.shape == (1, 2, 2, 4)
         assert trajectory.critic_valid.shape == (1, 2, 2)
-        assert trajectory.allocation_actor_valid.shape == (1, 2, 2)
+        assert trajectory.biological_rate_actor_valid.shape == (1, 2, 2)
         assert trajectory.trade_actor_valid.shape == (1, 2, 2)
         assert trajectory.bootstrap_observation.shape == (1, 2, 2, 5)
         for values in (
             trajectory.latent_trade_action,
-            trajectory.latent_allocation_action,
-            trajectory.physical_action,
+            trajectory.latent_biological_rate_action,
+            trajectory.rate_action,
             trajectory.trade_log_probability,
-            trajectory.allocation_log_probability,
+            trajectory.biological_rate_log_probability,
             trajectory.value,
         ):
             assert jnp.all(jnp.isfinite(values))
-        assert jnp.all(
-            (trajectory.physical_action[..., 0] >= 0.0)
-            & (trajectory.physical_action[..., 0] <= 1.0)
-        )
-        assert jnp.all(trajectory.physical_action[..., 1:] >= 0.0)
+        assert jnp.all(trajectory.rate_action[..., 0] >= 0.0)
+        assert jnp.all(trajectory.rate_action[..., 1:] >= 0.0)
         assert jnp.allclose(
-            jnp.sum(trajectory.physical_action[..., 1:], axis=-1), 1.0
+            trajectory.rate_action,
+            latent_to_rate_action(
+                trajectory.latent_trade_action,
+                trajectory.latent_biological_rate_action,
+            ),
         )
 
         policy, _ = ActorCritic(activation=config.ACTIVATION).apply(
@@ -191,11 +156,11 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
             policy.trade_loc,
             policy.trade_log_std,
         )
-        recomputed_allocation = jnp.sum(
+        recomputed_biological_rate = jnp.sum(
             normal_log_probability(
-                trajectory.latent_allocation_action,
-                policy.allocation_loc,
-                policy.allocation_log_std,
+                trajectory.latent_biological_rate_action,
+                policy.biological_rate_loc,
+                policy.biological_rate_log_std,
             ),
             axis=-1,
         )
@@ -203,8 +168,8 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
             recomputed_trade, trajectory.trade_log_probability, atol=1e-6
         )
         assert jnp.allclose(
-            recomputed_allocation,
-            trajectory.allocation_log_probability,
+            recomputed_biological_rate,
+            trajectory.biological_rate_log_probability,
             atol=1e-6,
         )
 

@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from mycormarl.actions import physical_action
+from mycormarl.actions import rate_action as physical_action
 from mycormarl.algos.ppo import make_train
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
