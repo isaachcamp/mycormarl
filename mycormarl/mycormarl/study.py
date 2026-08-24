@@ -334,6 +334,14 @@ def _validate_required_declarations(manifest: Any) -> None:
             value = training.get(field, 1)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ValueError(f"training {field} must be a positive integer")
+        normalization = training.get(
+            "critic_target_normalization", "per-agent-running"
+        )
+        if normalization not in {"per-agent-running", "raw"}:
+            raise ValueError(
+                "training critic_target_normalization must be "
+                "'per-agent-running' or 'raw'"
+            )
         update_size = training.get("num_steps", 1) * training.get("num_envs", 1)
         if training["checkpoint_interval_timesteps"] % update_size != 0:
             raise ValueError("training checkpoint interval must contain whole PPO updates")
@@ -958,17 +966,31 @@ def _training_config(manifest: dict[str, Any], timesteps: int) -> PPOConfig:
         NUM_ENVS=training.get("num_envs", 1),
         UPDATE_EPOCHS=training.get("update_epochs", 1),
         NUM_MINIBATCHES=training.get("num_minibatches", 1),
+        DISCOUNT_HALF_LIFE_DAYS=training.get("discount_half_life_days"),
+        NORMALIZE_CRITIC_TARGETS=(
+            training.get("critic_target_normalization", "per-agent-running")
+            == "per-agent-running"
+        ),
     )
 
 
 def _actor_configuration(config: PPOConfig) -> dict[str, str]:
     """Persist every actor setting that changes checkpoint execution."""
-    return {"activation": config.ACTIVATION}
+    return {
+        "activation": config.ACTIVATION,
+        "critic_target_normalization": (
+            "per-agent-running" if config.NORMALIZE_CRITIC_TARGETS else "raw"
+        ),
+    }
 
 
 def _training_diagnostics(chunks: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
     """Summarise PPO optimizer health since the preceding saved checkpoint."""
-    fields = ("total_loss", "value_loss", "actor_loss", "approx_kl", "latent_entropy")
+    fields = (
+        "total_loss", "value_loss", "actor_loss", "approx_kl", "latent_entropy",
+        "raw_return_mean", "normalized_return_mean", "raw_critic_mean",
+        "normalized_critic_mean", "critic_target_scale",
+    )
     diagnostics: dict[str, dict[str, float]] = {}
     for agent in ("plant", "fungus"):
         metrics = [chunk[agent] for chunk in chunks]

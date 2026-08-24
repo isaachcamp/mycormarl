@@ -136,6 +136,7 @@ def test_phase_1_checkpoint_records_ppo_diagnostics_for_training_analysis(tmp_pa
     manifest["training"].update({
         "minimum_transition_budget": 2,
         "maximum_transition_budget": 2,
+        "discount_half_life_days": 30.0,
     })
 
     bundle = json.loads(
@@ -147,8 +148,38 @@ def test_phase_1_checkpoint_records_ppo_diagnostics_for_training_analysis(tmp_pa
     for agent in diagnostics.values():
         assert {
             "learning_rate", "total_loss", "value_loss", "actor_loss",
-            "approx_kl", "latent_entropy",
+            "approx_kl", "latent_entropy", "raw_return_mean",
+            "normalized_return_mean", "raw_critic_mean",
+            "normalized_critic_mean", "critic_target_scale",
         } <= agent.keys()
+
+
+def test_pilot_can_declare_the_raw_critic_ablation_without_changing_endpoints(tmp_path):
+    """A short raw/normalized ablation retains reproductive-fitness reporting."""
+    normalized_manifest = _pilot_manifest(tmp_path)
+    normalized_manifest["output"]["identity"] = "normalized-critic"
+    normalized_manifest["training"]["discount_half_life_days"] = 30.0
+    normalized = json.loads(run_study(
+        _write_manifest(tmp_path, normalized_manifest)
+    ).bundle_path.read_text())
+
+    raw_manifest = _pilot_manifest(tmp_path)
+    raw_manifest["output"]["identity"] = "raw-critic"
+    raw_manifest["training"].update({
+        "discount_half_life_days": 30.0,
+        "critic_target_normalization": "raw",
+    })
+    raw = json.loads(run_study(
+        _write_manifest(tmp_path, raw_manifest)
+    ).bundle_path.read_text())
+
+    for bundle in (normalized, raw):
+        checkpoint = bundle["entries"][0]["stopping_checkpoints"][0]
+        assert set(checkpoint["metrics"]["fitness"]) == {"plant", "fungus"}
+    assert raw["manifest"]["training"]["critic_target_normalization"] == "raw"
+    assert normalized["manifest"]["training"].get(
+        "critic_target_normalization", "per-agent-running"
+    ) == "per-agent-running"
 
 
 def test_scientific_phase_1_manifest_fixes_the_range_finding_design(tmp_path):
@@ -1359,7 +1390,10 @@ def test_single_condition_training_can_stop_and_resume_from_checkpoint(tmp_path)
     manifest["stage"] = "single-condition-training"
     manifest["modes"] = ["plant-only"]
     manifest["training"].update(
-        {"num_steps": 1, "num_envs": 1, "update_epochs": 1, "num_minibatches": 1}
+        {
+            "num_steps": 1, "num_envs": 1, "update_epochs": 1,
+            "num_minibatches": 1, "discount_half_life_days": 30.0,
+        }
     )
     manifest_path = _write_manifest(tmp_path, manifest)
 
@@ -1378,6 +1412,7 @@ def test_single_condition_training_can_stop_and_resume_from_checkpoint(tmp_path)
     assert set(checkpoint_payload["runner_state"]) == {"0", "1", "2", "3"}
     assert set(checkpoint_payload["runner_state"]["0"]) == {"plant", "fungus"}
     assert "opt_state" in checkpoint_payload["runner_state"]["0"]["plant"]
+    assert "critic_normalizer" in checkpoint_payload["runner_state"]["0"]["plant"]
     first_evaluation = (
         tmp_path / "outputs" / "training-resume" / "evaluations"
         / "checkpoint-00000001.json"
@@ -1399,7 +1434,10 @@ def test_single_condition_training_can_stop_and_resume_from_checkpoint(tmp_path)
     uninterrupted_manifest["stage"] = "single-condition-training"
     uninterrupted_manifest["modes"] = ["plant-only"]
     uninterrupted_manifest["training"].update(
-        {"num_steps": 1, "num_envs": 1, "update_epochs": 1, "num_minibatches": 1}
+        {
+            "num_steps": 1, "num_envs": 1, "update_epochs": 1,
+            "num_minibatches": 1, "discount_half_life_days": 30.0,
+        }
     )
     full = run_study(
         _write_manifest(tmp_path / "uninterrupted", uninterrupted_manifest)
