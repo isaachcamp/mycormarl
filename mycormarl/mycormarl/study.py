@@ -36,6 +36,7 @@ from mycormarl.random_streams import (
 )
 from mycormarl.algos.ppo import PPOConfig, make_train
 from mycormarl.environments.base_mycor import BaseMycorMarl
+from mycormarl.environments.policy_interval import PolicyIntervalMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
@@ -91,6 +92,10 @@ def _provenance(manifest: dict[str, Any]) -> dict[str, Any]:
         "mycormarl_version": version("mycormarl"),
         "python_version": platform.python_version(),
         "result_format_version": STUDY_RESULT_VERSION,
+        "numerical_timestep_days": manifest["horizon"]["timestep_days"],
+        "policy_decision_interval_days": manifest["horizon"].get(
+            "decision_interval_days", manifest["horizon"]["timestep_days"]
+        ),
     }
 
 
@@ -231,17 +236,21 @@ def _validate_required_declarations(manifest: Any) -> None:
         raise ValueError("horizon must declare days and timestep_days")
     days = horizon["days"]
     timestep_days = horizon["timestep_days"]
+    decision_interval_days = horizon.get("decision_interval_days", timestep_days)
     if any(
         isinstance(value, bool)
         or not isinstance(value, (int, float))
         or not math.isfinite(value)
         or value <= 0.0
-        for value in (days, timestep_days)
+        for value in (days, timestep_days, decision_interval_days)
     ):
-        raise ValueError("horizon days and timestep_days must be finite and positive")
-    transitions = days / timestep_days
-    if not math.isclose(transitions, round(transitions), rel_tol=0.0, abs_tol=1e-9):
-        raise ValueError("horizon days must contain a whole number of timesteps")
+        raise ValueError("horizon timing values must be finite and positive")
+    decisions = days / decision_interval_days
+    numerical_substeps = decision_interval_days / timestep_days
+    if not math.isclose(decisions, round(decisions), rel_tol=0.0, abs_tol=1e-9):
+        raise ValueError("horizon days must contain a whole number of policy decisions")
+    if not math.isclose(numerical_substeps, round(numerical_substeps), rel_tol=0.0, abs_tol=1e-9):
+        raise ValueError("decision_interval_days must contain a whole number of timesteps")
     training = manifest["training"]
     training_fields = (
         ("minimum_transition_budget", "maximum_transition_budget", "checkpoint_interval_timesteps")
@@ -352,7 +361,14 @@ def _validate_required_declarations(manifest: Any) -> None:
             manifest["modes"] != ["mixed", "plant-only"]
             or manifest["initial_p_micromolar"] != [0.1, 0.3, 1.0, 3.0]
             or len(manifest["seeds"]) != 5
-            or manifest["horizon"] != {"days": 120.0, "timestep_days": 0.025}
+            or manifest["horizon"] not in (
+                {"days": 120.0, "timestep_days": 0.025},
+                {
+                    "days": 120.0,
+                    "timestep_days": 0.025,
+                    "decision_interval_days": 0.025,
+                },
+            )
         ):
             raise ValueError(
                 "Phase 1 pilot requires the fixed 40-run range-finding design"
@@ -895,9 +911,10 @@ def _run_static_controls_study(
     return StudyResult(bundle_path, summary_path)
 
 
-def _training_environment(manifest: dict[str, Any], mode: str, p_level: float) -> BaseMycorMarl:
+def _training_environment(manifest: dict[str, Any], mode: str, p_level: float) -> PolicyIntervalMycorMarl:
     model_environment = manifest["model"]["environment"]
     horizon = manifest["horizon"]
+    decision_interval_days = horizon.get("decision_interval_days", horizon["timestep_days"])
     config = EnvConfig(
         max_steps=round(horizon["days"] / horizon["timestep_days"]),
         dt=horizon["timestep_days"],
@@ -911,7 +928,11 @@ def _training_environment(manifest: dict[str, Any], mode: str, p_level: float) -
             "initial_solution_p_depth_profile"
         ),
     )
-    return BaseMycorMarl(config, SpeciesParams(PlantTraits(), FungusTraits()))
+    return PolicyIntervalMycorMarl(
+        BaseMycorMarl(config, SpeciesParams(PlantTraits(), FungusTraits())),
+        decision_interval_days=decision_interval_days,
+        max_episode_steps=round(horizon["days"] / decision_interval_days),
+    )
 
 
 def _training_config(manifest: dict[str, Any], timesteps: int) -> PPOConfig:

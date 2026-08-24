@@ -1,4 +1,5 @@
 from .base_mycor import AGENTS, FUNGUS, PLANT, Actions, BaseMycorMarl
+from .policy_interval import PolicyIntervalMycorMarl
 
 __all__ = [
     "AGENTS",
@@ -6,4 +7,5 @@ __all__ = [
     "PLANT",
     "Actions",
     "BaseMycorMarl",
+    "PolicyIntervalMycorMarl",
 ]

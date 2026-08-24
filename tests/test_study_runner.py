@@ -839,6 +839,25 @@ def test_manifest_rejects_horizon_inconsistent_with_timestep(tmp_path):
     assert not (tmp_path / "outputs").exists()
 
 
+def test_training_environment_separates_policy_schedule_from_numerical_timestep(
+    tmp_path,
+):
+    """A 0.10-day policy decision may hold across two 0.05-day integrations."""
+    manifest = _manifest(tmp_path)
+    manifest["horizon"] = {
+        "days": 0.10,
+        "timestep_days": 0.05,
+        "decision_interval_days": 0.10,
+    }
+
+    environment = study_module._training_environment(manifest, "mixed", 0.3)
+
+    assert environment.config.dt == pytest.approx(0.05)
+    assert environment.decision_interval_days == pytest.approx(0.10)
+    assert environment.numerical_substeps_per_decision == 2
+    assert environment.max_episode_steps == 1
+
+
 def test_manifest_rejects_missing_training_budget_before_execution(tmp_path):
     """Execution cannot start until its training and checkpoint budgets are fixed."""
     manifest = _manifest(tmp_path)
@@ -1167,6 +1186,8 @@ def test_result_bundle_records_versioned_interface_provenance(tmp_path):
         "jaxlib_version": version("jaxlib"),
         "manifest_schema_version": 1,
         "mycormarl_version": "0.1.0",
+        "numerical_timestep_days": 0.025,
+        "policy_decision_interval_days": 0.025,
         "python_version": platform.python_version(),
         "result_format_version": 2,
     }

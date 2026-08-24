@@ -306,7 +306,8 @@ def make_train(
     """
 
     gamma = discount_from_half_life(
-        env.config.dt, config.DISCOUNT_HALF_LIFE_DAYS
+        getattr(env, "decision_interval_days", env.config.dt),
+        config.DISCOUNT_HALF_LIFE_DAYS,
     )
     if gamma == 1.0:
         configured_consumers = []

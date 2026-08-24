@@ -20,7 +20,8 @@ class EnvConfig:
     explicit domains should be used for tests and development runs.
     Spatial values use cm. Radial and depth intervals must divide their
     corresponding extents into uniform cells; invalid requests are rejected
-    with the nearest valid interval. ``dt`` uses days, the phosphate diffusion
+    with the nearest valid interval. ``dt`` is the numerical integration
+    timestep in days. The phosphate diffusion
     coefficient uses cm² s⁻¹, and its dimensionless impedance factor and CFL
     safety are applied by the soil scheduler. The uptake-regime reference time
     uses days; its positive transition exponent is dimensionless.
