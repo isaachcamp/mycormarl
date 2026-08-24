@@ -12,7 +12,7 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-from mycormarl.actions import physical_action
+from mycormarl.actions import rate_action
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
@@ -37,12 +37,10 @@ def _species(manifest: dict[str, Any]) -> SpeciesParams:
 def _action(value: Any, agent: str):
     action = jnp.asarray(value, dtype=jnp.float32)
     if action.shape != (4,) or not bool(jnp.all(jnp.isfinite(action))):
-        raise ValueError(f"invalid physical action for {agent}")
-    if not 0.0 <= float(action[0]) <= 1.0 or bool(jnp.any(action[1:] < 0.0)):
-        raise ValueError(f"invalid physical action for {agent}")
-    if abs(float(jnp.sum(action[1:])) - 1.0) > 1e-6:
-        raise ValueError(f"invalid physical action for {agent}")
-    return physical_action(*[float(item) for item in action])
+        raise ValueError(f"invalid Rate action for {agent}")
+    if bool(jnp.any(action < 0.0)):
+        raise ValueError(f"invalid Rate action for {agent}")
+    return rate_action(*[float(item) for item in action])
 
 
 def _actions(manifest: dict[str, Any]) -> dict[str, Any]:

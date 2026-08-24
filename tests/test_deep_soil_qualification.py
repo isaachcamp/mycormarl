@@ -213,7 +213,7 @@ def test_writer_emits_separate_soil_snapshots_and_complete_provenance(tmp_path):
     assert manifest["duration_days"] == 1
     assert manifest["environment"]["dt"] == pytest.approx(1.0)
     assert manifest["traits"]["fungus"]["saturation_density"] == pytest.approx(2000.0)
-    assert manifest["policies"]["fungus"]["physical_action"] == pytest.approx(
+    assert manifest["policies"]["fungus"]["rate_action_per_day"] == pytest.approx(
         [0.0, 0.0, 0.0, 1.0]
     )
     with np.load(paths["daily_soil_p_npz"]) as snapshots:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-import math
 from typing import Any
 
 import jax
@@ -18,9 +17,7 @@ from mycormarl.soil.phosphate_grid import labile_amount_to_solution_concentratio
 
 
 _AGENTS = (PLANT, FUNGUS)
-_ACTION_TOLERANCE = 1e-6
-
-
+_POOL_TOLERANCE = 1e-6
 def _species(manifest: dict[str, Any]) -> SpeciesParams:
     declarations = manifest.get("model", {}).get("species", {})
     plant = PlantTraits()
@@ -63,13 +60,11 @@ def _action(value: Any, agent: str) -> jax.Array:
     try:
         action = jnp.asarray(value, dtype=jnp.float32)
     except (TypeError, ValueError) as error:
-        raise ValueError(f"invalid physical action for {agent}") from error
+        raise ValueError(f"invalid Rate action for {agent}") from error
     if action.shape != (4,) or not bool(jnp.all(jnp.isfinite(action))):
-        raise ValueError(f"invalid physical action for {agent}")
-    if not (0.0 <= float(action[0]) <= 1.0):
-        raise ValueError(f"invalid physical action for {agent}")
-    if bool(jnp.any(action[1:] < 0.0)) or not math.isclose(float(jnp.sum(action[1:])), 1.0, abs_tol=_ACTION_TOLERANCE):
-        raise ValueError(f"invalid physical action for {agent}")
+        raise ValueError(f"invalid Rate action for {agent}")
+    if bool(jnp.any(action < 0.0)):
+        raise ValueError(f"invalid Rate action for {agent}")
     return action
 
 
@@ -252,7 +247,7 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
     residual = initial_total - final_soil - final_pools - losses
     if not uniform and env.config.initial_solution_p_depth_profile is None:
         reasons.append("uniform initial P verification failed")
-    if float(jnp.min(state.soil_labile_p)) < -_ACTION_TOLERANCE:
+    if float(jnp.min(state.soil_labile_p)) < -_POOL_TOLERANCE:
         reasons.append("negative soil P pool")
     for agent, dead in ((PLANT, state.plant_dead), (FUNGUS, state.fungus_dead)):
         if bool(jnp.any(dead)) and (mode == "mixed" or agent == PLANT):

@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from mycormarl.actions import physical_action
+from mycormarl.actions import rate_action as physical_action
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.mycelium import fungal_biomass_for_colony_radius
 from mycormarl.fungus.traits import FungusTraits

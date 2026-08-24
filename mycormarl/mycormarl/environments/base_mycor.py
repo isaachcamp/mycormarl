@@ -43,11 +43,11 @@ FUNGUS = "fungus"
 AGENTS = (PLANT, FUNGUS)
 
 class Actions(IntEnum):
-    # Physical action: independent trade plus a biological allocation simplex.
+    # Rate action: independent first-order rates in d^-1.
     trade = 0
     growth = 1
     reproduction = 2
-    reserve = 3
+    storage = 3
 
 
 class BaseMycorMarl(MultiAgentEnv):
@@ -121,17 +121,17 @@ class BaseMycorMarl(MultiAgentEnv):
         obs_dim = 5
 
         self.action_set = jnp.array(
-            [Actions.trade, Actions.growth, Actions.reproduction, Actions.reserve]
+            [Actions.trade, Actions.growth, Actions.reproduction, Actions.storage]
         )
 
         self.observation_spaces = {
             PLANT: Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=jnp.float32),
             FUNGUS: Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=jnp.float32),
         }
-        # Physical action: trade, growth, reproduction, reserve.
+        # Rate action in d^-1: trade, growth, reproduction, storage.
         self.action_spaces = {
-            PLANT: Box(low=0.0, high=1.0, shape=self.action_set.shape, dtype=jnp.float32),
-            FUNGUS: Box(low=0.0, high=1.0, shape=self.action_set.shape, dtype=jnp.float32),
+            PLANT: Box(low=0.0, high=jnp.inf, shape=self.action_set.shape, dtype=jnp.float32),
+            FUNGUS: Box(low=0.0, high=jnp.inf, shape=self.action_set.shape, dtype=jnp.float32),
         }
 
         # Environment parameters
@@ -370,14 +370,20 @@ class BaseMycorMarl(MultiAgentEnv):
         trading_enabled = jnp.logical_and(
             plant_operational_at_end, fungus_operational_at_end
         )
+        plant_trade_fraction = -jnp.expm1(
+            -actions[PLANT][Actions.trade] * self.config.dt
+        )
+        fungus_trade_fraction = -jnp.expm1(
+            -actions[FUNGUS][Actions.trade] * self.config.dt
+        )
         plant_c_trade_proposed = jnp.where(
             plant_operational_at_start,
-            actions[PLANT][Actions.trade] * plant_maintenance["c_pool"],
+            plant_trade_fraction * plant_maintenance["c_pool"],
             0.0,
         )
         fungus_p_trade_proposed = jnp.where(
             fungus_operational_at_start,
-            actions[FUNGUS][Actions.trade] * fungus_maintenance["p_pool"],
+            fungus_trade_fraction * fungus_maintenance["p_pool"],
             0.0,
         )
         plant_c_trade_out = jnp.where(
@@ -677,10 +683,18 @@ class BaseMycorMarl(MultiAgentEnv):
         operational: chex.Array,
         biomass_cap: float | None = None,
     ) -> dict:
-        """Apply growth/reproduction/reserve fractions to disposable C and P."""
+        """Apply competing growth/reproduction/storage rates to free C and P."""
         action = jnp.where(operational, action, jnp.zeros_like(action))
-        growth_alloc = action[Actions.growth]
-        reproduction_alloc = action[Actions.reproduction]
+        biological_rates = action[Actions.growth :]
+        total_rate = jnp.sum(biological_rates)
+        selected_fraction = -jnp.expm1(-total_rate * self.config.dt)
+        rate_shares = jnp.where(
+            total_rate > 0.0,
+            biological_rates / jnp.maximum(total_rate, 1e-12),
+            jnp.zeros_like(biological_rates),
+        )
+        growth_alloc = selected_fraction * rate_shares[0]
+        reproduction_alloc = selected_fraction * rate_shares[1]
 
         growth_c_alloc = growth_alloc * c_pool
         growth_p_alloc = growth_alloc * p_pool

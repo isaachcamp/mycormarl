@@ -3,42 +3,26 @@ import chex
 import jax.numpy as jnp
 
 
-def physical_action(
+def rate_action(
     trade: chex.Numeric,
     growth: chex.Numeric,
     reproduction: chex.Numeric,
-    reserve: chex.Numeric,
+    storage: chex.Numeric,
 ) -> chex.Array:
-    """Construct ``[trade, growth, reproduction, reserve]``.
+    """Construct a non-negative ``d^-1`` Rate action.
 
-    Trade is bounded independently between [0, 1]; the remaining components
-    are interpreted as non-negative biological weights and normalised onto
-    their simplex.
-    If simplex fractions are undefined (all zero), they are replaced with
-    uniform fractions.
+    The components are ``[trade, growth, reproduction, storage]``. They are
+    independent first-order rates and therefore are neither clipped to one nor
+    normalised to a simplex.
     """
-    trade_fraction = jnp.asarray(trade, dtype=jnp.float32)
-    trade_fraction = jnp.where(jnp.isfinite(trade_fraction), trade_fraction, 0.0)
-    trade_fraction = jnp.clip(trade_fraction, 0.0, 1.0)
-    biological_weights = jnp.stack(
+    rates = jnp.stack(
         [
+            jnp.asarray(trade, dtype=jnp.float32),
             jnp.asarray(growth, dtype=jnp.float32),
             jnp.asarray(reproduction, dtype=jnp.float32),
-            jnp.asarray(reserve, dtype=jnp.float32),
+            jnp.asarray(storage, dtype=jnp.float32),
         ],
         axis=-1,
     )
-    biological_weights = jnp.where(
-        jnp.isfinite(biological_weights), biological_weights, 0.0
-    )
-    biological_weights = jnp.maximum(biological_weights, 0.0)
-    total = jnp.sum(biological_weights, axis=-1, keepdims=True)
-    biological_allocation = jnp.where(
-        total > 0.0,
-        biological_weights / total,
-        jnp.ones_like(biological_weights) / 3.0,
-    )
-    return jnp.concatenate(
-        [jnp.expand_dims(trade_fraction, axis=-1), biological_allocation],
-        axis=-1,
-    )
+    rates = jnp.where(jnp.isfinite(rates), rates, 0.0)
+    return jnp.maximum(rates, 0.0)

@@ -13,28 +13,18 @@ An absent single-consumer counterpart and an already dead organism are both
 non-operational. A change from operational to non-operational during a
 transition is a biological termination event.
 
-### Physical action
+### Rate action
 
-The bounded resource-allocation command passed to `BaseMycorMarl`:
-`[trade, growth, reproduction, reserve]`, where trade is independently bounded
-and the remaining three components form a simplex.
-
-A physical action is valid by construction before it reaches the environment.
-`BaseMycorMarl` executes it unchanged and does not clip, sanitise, project, or
-renormalise it. PPO produces physical actions through its latent transforms;
-non-policy callers use the shared public action-construction helper.
-
-### Rate action (accepted successor contract)
-
-The planned replacement for the Physical action. It will command non-negative
+The action command passed to `BaseMycorMarl`. It commands non-negative
 first-order **per-day** rates for trade, growth, reproduction, and storage.
 Growth, reproduction, and storage compete as pool outflow hazards rather than
 as a simplex; storage initially means retention in the existing free pool, not
 a new compartment. Newly acquired soil P, photosynthate, and received trade
 are eligible for the held rate during subsequent numerical substeps.
 
-This contract is not implemented yet. Until its migration is complete,
-**Physical action** retains its current fraction-and-simplex meaning.
+The policy wrapper holds the Rate action unchanged across numerical substeps.
+PPO records sampled latents, the executed Rate action, and likelihoods in
+latent space. Non-policy callers use `mycormarl.actions.rate_action`.
 
 ### Transition
 

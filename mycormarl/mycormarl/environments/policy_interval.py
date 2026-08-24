@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 
-from mycormarl.environments.base_mycor import AGENTS, FUNGUS, PLANT, Actions, BaseMycorMarl
+from mycormarl.environments.base_mycor import AGENTS, FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.state import State
 from mycormarl.transition import Transition
 
@@ -19,9 +19,9 @@ class PolicyIntervalMycorMarl(MultiAgentEnv):
     """Hold one policy decision across integral numerical timesteps.
 
     ``BaseMycorMarl`` remains the numerical environment. This wrapper is the
-    policy-facing seam: it maps a decision-interval physical action to an
-    equivalent valid action for each numerical step and returns one transition
-    to PPO for the complete policy interval.
+    policy-facing seam: it holds one Rate action constant while the numerical
+    environment integrates it over each numerical step, then returns one
+    transition to PPO for the complete policy interval.
     """
 
     def __init__(
@@ -62,17 +62,13 @@ class PolicyIntervalMycorMarl(MultiAgentEnv):
 
     def step_env(self, key: chex.PRNGKey, state: State, actions: Dict[str, chex.Array]):
         initial_state = state
-        numerical_actions = {
-            agent: self._action_for_numerical_substep(action)
-            for agent, action in actions.items()
-        }
         rewards = {PLANT: jnp.asarray(0.0), FUNGUS: jnp.asarray(0.0)}
         trade_executed = {PLANT: jnp.asarray(False), FUNGUS: jnp.asarray(False)}
         infos = None
         for _ in range(self.numerical_substeps_per_decision):
             key, substep_key = jax.random.split(key)
             observations, state, substep_rewards, dones, infos = self.numerical_environment.step_env(
-                substep_key, state, numerical_actions
+                substep_key, state, actions
             )
             rewards = {agent: rewards[agent] + substep_rewards[agent] for agent in AGENTS}
             trade_executed = {
@@ -95,16 +91,3 @@ class PolicyIntervalMycorMarl(MultiAgentEnv):
                 final_observation=observations[agent],
             )
         return observations, state, rewards, dones, infos
-
-    def _action_for_numerical_substep(self, action: chex.Array) -> chex.Array:
-        if self.numerical_substeps_per_decision == 1:
-            return action
-        fraction = self.config.dt / self.decision_interval_days
-        trade = 1.0 - jnp.power(1.0 - action[Actions.trade], fraction)
-        retained = jnp.power(action[Actions.reserve], fraction)
-        allocated = 1.0 - retained
-        non_reserve = 1.0 - action[Actions.reserve]
-        growth = allocated * jnp.where(
-            non_reserve > 0.0, action[Actions.growth] / non_reserve, 0.0
-        )
-        return jnp.array([trade, growth, allocated - growth, retained], dtype=action.dtype)

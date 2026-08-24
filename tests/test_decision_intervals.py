@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from mycormarl.actions import physical_action
+from mycormarl.actions import rate_action
 from mycormarl.algos.ppo import PPOConfig, make_train
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.environments.policy_interval import PolicyIntervalMycorMarl
@@ -57,8 +57,8 @@ def _environment(
 
 
 def test_held_policy_action_has_compatible_fixed_horizon_effect_under_substepping():
-    """Two numerical substeps do not execute a 50% allocation twice."""
-    action = physical_action(0.0, 0.5, 0.0, 0.5)
+    """A held Rate action has one physical effect under numerical refinement."""
+    action = rate_action(0.0, jnp.log(2.0) / 0.10, 0.0, 0.0)
     actions = {PLANT: action, FUNGUS: action}
     compatibility = _environment(dt=0.10, decision_interval_days=0.10)
     substepped = _environment(dt=0.05, decision_interval_days=0.10)
@@ -93,8 +93,8 @@ def test_decision_interval_equal_to_numerical_timestep_matches_base_environment(
     wrapped = _environment(dt=0.10, decision_interval_days=0.10, initial_solution_p_um=1.0)
     numerical = wrapped.numerical_environment
     actions = {
-        PLANT: physical_action(0.25, 0.5, 0.25, 0.0),
-        FUNGUS: physical_action(0.25, 0.5, 0.25, 0.0),
+        PLANT: rate_action(0.25, 0.5, 0.25, 0.0),
+        FUNGUS: rate_action(0.25, 0.5, 0.25, 0.0),
     }
     _, wrapped_state = wrapped.reset(jax.random.PRNGKey(0))
     _, numerical_state = numerical.reset(jax.random.PRNGKey(0))
@@ -114,7 +114,7 @@ def test_decision_interval_equal_to_numerical_timestep_matches_base_environment(
 
 def test_held_policy_action_preserves_nonzero_integrated_uptake_under_substepping():
     """A fixed policy schedule keeps physical phosphate fluxes comparable."""
-    action = physical_action(0.0, 0.0, 0.0, 1.0)
+    action = rate_action(0.0, 0.0, 0.0, 0.0)
     actions = {PLANT: action, FUNGUS: action}
     compatibility = _environment(
         dt=0.10, decision_interval_days=0.10, initial_solution_p_um=1.0

@@ -57,6 +57,18 @@ def test_static_controls_report_uniform_reset_and_finite_inventory_dynamics():
     )
 
 
+def test_static_controls_accept_independent_nonnegative_per_day_rates():
+    manifest = _manifest()
+    manifest["static_policy"] = {
+        "plant": [1.25, 2.0, 0.5, 0.25],
+        "fungus": [1.25, 2.0, 0.5, 0.25],
+    }
+
+    result = run_static_controls(manifest)
+
+    assert result["status"] == "complete"
+
+
 def test_static_controls_emit_the_common_study_result_bundle(tmp_path, monkeypatch):
     monkeypatch.setattr(
         study_module,
@@ -164,7 +176,7 @@ def test_static_controls_record_gamma_normalized_limitation_trace():
             assert "trade_in_raw" in values
 
 
-def test_static_controls_reject_non_physical_actions_without_running_a_condition():
+def test_static_controls_reject_non_finite_rate_actions_without_running_a_condition():
     manifest = _manifest()
     manifest["static_policy"]["plant"] = [jnp.nan, 0.0, 0.0, 1.0]
 
@@ -172,7 +184,7 @@ def test_static_controls_reject_non_physical_actions_without_running_a_condition
 
     assert result["status"] == "rejected"
     assert result["entries"][0]["status"] == "rejected"
-    assert "invalid physical action" in result["entries"][0]["rejection_reasons"][0]
+    assert "invalid Rate action" in result["entries"][0]["rejection_reasons"][0]
 
 
 def test_static_controls_make_accounting_and_depletion_failures_explicit():
