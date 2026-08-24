@@ -828,19 +828,28 @@ def _write_summary(bundle: dict[str, Any], summary_path: Path) -> None:
     if qualification is not None:
         accepted = qualification["accepted_domain"]
         profile = qualification["initial_solution_p_profiled"]
+        uptake_tolerance = qualification["candidates"][0][
+            "direct_plant_uptake_behavior"
+        ]["relative_tolerance"]
         summary += (
             "\n## Domain qualification\n\n"
+            f"- Qualification outcome: {qualification['status']}\n"
             f"- Initial-P scenario: {qualification['initial_p_scenario']}\n"
             f"- Profiled initial Pi: {'yes' if profile else 'no'}\n"
-            f"- Accepted depth: {accepted['domain']['soil_depth_cm']} cm "
-            f"({accepted['name']})\n"
             "- Acceptance gates: no fungal lower-boundary contact; maximum "
             "direct-plant-Pi uptake difference to the largest depth domain "
-            f"≤ {accepted['direct_plant_uptake_behavior']['relative_tolerance']:.0%}.\n\n"
+            f"≤ {uptake_tolerance:.0%}.\n"
             "| Candidate | Depth (cm) | Status | Fungal lower-boundary contact | "
             "Largest-depth comparison | Max uptake difference | Runtime (s) |\n"
             "|---|---:|---|---|---|---:|---:|\n"
         )
+        if accepted is None:
+            summary += "- Accepted depth: none\n\n"
+        else:
+            summary += (
+                f"- Accepted depth: {accepted['domain']['soil_depth_cm']} cm "
+                f"({accepted['name']})\n\n"
+            )
         for candidate in qualification["candidates"]:
             uptake = candidate["direct_plant_uptake_behavior"]
             difference = uptake["maximum_relative_difference"]

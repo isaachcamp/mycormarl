@@ -284,16 +284,15 @@ def run_domain_qualification(manifest: dict[str, Any]) -> dict[str, Any]:
         output["rejection_reasons"] = reasons
         if not reasons:
             passing.append(output)
-    if not passing:
-        raise ValueError("no candidate domain passed qualification")
-    accepted = passing[0]
-    accepted["status"] = "accepted"
-    for output in passing[1:]:
-        output["status"] = "eligible"
+    accepted = passing[0] if passing else None
+    if accepted is not None:
+        accepted["status"] = "accepted"
+        for output in passing[1:]:
+            output["status"] = "eligible"
     return {
         "format": "mycormarl-domain-qualification",
         "format_version": 1,
-        "status": "complete",
+        "status": "complete" if accepted is not None else "rejected",
         "accepted_domain": accepted,
         "comparison_reference_domain": outputs[-1]["name"],
         "candidates": outputs,

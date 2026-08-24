@@ -724,6 +724,47 @@ def test_domain_qualification_emits_one_frozen_accepted_candidate(tmp_path):
     assert repeated.bundle_path.read_bytes() == first_bytes
 
 
+def test_domain_qualification_persists_candidate_evidence_when_none_pass(tmp_path, monkeypatch):
+    """A completed but rejected qualification remains inspectable and reproducible."""
+    def trajectory(manifest, candidate, mode, p_level, seed, actions, depth_profile):
+        return {
+            "fungal_lower_boundary_contact": False,
+            "fungal_lower_boundary_first_contact_step": None,
+            "initial_p_inventory_micromol": 1.0,
+            "final_plant_biomass_g": 1.0,
+            "cumulative_direct_plant_p_uptake_micromol": (
+                1.0 if candidate["name"] == "small" else 10.0
+            ),
+            "final_soil_inventory_micromol": 0.5,
+            "soil_inventory_trace_micromol": [1.0, 0.5],
+            "depletion_fraction": 0.5,
+        }
+
+    monkeypatch.setattr(domain_qualification_module, "_trajectory", trajectory)
+    manifest = _manifest(tmp_path / "domain", identity="rejected-domain")
+    manifest.update({"stage": "domain-qualification", "static_policy": {
+        "plant": [0.0, 1.0, 0.0, 0.0],
+        "fungus": [0.0, 1.0, 0.0, 0.0],
+    }})
+    manifest["domain_qualification"] = {"candidates": [
+        {"name": "small", "soil_radius_cm": 1.0, "soil_depth_cm": 1.0},
+        {"name": "reference", "soil_radius_cm": 1.0, "soil_depth_cm": 2.0},
+    ]}
+
+    result = run_study(_write_manifest(tmp_path / "domain", manifest))
+    bundle = json.loads(result.bundle_path.read_text(encoding="utf-8"))
+
+    assert bundle["status"] == "complete"
+    assert bundle["qualification"]["status"] == "rejected"
+    assert bundle["qualification"]["accepted_domain"] is None
+    assert bundle["qualification"]["candidates"][0]["rejection_reasons"] == [
+        "direct plant P uptake changed at largest depth domain"
+    ]
+    summary = result.summary_path.read_text(encoding="utf-8")
+    assert "Qualification outcome: rejected" in summary
+    assert "Accepted depth: none" in summary
+
+
 def test_domain_qualification_records_exact_direct_plant_uptake_comparison(tmp_path):
     """Depth qualification compares the cumulative root-to-plant P flux."""
     static_policy = {
