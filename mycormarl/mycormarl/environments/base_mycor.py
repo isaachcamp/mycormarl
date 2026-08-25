@@ -118,7 +118,7 @@ class BaseMycorMarl(MultiAgentEnv):
             self.z_edges.shape[0] - 1,
         )
 
-        obs_dim = 5
+        obs_dim = 6 if self.config.include_episode_clock else 5
 
         self.action_set = jnp.array(
             [Actions.trade, Actions.growth, Actions.reproduction, Actions.storage]
@@ -147,6 +147,11 @@ class BaseMycorMarl(MultiAgentEnv):
 
     def get_obs(self, state: State) -> Dict[str, chex.Array]:
         """Reconstruct bounded actor observations entirely from environment state."""
+        episode_clock = None
+        if self.config.include_episode_clock:
+            episode_clock = jnp.atleast_1d(
+                state.step / self.max_episode_steps
+            ).astype(jnp.float32)
         # Keep policy-input scaling independent of the numerical growth guard.
         plant_biomass_reference = (
             self.species.plant.biomass_observation_reference
@@ -184,6 +189,7 @@ class BaseMycorMarl(MultiAgentEnv):
                 ),
                 association=association,
                 operational=~state.plant_dead,
+                episode_clock=episode_clock,
             ),
             FUNGUS: actor_observation(
                 biomass=state.fungus_biomass,
@@ -200,6 +206,7 @@ class BaseMycorMarl(MultiAgentEnv):
                 ),
                 association=association,
                 operational=~state.fungus_dead,
+                episode_clock=episode_clock,
             ),
         }
 

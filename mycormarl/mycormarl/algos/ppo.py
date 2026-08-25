@@ -418,9 +418,14 @@ def make_train(
     )
     if run_timesteps < rollout_timesteps or run_timesteps % rollout_timesteps:
         raise ValueError("RUN_TIMESTEPS must contain whole PPO updates")
-    for agent in env.agents:
-        if env.observation_spaces[agent].shape != (5,):
-            raise ValueError("each independent actor-critic requires five observations")
+    observation_widths = {
+        env.observation_spaces[agent].shape for agent in env.agents
+    }
+    if observation_widths not in ({(5,)}, {(6,)}):
+        raise ValueError(
+            "each independent actor-critic requires either five state-only "
+            "or six time-aware observations"
+        )
 
     NUM_UPDATES = (
         run_timesteps // config.NUM_STEPS // config.NUM_ENVS

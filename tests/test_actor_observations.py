@@ -69,6 +69,44 @@ def test_reset_returns_stable_bounded_actor_observation_contract():
         assert observation[4] == 1.0
 
 
+def test_opt_in_episode_clock_tracks_declared_horizon_through_final_transition():
+    """The time-aware contract is zero at reset and one at its final state."""
+    env = _environment(
+        config=EnvConfig(
+            dt=1.0,
+            max_steps=2,
+            soil_radius_cm=1.0,
+            soil_depth_cm=1.0,
+            radial_interval_cm=0.5,
+            depth_interval_cm=0.5,
+            initial_solution_p_um=0.0,
+            include_episode_clock=True,
+        )
+    )
+    observations, state = env.reset(jax.random.PRNGKey(0))
+    inactive_actions = {
+        PLANT: rate_action(0.0, 0.0, 0.0, 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+    }
+
+    for agent in (PLANT, FUNGUS):
+        assert observations[agent].shape == env.observation_spaces[agent].shape == (6,)
+        assert observations[agent][-1] == 0.0
+
+    observations, state, _, _, _ = env.step_env(
+        jax.random.PRNGKey(1), state, inactive_actions
+    )
+    for agent in (PLANT, FUNGUS):
+        assert observations[agent][-1] == pytest.approx(0.5)
+
+    observations, _, _, _, infos = env.step_env(
+        jax.random.PRNGKey(2), state, inactive_actions
+    )
+    for agent in (PLANT, FUNGUS):
+        assert observations[agent][-1] == 1.0
+        assert infos["transitions"][agent].final_observation[-1] == 1.0
+
+
 def test_state_observations_use_agreed_feature_equations_and_order():
     """The synthetic fungal traits make radial-fill biomass 1 g."""
     env = _environment(

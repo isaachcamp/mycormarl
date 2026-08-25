@@ -16,7 +16,7 @@ from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
 
 
-def _small_environment():
+def _small_environment(*, include_episode_clock: bool = False):
     """Build a compact mixed-consumer environment for actor integration tests."""
     return BaseMycorMarl(
         EnvConfig(
@@ -26,6 +26,7 @@ def _small_environment():
             soil_depth_cm=0.2,
             radial_interval_cm=0.1,
             depth_interval_cm=0.1,
+            include_episode_clock=include_episode_clock,
         ),
         SpeciesParams(
             plant=PlantTraits(kappa_c=0.0, kappa_p=0.0),
@@ -200,6 +201,26 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
         for state in train_states.values()
         for leaf in jax.tree.leaves(state.params)
     )
+
+
+def test_jitted_ppo_rollout_accepts_opt_in_episode_clock_observations():
+    """The time-aware actor and critic consume the six-feature environment seam."""
+    environment = _small_environment(include_episode_clock=True)
+    config = PPOConfig(
+        TOTAL_TIMESTEPS=4,
+        NUM_STEPS=2,
+        NUM_ENVS=1,
+        NUM_MINIBATCHES=1,
+        UPDATE_EPOCHS=1,
+        LR=0.0,
+        DISCOUNT_HALF_LIFE_DAYS=30.0,
+    )
+
+    output = jax.jit(make_train(environment, config))(jax.random.PRNGKey(5))
+
+    for trajectory in output["trajectories"]:
+        assert trajectory.obs.shape == (2, 2, 1, 6)
+        assert trajectory.bootstrap_observation.shape == (2, 2, 1, 6)
 
 
 def test_resumed_training_anneals_learning_rate_over_the_global_budget():
