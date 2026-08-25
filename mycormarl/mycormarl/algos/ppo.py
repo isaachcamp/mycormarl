@@ -38,8 +38,16 @@ class PPOStepFields(NamedTuple):
     bootstrap_observation: jax.Array
 
 
-def transition_to_ppo_fields(transition: Transition) -> PPOStepFields:
-    """Convert algorithm-independent lifecycle facts into PPO controls."""
+def transition_to_ppo_fields(
+    transition: Transition,
+    *,
+    finite_horizon_returns: bool = False,
+) -> PPOStepFields:
+    """Convert algorithm-independent lifecycle facts into PPO controls.
+
+    Continuing tasks bootstrap through administrative truncations. A declared
+    finite-horizon return instead treats that same boundary as terminal.
+    """
     critic_valid = transition.operational_at_start
     terminated = transition.operational_at_start & ~transition.operational_at_end
     return PPOStepFields(
@@ -48,7 +56,10 @@ def transition_to_ppo_fields(transition: Transition) -> PPOStepFields:
         trade_actor_valid=transition.trade_executed,
         terminated=terminated,
         truncated=transition.truncated,
-        bootstrap_valid=transition.operational_at_end,
+        bootstrap_valid=(
+            transition.operational_at_end
+            & ~(finite_horizon_returns & transition.truncated)
+        ),
         gae_trace_continues=(
             critic_valid & ~terminated & ~transition.truncated
         ),
@@ -171,6 +182,7 @@ class PPOConfig:
     PLANT_INITIAL_TRADE: float = 0.05
     FUNGUS_INITIAL_TRADE: float = 0.75
     NORMALIZE_CRITIC_TARGETS: bool = True
+    FINITE_HORIZON_RETURNS: bool = False
 
 
 @struct.dataclass
@@ -374,7 +386,7 @@ def make_train(
         getattr(env, "decision_interval_days", env.config.dt),
         config.DISCOUNT_HALF_LIFE_DAYS,
     )
-    if gamma == 1.0:
+    if gamma == 1.0 and not config.FINITE_HORIZON_RETURNS:
         configured_consumers = []
         if env.config.consumer_mode in ("mixed", "plant-only"):
             configured_consumers.append((PLANT, env.species.plant))
@@ -605,10 +617,12 @@ def make_train(
                     rng_step, env_state, env_act
                 )
                 plant_fields = transition_to_ppo_fields(
-                    info["transitions"][PLANT]
+                    info["transitions"][PLANT],
+                    finite_horizon_returns=config.FINITE_HORIZON_RETURNS,
                 )
                 fungus_fields = transition_to_ppo_fields(
-                    info["transitions"][FUNGUS]
+                    info["transitions"][FUNGUS],
+                    finite_horizon_returns=config.FINITE_HORIZON_RETURNS,
                 )
 
                 # Collect Trajectory object
