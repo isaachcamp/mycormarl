@@ -451,7 +451,11 @@ def make_train(
             return denormalize_critic_values(values, normalizer)
         return values
 
-    def train(rng):
+    # Keep resumed state as a dynamic JAX argument so callers can reuse one
+    # compiled executable across updates instead of recompiling per checkpoint.
+    resume_mode = initial_runner_state is not None
+
+    def train(rng, resumed_runner_state=initial_runner_state):
         """
         Main training function for PPO. 
         --- Steps ---
@@ -476,7 +480,7 @@ def make_train(
             initial_trade=getattr(config, "FUNGUS_INITIAL_TRADE", 0.75),
         )
 
-        if initial_runner_state is None:
+        if not resume_mode:
             if random_streams is None:
                 rng, plant_rng, fungus_rng = jax.random.split(rng, 3)
                 action_rng = rng
@@ -509,7 +513,9 @@ def make_train(
             obs, env_state = jax.vmap(env.reset, in_axes=(0,))(reset_rng)
             runner_rngs = (action_rng, environment_rng, minibatch_rng)
         else:
-            train_state, env_state, obs, runner_rngs = initial_runner_state
+            if resumed_runner_state is None:
+                raise ValueError("resumed trainer requires runner state")
+            train_state, env_state, obs, runner_rngs = resumed_runner_state
             action_rng, environment_rng, minibatch_rng = runner_rngs
 
         def _update_step(runner_state, x):
@@ -991,7 +997,7 @@ def make_train(
             )
 
         # Scan over update steps. Each stochastic subsystem retains its own key.
-        if initial_runner_state is None:
+        if not resume_mode:
             runner_rngs = (action_rng, environment_rng, minibatch_rng)
         runner_state = (train_state, env_state, obs, runner_rngs)
         runner_state, (
