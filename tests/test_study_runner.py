@@ -114,6 +114,205 @@ def _pilot_manifest(tmp_path, *, fixture=True):
     return manifest
 
 
+def _historical_trade_only_manifest(tmp_path, *, fixture=True):
+    manifest = _pilot_manifest(tmp_path, fixture=fixture)
+    manifest["stage"] = "historical-grid-trade-only-pilot"
+    manifest["output"]["identity"] = "historical-grid-trade-only"
+    manifest["initial_p_micromolar"] = [0.3, 0.75, 1.5, 3.0, 5.0, 10.0]
+    manifest["policy"] = {
+        "mode": "trade-only-fixed-allocation",
+        "fixed_allocation": {
+            "total_biological_rate_per_day": 6.907755,
+            "growth_fraction": 0.9,
+            "reproduction_fraction": 0.1,
+            "storage_rate_per_day": 0.0,
+        },
+    }
+    return manifest
+
+
+def test_historical_trade_only_manifest_declares_its_immutable_protocol(tmp_path):
+    """The new pilot has its own historical P grid and fixed policy contract."""
+    manifest = _historical_trade_only_manifest(tmp_path)
+
+    study_module._validate_required_declarations(manifest)
+
+    assert manifest["initial_p_micromolar"] == [0.3, 0.75, 1.5, 3.0, 5.0, 10.0]
+    assert manifest["policy"]["mode"] == "trade-only-fixed-allocation"
+    assert manifest["policy"]["fixed_allocation"] == {
+        "total_biological_rate_per_day": 6.907755,
+        "growth_fraction": 0.9,
+        "reproduction_fraction": 0.1,
+        "storage_rate_per_day": 0.0,
+    }
+
+
+def test_scientific_historical_trade_only_manifest_pins_its_budget_and_grid(tmp_path):
+    """The executable protocol rejects post-hoc changes to its run budget."""
+    manifest = _historical_trade_only_manifest(tmp_path, fixture=False)
+    manifest["seeds"] = [0, 1, 2, 3, 4]
+    manifest["horizon"] = {
+        "days": 120.0,
+        "timestep_days": 0.025,
+        "decision_interval_days": 0.25,
+    }
+    manifest["training"] = {
+        "minimum_transition_budget": 49152,
+        "maximum_transition_budget": 239616,
+        "checkpoint_interval_timesteps": 6144,
+        "num_steps": 128,
+        "num_envs": 16,
+        "parallel_workers": 4,
+        "update_epochs": 4,
+        "num_minibatches": 8,
+        "finite_horizon_returns": True,
+        "stopping": {
+            "evaluation_window_checkpoints": 3,
+            "plateau_tolerances": {
+                "fitness_absolute_floor": 0.0001,
+                "fitness_relative": 0.2,
+                "action_absolute": 0.01,
+            },
+        },
+    }
+
+    study_module._validate_required_declarations(manifest)
+    manifest["training"]["maximum_transition_budget"] = 245760
+
+    with pytest.raises(ValueError, match="historical trade-only pilot"):
+        study_module._validate_required_declarations(manifest)
+
+
+def test_historical_trade_only_matrix_has_five_learned_seeds_and_one_control(tmp_path):
+    """Controls are deterministic singletons rather than duplicate PPO runs."""
+    manifest = _historical_trade_only_manifest(tmp_path)
+    manifest["seeds"] = [0, 1, 2, 3, 4]
+
+    conditions = study_module._condition_matrix(manifest)
+
+    assert len(conditions) == 36
+    assert {
+        seed for mode, p_level, seed in conditions
+        if mode == "mixed" and p_level == 0.3
+    } == {0, 1, 2, 3, 4}
+    assert [condition for condition in conditions if condition[:2] == ("plant-only", 0.3)] == [
+        ("plant-only", 0.3, 0)
+    ]
+
+
+def test_historical_trade_only_training_uses_the_scalar_trade_actor(tmp_path):
+    """The manifest selects the production trade-only PPO architecture."""
+    manifest = _historical_trade_only_manifest(tmp_path)
+
+    config = study_module._training_config(manifest, timesteps=1)
+
+    assert config.TRADE_ONLY is True
+
+
+def test_historical_trade_only_runner_keeps_controls_static_and_learners_seeded(
+    tmp_path, monkeypatch,
+):
+    """The standard bundle distinguishes the static controls from IPPO outcomes."""
+    manifest = _historical_trade_only_manifest(tmp_path)
+    manifest["seeds"] = [0, 1, 2, 3, 4]
+    learned, controls = [], []
+
+    def train(_manifest, _output, mode, p_level, seed):
+        learned.append((mode, p_level, seed))
+        return {"mode": mode, "initial_p_micromolar": p_level, "seed": seed,
+                "status": "completed", "execution_kind": "trade-only-ippo"}
+
+    def control(_manifest, _output, mode, p_level, seed):
+        controls.append((mode, p_level, seed))
+        return {"mode": mode, "initial_p_micromolar": p_level, "seed": seed,
+                "status": "completed", "execution_kind": "deterministic-static-control"}
+
+    monkeypatch.setattr(study_module, "_run_condition_training", train)
+    monkeypatch.setattr(study_module, "_run_historical_trade_only_control", control)
+
+    result = run_study(_write_manifest(tmp_path, manifest))
+    bundle = json.loads(result.bundle_path.read_text(encoding="utf-8"))
+
+    assert len(learned) == 30
+    assert len(controls) == 6
+    assert bundle["completion"] == {"completed": 36, "requested": 36}
+    assert {entry["execution_kind"] for entry in bundle["entries"]} == {
+        "trade-only-ippo", "deterministic-static-control",
+    }
+
+
+def test_trade_only_checkpoint_metadata_preserves_actor_and_allocation_context(tmp_path):
+    """A saved scalar-trade actor can be resumed or evaluated compatibly."""
+    manifest = _historical_trade_only_manifest(tmp_path)
+    config = study_module._training_config(manifest, timesteps=1)
+
+    metadata = study_module._checkpoint_metadata(
+        manifest, config, mode="mixed", p_level=0.3, seed=7, transitions=1,
+    )
+
+    assert metadata["actor_configuration"]["trade_only"] is True
+    assert metadata["policy_context"] == manifest["policy"]
+
+
+def test_trade_only_stopping_uses_only_the_learned_trade_action():
+    """The fixed biological allocation cannot influence a policy plateau gate."""
+    training = {
+        "minimum_transition_budget": 2,
+        "maximum_transition_budget": 2,
+        "stopping": {
+            "evaluation_window_checkpoints": 2,
+            "plateau_tolerances": {
+                "plant_fitness_absolute": 0.0,
+                "fungus_fitness_absolute": 0.0,
+                "action_absolute": 0.0,
+            },
+        },
+    }
+    checkpoints = [
+        {"transitions": index, "metrics": {
+            "fitness": {"plant": 1.0, "fungus": 1.0},
+            "actions": {"plant": [0.2], "fungus": [0.3]},
+        }}
+        for index in (1, 2)
+    ]
+
+    decision = study_module._stopping_decision(
+        checkpoints, training, "mixed", trade_only=True,
+    )
+
+    assert decision["plateau_metrics"]["actions"]["components"] == ["trade_rate_per_day"]
+
+
+def test_historical_trade_only_fixture_emits_a_standard_provenance_bundle(tmp_path):
+    """A tiny public run exercises static control, scalar PPO, and checkpoint evidence."""
+    manifest = _historical_trade_only_manifest(tmp_path)
+    manifest["initial_p_micromolar"] = [0.3]
+
+    result = run_study(_write_manifest(tmp_path, manifest))
+    bundle = json.loads(result.bundle_path.read_text(encoding="utf-8"))
+    checkpoint = (
+        tmp_path / "outputs" / "historical-grid-trade-only" / "conditions"
+        / "mixed-p0.3-seed7" / "checkpoints" / "checkpoint-00000001.msgpack"
+    )
+    payload = serialization.msgpack_restore(checkpoint.read_bytes())
+
+    assert bundle["completion"] == {"completed": 2, "requested": 2}
+    assert {entry["execution_kind"] for entry in bundle["entries"]} == {
+        "deterministic-static-control",
+        "trade-only-ippo",
+    }
+    assert payload["metadata"]["actor_configuration"]["trade_only"] is True
+    assert payload["metadata"]["policy_context"] == manifest["policy"]
+
+
+def test_checked_in_historical_trade_only_manifest_is_executable_protocol():
+    """The published pilot declaration remains accepted by the public runner."""
+    manifest_path = _REPOSITORY_ROOT / "docs" / "studies" / "historical-grid-trade-only-pilot-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    study_module._validate_required_declarations(manifest)
+
+
 def test_reduced_phase_1_fixture_uses_the_pilot_matrix_path(tmp_path):
     """A reduced fixture retains the Phase 1 qualification and matrix contract."""
     manifest = _pilot_manifest(tmp_path)
