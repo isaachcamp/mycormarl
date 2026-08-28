@@ -62,10 +62,8 @@ class PolicyIntervalMycorMarl(MultiAgentEnv):
 
     def step_env(self, key: chex.PRNGKey, state: State, actions: Dict[str, chex.Array]):
         initial_state = state
-        rewards = {PLANT: jnp.asarray(0.0), FUNGUS: jnp.asarray(0.0)}
-        trade_executed = {PLANT: jnp.asarray(False), FUNGUS: jnp.asarray(False)}
-        infos = None
-        for _ in range(self.numerical_substeps_per_decision):
+        def numerical_substep(carry, _):
+            key, state, rewards, trade_executed = carry
             key, substep_key = jax.random.split(key)
             observations, state, substep_rewards, dones, infos = self.numerical_environment.step_env(
                 substep_key, state, actions
@@ -75,8 +73,18 @@ class PolicyIntervalMycorMarl(MultiAgentEnv):
                 agent: trade_executed[agent] | infos["transitions"][agent].trade_executed
                 for agent in AGENTS
             }
+            return (key, state, rewards, trade_executed), (observations, dones, infos)
 
-        assert infos is not None
+        (_, state, rewards, trade_executed), (observations, dones, infos) = jax.lax.scan(
+            numerical_substep,
+            (key, state, {PLANT: jnp.asarray(0.0), FUNGUS: jnp.asarray(0.0)},
+             {PLANT: jnp.asarray(False), FUNGUS: jnp.asarray(False)}),
+            xs=None,
+            length=self.numerical_substeps_per_decision,
+        )
+        observations = jax.tree.map(lambda values: values[-1], observations)
+        dones = jax.tree.map(lambda values: values[-1], dones)
+        infos = jax.tree.map(lambda values: values[-1], infos)
         for agent, active in ((PLANT, self.numerical_environment.plant_active), (FUNGUS, self.numerical_environment.fungus_active)):
             start = jnp.logical_and(active, ~getattr(initial_state, f"{agent}_dead")).squeeze()
             end = jnp.logical_and(active, ~getattr(state, f"{agent}_dead")).squeeze()

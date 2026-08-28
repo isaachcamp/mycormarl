@@ -223,6 +223,25 @@ def test_jitted_ppo_rollout_accepts_opt_in_episode_clock_observations():
         assert trajectory.bootstrap_observation.shape == (2, 2, 1, 6)
 
 
+def test_ppo_minibatches_flatten_time_and_environment_samples_together():
+    """Multiple vector environments must train without mask/likelihood shape drift."""
+    environment = _small_environment()
+    config = PPOConfig(
+        TOTAL_TIMESTEPS=32,
+        NUM_STEPS=2,
+        NUM_ENVS=16,
+        NUM_MINIBATCHES=1,
+        UPDATE_EPOCHS=1,
+        LR=0.0,
+        DISCOUNT_HALF_LIFE_DAYS=30.0,
+    )
+
+    output = jax.jit(make_train(environment, config))(jax.random.PRNGKey(17))
+
+    for agent in (PLANT, FUNGUS):
+        assert jnp.all(jnp.isfinite(output["metrics"][agent].total_loss))
+
+
 def test_resumed_training_anneals_learning_rate_over_the_global_budget():
     """A resumed PPO chunk continues, rather than restarts, LR annealing."""
     environment = _small_environment()

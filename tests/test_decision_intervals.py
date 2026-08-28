@@ -148,6 +148,21 @@ def test_held_policy_action_preserves_nonzero_integrated_uptake_under_substeppin
         )
 
 
+def test_policy_interval_represents_held_numerical_substeps_as_one_jax_scan():
+    """Compilation must not expand one held decision into Python substep calls."""
+    environment = _environment(dt=0.05, decision_interval_days=0.10)
+    _, state = environment.reset(jax.random.PRNGKey(0))
+    actions = {agent: rate_action(0.0, 0.0, 0.0, 0.0) for agent in (PLANT, FUNGUS)}
+
+    jaxpr = jax.make_jaxpr(environment.step_env)(jax.random.PRNGKey(1), state, actions)
+
+    assert any(
+        equation.primitive.name == "scan"
+        and equation.params.get("length") == environment.numerical_substeps_per_decision
+        for equation in jaxpr.jaxpr.eqns
+    )
+
+
 def test_policy_interval_supports_jitted_ppo_rollout():
     """PPO rolls out one decision while the wrapper executes two numerical steps."""
     environment = _environment(dt=0.05, decision_interval_days=0.10)

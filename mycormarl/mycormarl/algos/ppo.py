@@ -13,6 +13,7 @@ import optax
 
 from mycormarl.environments.base_mycor import FUNGUS, PLANT
 from mycormarl.random_streams import RandomStreamContract
+from mycormarl.trade_only import fixed_allocation_rate_action
 from mycormarl.transition import Transition
 
 
@@ -183,6 +184,7 @@ class PPOConfig:
     FUNGUS_INITIAL_TRADE: float = 0.75
     NORMALIZE_CRITIC_TARGETS: bool = True
     FINITE_HORIZON_RETURNS: bool = False
+    TRADE_ONLY: bool = False
 
 
 @struct.dataclass
@@ -258,6 +260,7 @@ class ActorCritic(nn.Module):
 
     activation: str = "relu"
     initial_trade: float = 0.1
+    trade_only: bool = False
 
     @nn.compact
     def __call__(self, obs: jnp.ndarray) -> Tuple[PolicyParameters, jnp.ndarray]:
@@ -274,15 +277,20 @@ class ActorCritic(nn.Module):
             bias_init=constant(jnp.log(jnp.expm1(self.initial_trade))),
             name="trade_head",
         )(policy_features)[..., 0]
-        biological_rate_loc = nn.Dense(
-            3,
-            kernel_init=constant(0.0),
-            bias_init=constant(0.0),
-            name="biological_rate_head",
-        )(policy_features)
+        if self.trade_only:
+            biological_rate_loc = jnp.zeros(obs.shape[:-1] + (3,))
+        else:
+            biological_rate_loc = nn.Dense(
+                3,
+                kernel_init=constant(0.0),
+                bias_init=constant(0.0),
+                name="biological_rate_head",
+            )(policy_features)
         trade_log_std = self.param("trade_log_std", constant(0.0), (1,))
-        biological_rate_log_std = self.param(
-            "biological_rate_log_std", constant(0.0), (3,)
+        biological_rate_log_std = (
+            jnp.zeros(3) if self.trade_only else self.param(
+                "biological_rate_log_std", constant(0.0), (3,)
+            )
         )
         policy = PolicyParameters(
             trade_loc=trade_loc,
@@ -368,6 +376,72 @@ def unbatchify(
     x = x.reshape((num_actors, num_envs, -1))
     return {a: x[i] for i, a in enumerate(agent_list)}
 
+
+def initialize_runner_state(
+    env,
+    config: PPOConfig,
+    random_streams: RandomStreamContract | None = None,
+    rng: jax.Array | None = None,
+):
+    """Create a fresh, reproducible PPO runner state without an update.
+
+    This keeps network/optimizer initialisation and the first environment reset
+    outside the expensive PPO-update executable. Study runners can initialise
+    each seed with named streams while sharing one updater across replicates.
+    """
+    if random_streams is None:
+        if rng is None:
+            raise ValueError("initialization without named streams requires rng")
+        rng, plant_rng, fungus_rng = jax.random.split(rng, 3)
+        action_rng = environment_rng = minibatch_rng = rng
+    else:
+        plant_rng = random_streams.key("plant_initialization")
+        fungus_rng = random_streams.key("fungal_initialization")
+        action_rng = random_streams.key("policy_action_sampling")
+        environment_rng = random_streams.key("environment_variation")
+        minibatch_rng = random_streams.key("minibatch_ordering")
+
+    rollout_timesteps = config.NUM_STEPS * config.NUM_ENVS
+    total_optimizer_steps = (
+        config.TOTAL_TIMESTEPS // rollout_timesteps
+        * config.NUM_MINIBATCHES * config.UPDATE_EPOCHS
+    )
+
+    def linear_schedule(count):
+        return config.LR * jnp.maximum(0.0, 1.0 - count / total_optimizer_steps)
+
+    init_x = jnp.zeros((1, env.observation_spaces[PLANT].shape[0]))
+    policies = {
+        PLANT: ActorCritic(
+            activation=config.ACTIVATION,
+            initial_trade=getattr(config, "PLANT_INITIAL_TRADE", 0.05),
+            trade_only=config.TRADE_ONLY,
+        ),
+        FUNGUS: ActorCritic(
+            activation=config.ACTIVATION,
+            initial_trade=getattr(config, "FUNGUS_INITIAL_TRADE", 0.75),
+            trade_only=config.TRADE_ONLY,
+        ),
+    }
+    train_state = {
+        PLANT: IPPOTrainState.create(
+            apply_fn=policies[PLANT].apply,
+            params=policies[PLANT].init(plant_rng, init_x),
+            tx=optax.adam(learning_rate=linear_schedule),
+            critic_normalizer=initial_critic_normalizer(),
+        ),
+        FUNGUS: IPPOTrainState.create(
+            apply_fn=policies[FUNGUS].apply,
+            params=policies[FUNGUS].init(fungus_rng, init_x),
+            tx=optax.adam(learning_rate=linear_schedule),
+            critic_normalizer=initial_critic_normalizer(),
+        ),
+    }
+    environment_rng, reset_key = jax.random.split(environment_rng)
+    reset_rng = jax.random.split(reset_key, config.NUM_ENVS)
+    obs, env_state = jax.vmap(env.reset, in_axes=(0,))(reset_rng)
+    return train_state, env_state, obs, (action_rng, environment_rng, minibatch_rng)
+
 def make_train(
     env,
     config,
@@ -430,10 +504,7 @@ def make_train(
     NUM_UPDATES = (
         run_timesteps // config.NUM_STEPS // config.NUM_ENVS
     )
-    MINIBATCH_SIZE = (
-        # config.NUM_ACTORS * # Two separate networks, so do not multiply by NUM_ACTORS.
-        config.NUM_STEPS // config.NUM_MINIBATCHES
-    )
+    MINIBATCH_SIZE = rollout_timesteps // config.NUM_MINIBATCHES
 
     total_optimizer_steps = (
         config.TOTAL_TIMESTEPS // rollout_timesteps
@@ -474,44 +545,19 @@ def make_train(
         plant_policy = ActorCritic(
             activation=config.ACTIVATION,
             initial_trade=getattr(config, "PLANT_INITIAL_TRADE", 0.05),
+            trade_only=config.TRADE_ONLY,
         )
         fungus_policy = ActorCritic(
             activation=config.ACTIVATION,
             initial_trade=getattr(config, "FUNGUS_INITIAL_TRADE", 0.75),
+            trade_only=config.TRADE_ONLY,
         )
 
         if not resume_mode:
-            if random_streams is None:
-                rng, plant_rng, fungus_rng = jax.random.split(rng, 3)
-                action_rng = rng
-                environment_rng = rng
-                minibatch_rng = rng
-            else:
-                plant_rng = random_streams.key("plant_initialization")
-                fungus_rng = random_streams.key("fungal_initialization")
-                action_rng = random_streams.key("policy_action_sampling")
-                environment_rng = random_streams.key("environment_variation")
-                minibatch_rng = random_streams.key("minibatch_ordering")
-            init_x = jnp.zeros((1, env.observation_spaces[PLANT].shape[0]))
-            plant_tx = optax.adam(learning_rate=linear_schedule)
-            fungus_tx = optax.adam(learning_rate=linear_schedule)
-            plant_train_state = IPPOTrainState.create(
-                apply_fn=plant_policy.apply,
-                params=plant_policy.init(plant_rng, init_x),
-                tx=plant_tx,
-                critic_normalizer=initial_critic_normalizer(),
+            train_state, env_state, obs, runner_rngs = initialize_runner_state(
+                env, config, random_streams, rng
             )
-            fungus_train_state = IPPOTrainState.create(
-                apply_fn=fungus_policy.apply,
-                params=fungus_policy.init(fungus_rng, init_x),
-                tx=fungus_tx,
-                critic_normalizer=initial_critic_normalizer(),
-            )
-            train_state = {PLANT: plant_train_state, FUNGUS: fungus_train_state}
-            environment_rng, _rng = jax.random.split(environment_rng)
-            reset_rng = jax.random.split(_rng, config.NUM_ENVS)
-            obs, env_state = jax.vmap(env.reset, in_axes=(0,))(reset_rng)
-            runner_rngs = (action_rng, environment_rng, minibatch_rng)
+            action_rng, environment_rng, minibatch_rng = runner_rngs
         else:
             if resumed_runner_state is None:
                 raise ValueError("resumed trainer requires runner state")
@@ -536,12 +582,8 @@ def make_train(
                 action_rng, plant_act_rng, fungus_act_rng = jax.random.split(
                     action_rng, 3
                 )
-                plant_trade_rng, plant_allocation_rng = jax.random.split(
-                    plant_act_rng
-                )
-                fungus_trade_rng, fungus_allocation_rng = jax.random.split(
-                    fungus_act_rng
-                )
+                plant_trade_rng, plant_allocation_rng = jax.random.split(plant_act_rng)
+                fungus_trade_rng, fungus_allocation_rng = jax.random.split(fungus_act_rng)
 
                 # Batch observations for the independent plant and fungal policies.
                 obs_batch = batchify(
@@ -558,29 +600,32 @@ def make_train(
                 ) * jax.random.normal(
                     plant_trade_rng, plant_policy_parameters.trade_loc.shape
                 )
-                plant_latent_biological_rate = (
-                    plant_policy_parameters.biological_rate_loc
+                plant_latent_biological_rate = jax.lax.cond(
+                    config.TRADE_ONLY,
+                    lambda _: jnp.zeros_like(plant_policy_parameters.biological_rate_loc),
+                    lambda _: plant_policy_parameters.biological_rate_loc
                     + jnp.exp(plant_policy_parameters.biological_rate_log_std)
-                    * jax.random.normal(
-                        plant_allocation_rng,
-                        plant_policy_parameters.biological_rate_loc.shape,
-                    )
+                    * jax.random.normal(plant_allocation_rng, plant_policy_parameters.biological_rate_loc.shape),
+                    operand=None,
                 )
                 plant_trade_log_probability = normal_log_probability(
                     plant_latent_trade,
                     plant_policy_parameters.trade_loc,
                     plant_policy_parameters.trade_log_std,
                 )
-                plant_biological_rate_log_probability = jnp.sum(
-                    normal_log_probability(
-                        plant_latent_biological_rate,
-                        plant_policy_parameters.biological_rate_loc,
-                        plant_policy_parameters.biological_rate_log_std,
-                    ),
-                    axis=-1,
+                plant_biological_rate_log_probability = jax.lax.cond(
+                    config.TRADE_ONLY,
+                    lambda _: jnp.zeros_like(plant_trade_log_probability),
+                    lambda _: jnp.sum(normal_log_probability(
+                        plant_latent_biological_rate, plant_policy_parameters.biological_rate_loc,
+                        plant_policy_parameters.biological_rate_log_std), axis=-1),
+                    operand=None,
                 )
-                plant_rate_action = latent_to_rate_action(
-                    plant_latent_trade, plant_latent_biological_rate
+                plant_rate_action = (
+                    fixed_allocation_rate_action(jax.nn.softplus(plant_latent_trade))
+                    if config.TRADE_ONLY else latent_to_rate_action(
+                        plant_latent_trade, plant_latent_biological_rate
+                    )
                 )
 
                 fungus_policy_parameters, fungus_value = fungus_policy.apply(
@@ -591,29 +636,32 @@ def make_train(
                 ) * jax.random.normal(
                     fungus_trade_rng, fungus_policy_parameters.trade_loc.shape
                 )
-                fungus_latent_biological_rate = (
-                    fungus_policy_parameters.biological_rate_loc
+                fungus_latent_biological_rate = jax.lax.cond(
+                    config.TRADE_ONLY,
+                    lambda _: jnp.zeros_like(fungus_policy_parameters.biological_rate_loc),
+                    lambda _: fungus_policy_parameters.biological_rate_loc
                     + jnp.exp(fungus_policy_parameters.biological_rate_log_std)
-                    * jax.random.normal(
-                        fungus_allocation_rng,
-                        fungus_policy_parameters.biological_rate_loc.shape,
-                    )
+                    * jax.random.normal(fungus_allocation_rng, fungus_policy_parameters.biological_rate_loc.shape),
+                    operand=None,
                 )
                 fungus_trade_log_probability = normal_log_probability(
                     fungus_latent_trade,
                     fungus_policy_parameters.trade_loc,
                     fungus_policy_parameters.trade_log_std,
                 )
-                fungus_biological_rate_log_probability = jnp.sum(
-                    normal_log_probability(
-                        fungus_latent_biological_rate,
-                        fungus_policy_parameters.biological_rate_loc,
-                        fungus_policy_parameters.biological_rate_log_std,
-                    ),
-                    axis=-1,
+                fungus_biological_rate_log_probability = jax.lax.cond(
+                    config.TRADE_ONLY,
+                    lambda _: jnp.zeros_like(fungus_trade_log_probability),
+                    lambda _: jnp.sum(normal_log_probability(
+                        fungus_latent_biological_rate, fungus_policy_parameters.biological_rate_loc,
+                        fungus_policy_parameters.biological_rate_log_std), axis=-1),
+                    operand=None,
                 )
-                fungus_rate_action = latent_to_rate_action(
-                    fungus_latent_trade, fungus_latent_biological_rate
+                fungus_rate_action = (
+                    fixed_allocation_rate_action(jax.nn.softplus(fungus_latent_trade))
+                    if config.TRADE_ONLY else latent_to_rate_action(
+                        fungus_latent_trade, fungus_latent_biological_rate
+                    )
                 )
 
                 # Unbatchify the actions to match the environment's expected input format
@@ -651,7 +699,10 @@ def make_train(
                     obs=plant_obs_batch,
                     info=info[PLANT],
                     critic_valid=plant_fields.critic_valid,
-                    biological_rate_actor_valid=plant_fields.biological_rate_actor_valid,
+                    biological_rate_actor_valid=(
+                        jnp.zeros_like(plant_fields.biological_rate_actor_valid)
+                        if config.TRADE_ONLY else plant_fields.biological_rate_actor_valid
+                    ),
                     trade_actor_valid=plant_fields.trade_actor_valid,
                     terminated=plant_fields.terminated,
                     truncated=plant_fields.truncated,
@@ -673,7 +724,10 @@ def make_train(
                     obs=fungus_obs_batch,
                     info=info[FUNGUS],
                     critic_valid=fungus_fields.critic_valid,
-                    biological_rate_actor_valid=fungus_fields.biological_rate_actor_valid,
+                    biological_rate_actor_valid=(
+                        jnp.zeros_like(fungus_fields.biological_rate_actor_valid)
+                        if config.TRADE_ONLY else fungus_fields.biological_rate_actor_valid
+                    ),
                     trade_actor_valid=fungus_fields.trade_actor_valid,
                     terminated=fungus_fields.terminated,
                     truncated=fungus_fields.truncated,
@@ -771,13 +825,15 @@ def make_train(
                             policy_parameters.trade_loc,
                             policy_parameters.trade_log_std,
                         )
-                        biological_rate_log_probability = jnp.sum(
-                            normal_log_probability(
-                                traj_batch.latent_biological_rate_action,
-                                policy_parameters.biological_rate_loc,
-                                policy_parameters.biological_rate_log_std,
-                            ),
-                            axis=-1,
+                        biological_rate_log_probability = (
+                            jnp.zeros_like(traj_batch.trade_log_probability)
+                            if config.TRADE_ONLY else jnp.sum(
+                                normal_log_probability(
+                                    traj_batch.latent_biological_rate_action,
+                                    policy_parameters.biological_rate_loc,
+                                    policy_parameters.biological_rate_log_std,
+                                ), axis=-1,
+                            )
                         )
 
                         # CALCULATE VALUE LOSS
@@ -803,23 +859,25 @@ def make_train(
                         )
 
                         # CALCULATE ACTOR LOSS
-                        log_probability = biological_rate_log_probability + jnp.where(
-                            traj_batch.trade_actor_valid,
-                            trade_log_probability,
-                            0.0,
+                        actor_valid = (
+                            traj_batch.trade_actor_valid if config.TRADE_ONLY
+                            else traj_batch.biological_rate_actor_valid
+                        )
+                        log_probability = (
+                            trade_log_probability if config.TRADE_ONLY else
+                            biological_rate_log_probability + jnp.where(
+                                traj_batch.trade_actor_valid, trade_log_probability, 0.0
+                            )
                         )
                         old_log_probability = (
-                            traj_batch.biological_rate_log_probability
-                            + jnp.where(
+                            traj_batch.trade_log_probability if config.TRADE_ONLY else
+                            traj_batch.biological_rate_log_probability + jnp.where(
                                 traj_batch.trade_actor_valid,
-                                traj_batch.trade_log_probability,
-                                0.0,
+                                traj_batch.trade_log_probability, 0.0
                             )
                         )
                         ratio = jnp.exp(log_probability - old_log_probability)
-                        gae = masked_normalize(
-                            gae, traj_batch.biological_rate_actor_valid
-                        )
+                        gae = masked_normalize(gae, actor_valid)
                         loss_actor1 = ratio * gae
                         loss_actor2 = (
                             jnp.clip(
@@ -831,23 +889,24 @@ def make_train(
                         )
                         loss_actor = masked_mean(
                             -jnp.minimum(loss_actor1, loss_actor2),
-                            traj_batch.biological_rate_actor_valid,
+                            actor_valid,
                         )
                         approx_kl = masked_mean(
                             old_log_probability - log_probability,
-                            traj_batch.biological_rate_actor_valid,
+                            actor_valid,
                         )
                         normal_entropy = lambda log_std: jnp.sum(
                             log_std + 0.5 * (1.0 + jnp.log(2.0 * jnp.pi)), axis=-1
                         )
                         latent_entropy = masked_mean(
+                            normal_entropy(policy_parameters.trade_log_std)
+                            if config.TRADE_ONLY else
                             normal_entropy(policy_parameters.biological_rate_log_std)
                             + jnp.where(
                                 traj_batch.trade_actor_valid,
-                                normal_entropy(policy_parameters.trade_log_std),
-                                0.0,
+                                normal_entropy(policy_parameters.trade_log_std), 0.0
                             ),
-                            traj_batch.biological_rate_actor_valid,
+                            actor_valid,
                         )
                         total_loss = loss_actor + config.VF_COEF * value_loss
                         return total_loss, (value_loss, loss_actor, approx_kl, latent_entropy)
@@ -867,7 +926,10 @@ def make_train(
                         return state, (zero, zero, zero, zero, zero)
 
                     return jax.lax.cond(
-                        jnp.any(traj_batch.biological_rate_actor_valid),
+                        jnp.any(
+                            traj_batch.trade_actor_valid if config.TRADE_ONLY
+                            else traj_batch.biological_rate_actor_valid
+                        ),
                         _apply_update,
                         _skip_update,
                         agent_train_state,
@@ -876,32 +938,21 @@ def make_train(
                 agent_train_state, traj_batch, advantages, targets, rng = update_state
                 rng, _rng = jax.random.split(rng)
 
-                # Shuffle batch and create minibatches of shape 
-                # (NUM_MINIBATCHES, MINIBATCH_SIZE, NUM_ENVS).
+                # Flatten time and vector-environment axes into one independent
+                # sample axis before shuffling. Every trajectory field (masks,
+                # actions, observations, returns) must follow this convention.
                 batch_size = MINIBATCH_SIZE * config.NUM_MINIBATCHES
-                # assert (
-                #     batch_size == config.NUM_STEPS * config.NUM_ACTORS
-                # ), "batch size must be equal to number of steps * number of actors"
                 permutation = jax.random.permutation(_rng, batch_size)
                 batch = (traj_batch, advantages, targets)
 
-                # return (train_state, traj_batch, advantages, targets, rng), batch
-
-                # Reshape the batch to have the first dimension as batch_size.
-                # batch = jax.tree_util.tree_map(
-                #     lambda x: x.reshape((batch_size,) + x.shape[2:]), batch # hard-coded x.shape indices, assuming multiple agents in batch.
-                # )
-
                 batch = jax.tree_util.tree_map(
-                    lambda x: x.reshape((batch_size,) + x.shape[1:]), batch # hard-coded x.shape indices, assuming one agent in batch.
+                    lambda x: x.reshape((batch_size,) + x.shape[2:]), batch
                 )
 
                 # Shuffle the batch.
                 shuffled_batch = jax.tree_util.tree_map(
                     lambda x: jnp.take(x, permutation, axis=0), batch
                 )
-                # Create minibatches.
-                # Reshape the batch to have the first dimension as NUM_MINIBATCHES.
                 minibatches = jax.tree_util.tree_map(
                     lambda x: jnp.reshape(
                         x, [config.NUM_MINIBATCHES, -1] + list(x.shape[1:])

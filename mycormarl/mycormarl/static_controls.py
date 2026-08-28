@@ -109,8 +109,8 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
             return (steps < env.max_episode_steps) & ~current_state.terminal
 
         def advance(carry):
-            previous, steps, uptake, transfers, deaths, growth, carbon_fixed, trace, prior_acquired, accounting = carry
-            _, current, _, _, info = env.step_env(
+            previous, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed, trace, prior_acquired, accounting = carry
+            _, current, rewards, _, info = env.step_env(
                 jax.random.PRNGKey(seed + steps + 1), previous, actions
             )
             plant_info = info[PLANT]
@@ -131,6 +131,7 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
             growth = growth + jnp.array([
                 plant_info["growth"][0], fungus_info["growth"][0]
             ])
+            fitness = fitness + jnp.array([rewards[PLANT], rewards[FUNGUS]])
             carbon_fixed = carbon_fixed + plant_info["carbon_fixed"][0]
             step_accounting = jnp.zeros((2, 2, 5))
             if record_resource_accounting:
@@ -211,18 +212,18 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
                 ], axis=1)
                 trace_row = jnp.concatenate([trace_row, limiting_code[:, None]], axis=1)
                 trace = trace.at[steps].set(trace_row)
-            return current, steps + 1, uptake, transfers, deaths, growth, carbon_fixed, trace, acquired, accounting
+            return current, steps + 1, uptake, transfers, deaths, growth, fitness, carbon_fixed, trace, acquired, accounting
 
         return jax.lax.while_loop(
             condition,
             advance,
             (initial_state, jnp.array(0), jnp.zeros(2), jnp.zeros(2),
-             jnp.zeros(2, dtype=jnp.int32), jnp.zeros(2), jnp.array(0.0),
+             jnp.zeros(2, dtype=jnp.int32), jnp.zeros(2), jnp.zeros(2), jnp.array(0.0),
              jnp.zeros((env.max_episode_steps, 2, 18)), jnp.zeros((2, 2)),
              jnp.zeros((2, 2, 5))),
         )
 
-    state, steps, uptake_values, transfer_values, death_values, growth_values, carbon_fixed, trace_values, _, accounting_values = jax.jit(rollout)(state)
+    state, steps, uptake_values, transfer_values, death_values, growth_values, fitness_values, carbon_fixed, trace_values, _, accounting_values = jax.jit(rollout)(state)
     uptake = {PLANT: float(uptake_values[0]), FUNGUS: float(uptake_values[1])}
     transfers = {
         "plant_c_out": float(transfer_values[0]),
@@ -277,10 +278,16 @@ def _condition(manifest: dict[str, Any], mode: str, p_level: float, seed: int) -
         "steps": int(steps), "uniform_initial_p": uniform,
         "initial_solution_p_profiled": env.config.initial_solution_p_depth_profile is not None,
         "biomass": {PLANT: float(state.plant_biomass[0]), FUNGUS: float(state.fungus_biomass[0])},
+        "final_living_biomass": {
+            PLANT: 0.0 if bool(state.plant_dead[0]) else float(state.plant_biomass[0]),
+            FUNGUS: 0.0 if bool(state.fungus_dead[0]) else float(state.fungus_biomass[0]),
+        },
         "c_pools": {PLANT: float(state.plant_c_pool[0]), FUNGUS: float(state.fungus_c_pool[0])},
         "p_pools": {PLANT: float(state.plant_p_pool[0]), FUNGUS: float(state.fungus_p_pool[0])},
         "uptake": uptake, "transfers": transfers, "biological_deaths": biological_deaths,
+        "commanded_rate_actions": {agent: [float(value) for value in actions[agent]] for agent in _AGENTS},
         "cumulative_growth": {PLANT: float(growth_values[0]), FUNGUS: float(growth_values[1])},
+        "cumulative_reproductive_fitness": {PLANT: float(fitness_values[0]), FUNGUS: float(fitness_values[1])},
         "cumulative_direct_p_uptake_mg": uptake,
         "cumulative_carbon_fixed": float(carbon_fixed),
         "soil_inventory_initial": initial_soil, "soil_inventory_final": final_soil,

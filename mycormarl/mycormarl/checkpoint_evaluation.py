@@ -13,6 +13,7 @@ import jax
 import jax.numpy as jnp
 
 from mycormarl.algos.ppo import ActorCritic, latent_to_rate_action
+from mycormarl.trade_only import fixed_allocation_rate_action
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.policy_artifacts import (
     ACTOR_INTERFACE_VERSION,
@@ -227,8 +228,17 @@ def _actions(
         else:
             key, trade_key, biological_rate_key = jax.random.split(key, 3)
             trade_latent = policy.trade_loc + jnp.exp(policy.trade_log_std) * jax.random.normal(trade_key, policy.trade_loc.shape)
-            biological_rate_latent = policy.biological_rate_loc + jnp.exp(policy.biological_rate_log_std) * jax.random.normal(biological_rate_key, policy.biological_rate_loc.shape)
-        actions[agent] = latent_to_rate_action(trade_latent, biological_rate_latent)
+            biological_rate_latent = (
+                policy.biological_rate_loc if actor.trade_only else
+                policy.biological_rate_loc + jnp.exp(policy.biological_rate_log_std)
+                * jax.random.normal(biological_rate_key, policy.biological_rate_loc.shape)
+            )
+        actions[agent] = (
+            fixed_allocation_rate_action(jax.nn.softplus(trade_latent))
+            if actor.trade_only else latent_to_rate_action(
+                trade_latent, biological_rate_latent
+            )
+        )
     return actions, key
 
 
