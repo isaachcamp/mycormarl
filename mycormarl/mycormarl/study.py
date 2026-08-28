@@ -42,12 +42,13 @@ from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
 from mycormarl.static_controls import run_static_controls
 from mycormarl.domain_qualification import run_domain_qualification
+from mycormarl.trade_only import TOTAL_BIOLOGICAL_RATE_PER_DAY, plant_only_actions
 
 
 STUDY_RESULT_FORMAT = "mycormarl-study-result"
 STUDY_RESULT_VERSION = 2
 _STUDY_MODES = frozenset({"mixed", "plant-only"})
-_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training", "comparison-block-training", "phase-1-pilot", "phase-1-pilot-analysis", "static-controls", "domain-qualification"})
+_STUDY_STAGES = frozenset({"walking-skeleton", "single-condition-training", "comparison-block-training", "phase-1-pilot", "historical-grid-trade-only-pilot", "phase-1-pilot-analysis", "static-controls", "domain-qualification"})
 TRAINING_CHECKPOINT_FORMAT = "mycormarl-ppo-checkpoint"
 TRAINING_CHECKPOINT_VERSION = 1
 _REQUIRED_MANIFEST_FIELDS = (
@@ -252,9 +253,13 @@ def _validate_required_declarations(manifest: Any) -> None:
     if not math.isclose(numerical_substeps, round(numerical_substeps), rel_tol=0.0, abs_tol=1e-9):
         raise ValueError("decision_interval_days must contain a whole number of timesteps")
     training = manifest["training"]
+    comparison_block_stages = {
+        "comparison-block-training", "phase-1-pilot",
+        "historical-grid-trade-only-pilot",
+    }
     training_fields = (
         ("minimum_transition_budget", "maximum_transition_budget", "checkpoint_interval_timesteps")
-        if manifest["stage"] in {"comparison-block-training", "phase-1-pilot"}
+        if manifest["stage"] in comparison_block_stages
         else ("total_timesteps", "checkpoint_interval_timesteps")
     )
     if not isinstance(training, dict) or not set(training_fields).issubset(training):
@@ -273,7 +278,7 @@ def _validate_required_declarations(manifest: Any) -> None:
     )
     if training["checkpoint_interval_timesteps"] > maximum_budget:
         raise ValueError("training checkpoint interval cannot exceed total_timesteps")
-    if manifest["stage"] in {"comparison-block-training", "phase-1-pilot"}:
+    if manifest["stage"] in comparison_block_stages:
         minimum_budget = training["minimum_transition_budget"]
         if minimum_budget > maximum_budget:
             raise ValueError("training minimum transition budget cannot exceed maximum")
@@ -325,7 +330,7 @@ def _validate_required_declarations(manifest: Any) -> None:
                 "an evaluation window and either scale-aware fitness and action "
                 "plateau tolerances or the legacy fitness and action tolerances"
             )
-    if manifest["stage"] in {"single-condition-training", "comparison-block-training", "phase-1-pilot"}:
+    if manifest["stage"] in {"single-condition-training", *comparison_block_stages}:
         if manifest["stage"] == "single-condition-training" and (
             len(manifest["modes"]) != 1 or len(manifest["initial_p_micromolar"]) != 1 or len(manifest["seeds"]) != 1
         ):
@@ -345,7 +350,7 @@ def _validate_required_declarations(manifest: Any) -> None:
         update_size = training.get("num_steps", 1) * training.get("num_envs", 1)
         if training["checkpoint_interval_timesteps"] % update_size != 0:
             raise ValueError("training checkpoint interval must contain whole PPO updates")
-        if manifest["stage"] in {"comparison-block-training", "phase-1-pilot"} and any(
+        if manifest["stage"] in comparison_block_stages and any(
             budget % update_size
             for budget in (
                 training["minimum_transition_budget"],
@@ -353,7 +358,7 @@ def _validate_required_declarations(manifest: Any) -> None:
             )
         ):
             raise ValueError("comparison-block training budgets must contain whole PPO updates")
-        if manifest["stage"] in {"comparison-block-training", "phase-1-pilot"}:
+        if manifest["stage"] in comparison_block_stages:
             parallel_workers = manifest["training"].get("parallel_workers", 1)
             if (
                 isinstance(parallel_workers, bool)
@@ -386,6 +391,68 @@ def _validate_required_declarations(manifest: Any) -> None:
         ):
             raise ValueError(
                 "Phase 1 pilot requires plant_growth, static_controls, and domain qualification artifacts"
+            )
+    if manifest["stage"] == "historical-grid-trade-only-pilot":
+        fixture = manifest.get("pilot_fixture", False)
+        if not isinstance(fixture, bool):
+            raise ValueError("historical trade-only pilot_fixture must be a boolean")
+        policy = manifest.get("policy")
+        fixed_allocation = (
+            policy.get("fixed_allocation") if isinstance(policy, dict) else None
+        )
+        if (
+            not isinstance(policy, dict)
+            or policy.get("mode") != "trade-only-fixed-allocation"
+            or fixed_allocation != {
+                "total_biological_rate_per_day": TOTAL_BIOLOGICAL_RATE_PER_DAY,
+                "growth_fraction": 0.9,
+                "reproduction_fraction": 0.1,
+                "storage_rate_per_day": 0.0,
+            }
+        ):
+            raise ValueError(
+                "historical trade-only pilot requires the declared fixed-allocation trade-only policy"
+            )
+        if not fixture and (
+            manifest["modes"] != ["mixed", "plant-only"]
+            or manifest["initial_p_micromolar"] != [0.3, 0.75, 1.5, 3.0, 5.0, 10.0]
+            or len(manifest["seeds"]) != 5
+            or manifest["horizon"] != {
+                "days": 120.0,
+                "timestep_days": 0.025,
+                "decision_interval_days": 0.25,
+            }
+            or manifest["training"] != {
+                "minimum_transition_budget": 49152,
+                "maximum_transition_budget": 239616,
+                "checkpoint_interval_timesteps": 6144,
+                "num_steps": 128,
+                "num_envs": 16,
+                "parallel_workers": 4,
+                "update_epochs": 4,
+                "num_minibatches": 8,
+                "finite_horizon_returns": True,
+                "stopping": {
+                    "evaluation_window_checkpoints": 3,
+                    "plateau_tolerances": {
+                        "fitness_absolute_floor": 0.0001,
+                        "fitness_relative": 0.2,
+                        "action_absolute": 0.01,
+                    },
+                },
+            }
+        ):
+            raise ValueError(
+                "historical trade-only pilot requires its fixed 36-condition protocol"
+            )
+        artifacts = manifest.get("qualification_artifacts")
+        if (
+            not isinstance(artifacts, dict)
+            or set(artifacts) != {"plant_growth", "static_controls", "domain"}
+            or any(not isinstance(path, str) or not path for path in artifacts.values())
+        ):
+            raise ValueError(
+                "historical trade-only pilot requires plant_growth, static_controls, and domain qualification artifacts"
             )
     if manifest["stage"] == "phase-1-pilot-analysis":
         if not isinstance(manifest.get("pilot_result_bundle"), str) or not manifest["pilot_result_bundle"]:
@@ -964,20 +1031,50 @@ def _training_config(manifest: dict[str, Any], timesteps: int) -> PPOConfig:
         UPDATE_EPOCHS=training.get("update_epochs", 1),
         NUM_MINIBATCHES=training.get("num_minibatches", 1),
         DISCOUNT_HALF_LIFE_DAYS=training.get("discount_half_life_days"),
+        FINITE_HORIZON_RETURNS=training.get("finite_horizon_returns", True),
         NORMALIZE_CRITIC_TARGETS=(
             training.get("critic_target_normalization", "per-agent-running")
             == "per-agent-running"
         ),
+        TRADE_ONLY=(
+            manifest.get("policy", {}).get("mode")
+            == "trade-only-fixed-allocation"
+        ),
     )
 
 
-def _actor_configuration(config: PPOConfig) -> dict[str, str]:
+def _actor_configuration(config: PPOConfig) -> dict[str, Any]:
     """Persist every actor setting that changes checkpoint execution."""
     return {
         "activation": config.ACTIVATION,
+        "trade_only": config.TRADE_ONLY,
         "critic_target_normalization": (
             "per-agent-running" if config.NORMALIZE_CRITIC_TARGETS else "raw"
         ),
+    }
+
+
+def _checkpoint_metadata(
+    manifest: dict[str, Any],
+    config: PPOConfig,
+    *,
+    mode: str,
+    p_level: float,
+    seed: int,
+    transitions: int,
+) -> dict[str, Any]:
+    """Record the complete public context needed to restore a PPO actor."""
+    return {
+        "mode": mode,
+        "initial_p_micromolar": p_level,
+        "seed": seed,
+        "transitions": transitions,
+        "named_random_streams": derive_random_streams(seed).to_dict(),
+        "manifest": manifest,
+        "policy_context": manifest.get("policy"),
+        "actor_configuration": _actor_configuration(config),
+        "actor_interface_version": ACTOR_INTERFACE_VERSION,
+        "environment_state_schema_version": ENVIRONMENT_STATE_SCHEMA_VERSION,
     }
 
 

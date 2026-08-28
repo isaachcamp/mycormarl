@@ -32,6 +32,23 @@ paths and the frozen blind stopping rule are stored in the result bundle. A
 compatible incomplete block can resume pending conditions without rerunning
 completed, failed, or unconverged entries.
 
+## Historical-grid trade-only pilot
+
+`historical-grid-trade-only-pilot` is a separate, new protocol—not a
+continuation or reinterpretation of legacy trade-only artifacts. Its frozen
+manifest is
+[`historical-grid-trade-only-pilot-manifest.json`](../studies/historical-grid-trade-only-pilot-manifest.json).
+It declares initial solution-P levels `0.3`, `0.75`, `1.5`, `3`, `5`, and
+`10` µM; five independently seeded learned `mixed` conditions per level; and
+one deterministic static `plant-only` control per level (36 conditions).
+
+Only the bilateral trade rate is learned in `mixed`. Growth and reproduction
+are fixed at 90% and 10% of the declared biological rate and storage is zero.
+The standard checkpoint contract records this policy context and the
+trade-only actor configuration. Stopping evaluates reproductive fitness and
+the learned trade-rate action only; it does not treat the fixed allocation as
+learned behaviour.
+
 ## Single-condition training
 
 Set `stage` to `single-condition-training` and declare one value on each of

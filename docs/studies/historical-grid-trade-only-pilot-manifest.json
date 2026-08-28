@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "stage": "historical-grid-trade-only-pilot",
+  "pilot_fixture": false,
+  "model": {
+    "environment": {
+      "soil_radius_cm": 20.0,
+      "soil_depth_cm": 60.0,
+      "radial_interval_cm": 0.1,
+      "depth_interval_cm": 0.1
+    },
+    "species": {"plant": {}, "fungus": {}}
+  },
+  "horizon": {
+    "days": 120.0,
+    "timestep_days": 0.025,
+    "decision_interval_days": 0.25
+  },
+  "modes": ["mixed", "plant-only"],
+  "initial_p_micromolar": [0.3, 0.75, 1.5, 3.0, 5.0, 10.0],
+  "seeds": [0, 1, 2, 3, 4],
+  "policy": {
+    "mode": "trade-only-fixed-allocation",
+    "fixed_allocation": {
+      "total_biological_rate_per_day": 6.907755,
+      "growth_fraction": 0.9,
+      "reproduction_fraction": 0.1,
+      "storage_rate_per_day": 0.0
+    }
+  },
+  "training": {
+    "minimum_transition_budget": 49152,
+    "maximum_transition_budget": 239616,
+    "checkpoint_interval_timesteps": 6144,
+    "num_steps": 128,
+    "num_envs": 16,
+    "parallel_workers": 4,
+    "update_epochs": 4,
+    "num_minibatches": 8,
+    "finite_horizon_returns": true,
+    "stopping": {
+      "evaluation_window_checkpoints": 3,
+      "plateau_tolerances": {
+        "fitness_absolute_floor": 0.0001,
+        "fitness_relative": 0.2,
+        "action_absolute": 0.01
+      }
+    }
+  },
+  "evaluation": {"protocol": "latent-location", "episodes": 1},
+  "qualification_artifacts": {
+    "plant_growth": "../qualification/plant-growth-qualification.json",
+    "static_controls": "../../outputs/phase-1-static-controls/phase-1-static-controls/result-bundle.json",
+    "domain": "../../outputs/profile-depth-direct-uptake-qualification/profile-depth-direct-uptake-qualification/result-bundle.json"
+  },
+  "output": {
+    "directory": "outputs/historical-grid-trade-only-pilot",
+    "identity": "historical-grid-trade-only-pilot"
+  }
+}
