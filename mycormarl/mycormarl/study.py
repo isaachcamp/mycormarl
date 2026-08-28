@@ -166,6 +166,25 @@ def _execution_identity(
     )
 
 
+def _condition_matrix(
+    manifest: dict[str, Any],
+) -> list[tuple[str, int | float, int]]:
+    """Enumerate the immutable condition inventory for a declared study."""
+    if manifest["stage"] == "historical-grid-trade-only-pilot":
+        control_seed = manifest["seeds"][0]
+        return [
+            (mode, p_level, seed)
+            for mode in manifest["modes"]
+            for p_level in manifest["initial_p_micromolar"]
+            for seed in (
+                manifest["seeds"] if mode == "mixed" else (control_seed,)
+            )
+        ]
+    return list(itertools.product(
+        manifest["modes"], manifest["initial_p_micromolar"], manifest["seeds"],
+    ))
+
+
 def _validate_required_declarations(manifest: Any) -> None:
     if not isinstance(manifest, dict):
         raise ValueError("study manifest must be a JSON object")
@@ -1109,7 +1128,37 @@ def _checkpoint_bytes(metadata: dict[str, Any], runner_state: Any) -> bytes:
     })
 
 
-def _checkpoint_stopping_metrics(evaluation: Any, mode: str) -> dict[str, Any]:
+def _run_historical_trade_only_control(
+    manifest: dict[str, Any],
+    _output_dir: Path,
+    mode: str,
+    p_level: float,
+    seed: int,
+) -> dict[str, Any]:
+    """Evaluate the declared deterministic plant-only control once per P level."""
+    if mode != "plant-only":
+        raise ValueError("historical trade-only controls are plant-only")
+    actions = plant_only_actions()
+    controls = run_static_controls({
+        **manifest,
+        "modes": [mode],
+        "initial_p_micromolar": [p_level],
+        "seeds": [seed],
+        "static_policy": {
+            agent: action.tolist() for agent, action in actions.items()
+        },
+    })
+    entry = controls["entries"][0]
+    return {
+        **entry,
+        "execution_kind": "deterministic-static-control",
+        "policy": manifest["policy"],
+    }
+
+
+def _checkpoint_stopping_metrics(
+    evaluation: Any, mode: str, *, trade_only: bool = False,
+) -> dict[str, Any]:
     """Summarise a deterministic checkpoint without forming a treatment contrast."""
     agents = ("plant", "fungus") if mode == "mixed" else ("plant",)
     fitness = {
@@ -1126,15 +1175,17 @@ def _checkpoint_stopping_metrics(evaluation: Any, mode: str) -> dict[str, Any]:
             for episode in evaluation.episodes
             for row in episode.trace
         ]
-        actions[agent] = [
+        averaged = [
             sum(row[index] for row in rows) / len(rows)
             for index in range(len(rows[0]))
         ]
+        actions[agent] = averaged[:1] if trade_only else averaged
     return {"fitness": fitness, "actions": actions}
 
 
 def _stopping_decision(
-    checkpoints: list[dict[str, Any]], training: dict[str, Any], mode: str
+    checkpoints: list[dict[str, Any]], training: dict[str, Any], mode: str,
+    *, trade_only: bool = False,
 ) -> dict[str, Any]:
     """Apply one predeclared, treatment-blind stopping rule at a checkpoint."""
     stopping = training["stopping"]
@@ -1187,12 +1238,17 @@ def _stopping_decision(
         [checkpoint["metrics"]["fitness"]["plant"] for checkpoint in window],
         "plant_fitness_absolute",
     )
+    action_agents = ("plant", "fungus") if mode == "mixed" else ("plant",)
     action_span = max(
         span([checkpoint["metrics"]["actions"][agent][index] for checkpoint in window])
-        for agent in (("plant", "fungus") if mode == "mixed" else ("plant",))
-        for index in range(4)
+        for agent in action_agents
+        for index in range(len(window[0]["metrics"]["actions"][agent]))
     )
     result["plateau_metrics"]["actions"] = {
+        "components": ["trade_rate_per_day"] if trade_only else [
+            "trade_rate_per_day", "growth_rate_per_day",
+            "reproduction_rate_per_day", "storage_rate_per_day",
+        ],
         "maximum_component_span": action_span,
         "stable": action_span <= tolerances["action_absolute"],
     }
@@ -1240,17 +1296,10 @@ def _run_condition_training(
         transitions += update_size
         if transitions % training["checkpoint_interval_timesteps"]:
             continue
-        metadata = {
-            "mode": mode,
-            "initial_p_micromolar": p_level,
-            "seed": seed,
-            "transitions": transitions,
-            "named_random_streams": streams.to_dict(),
-            "manifest": manifest,
-            "actor_configuration": _actor_configuration(config),
-            "actor_interface_version": ACTOR_INTERFACE_VERSION,
-            "environment_state_schema_version": ENVIRONMENT_STATE_SCHEMA_VERSION,
-        }
+        metadata = _checkpoint_metadata(
+            manifest, config, mode=mode, p_level=p_level, seed=seed,
+            transitions=transitions,
+        )
         checkpoint_path = condition_dir / f"checkpoints/checkpoint-{transitions:08d}.msgpack"
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
         checkpoint_path.write_bytes(_checkpoint_bytes(metadata, state))
@@ -1262,6 +1311,11 @@ def _run_condition_training(
             protocol=manifest["evaluation"]["protocol"],
             seed=seed,
         )
+        if config.TRADE_ONLY:
+            evaluation_summary["actions"] = {
+                agent: values[:1]
+                for agent, values in evaluation_summary["actions"].items()
+            }
         training_diagnostics = _training_diagnostics(training_metric_chunks)
         evaluation_summary["training_diagnostics"] = training_diagnostics
         checkpoints.append({
@@ -1272,7 +1326,9 @@ def _run_condition_training(
             "training_diagnostics": training_diagnostics,
         })
         training_metric_chunks = []
-        stopping_decision = _stopping_decision(checkpoints, training, mode)
+        stopping_decision = _stopping_decision(
+            checkpoints, training, mode, trade_only=config.TRADE_ONLY,
+        )
         if stopping_decision["outcome"] in {"plateau-complete", "maximum-budget-unconverged"}:
             evaluation = evaluate_checkpoint(
                 checkpoint_path,
@@ -1291,6 +1347,9 @@ def _run_condition_training(
         "mode": mode,
         "initial_p_micromolar": p_level,
         "seed": seed,
+        "execution_kind": (
+            "trade-only-ippo" if config.TRADE_ONLY else "independent-ppo"
+        ),
         "status": "completed" if stopping_decision["outcome"] == "plateau-complete" else "unconverged",
         "transitions": transitions,
         "checkpoint": checkpoints[-1]["checkpoint"],
@@ -1329,9 +1388,7 @@ def _run_comparison_block_training(
             raise ValueError("existing comparison-block result provenance is incompatible")
         if existing_bundle.get("qualification_artifacts") != qualification_artifacts:
             raise ValueError("existing comparison-block qualification provenance is incompatible")
-        requested_conditions = list(itertools.product(
-            manifest["modes"], manifest["initial_p_micromolar"], manifest["seeds"],
-        ))
+        requested_conditions = _condition_matrix(manifest)
         existing_entries = _validated_existing_entries(
             existing_bundle, requested_conditions,
         )
@@ -1349,9 +1406,7 @@ def _run_comparison_block_training(
         for entry in existing_entries
     }
     pending_conditions = []
-    requested_conditions = list(itertools.product(
-        manifest["modes"], manifest["initial_p_micromolar"], manifest["seeds"]
-    ))
+    requested_conditions = _condition_matrix(manifest)
     for mode, p_level, seed in requested_conditions:
         existing = previous_entries.get((mode, p_level, seed))
         if existing is not None and existing["status"] in {"completed", "failed", "unconverged"}:
@@ -1363,7 +1418,13 @@ def _run_comparison_block_training(
         with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {
                 condition: executor.submit(
-                    _run_condition_training, manifest, output_dir, *condition
+                    _run_historical_trade_only_control
+                    if manifest["stage"] == "historical-grid-trade-only-pilot"
+                    and condition[0] == "plant-only"
+                    else _run_condition_training,
+                    manifest,
+                    output_dir,
+                    *condition,
                 )
                 for condition in pending_conditions
             }
@@ -1452,17 +1513,10 @@ def _run_single_condition_training(
         trained = jax.jit(make_train(env, config, streams, state))(jax.random.PRNGKey(seed))
         state = trained["runner_state"]
         transitions += update_size
-        intermediate_metadata = {
-            "mode": mode,
-            "initial_p_micromolar": p_level,
-            "seed": seed,
-            "transitions": transitions,
-            "named_random_streams": streams.to_dict(),
-            "manifest": manifest,
-            "actor_configuration": _actor_configuration(config),
-            "actor_interface_version": ACTOR_INTERFACE_VERSION,
-            "environment_state_schema_version": ENVIRONMENT_STATE_SCHEMA_VERSION,
-        }
+        intermediate_metadata = _checkpoint_metadata(
+            manifest, config, mode=mode, p_level=p_level, seed=seed,
+            transitions=transitions,
+        )
         intermediate_path = output_dir / f"checkpoints/checkpoint-{transitions:08d}.msgpack"
         intermediate_path.parent.mkdir(parents=True, exist_ok=True)
         intermediate_path.write_bytes(_checkpoint_bytes(intermediate_metadata, state))
@@ -1481,17 +1535,10 @@ def _run_single_condition_training(
     checkpoint_name = f"checkpoints/checkpoint-{transitions:08d}.msgpack"
     checkpoint_path = output_dir / checkpoint_name
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-    metadata = {
-        "mode": mode,
-        "initial_p_micromolar": p_level,
-        "seed": seed,
-        "transitions": transitions,
-        "named_random_streams": streams.to_dict(),
-        "manifest": manifest,
-        "actor_configuration": _actor_configuration(config),
-        "actor_interface_version": ACTOR_INTERFACE_VERSION,
-        "environment_state_schema_version": ENVIRONMENT_STATE_SCHEMA_VERSION,
-    }
+    metadata = _checkpoint_metadata(
+        manifest, config, mode=mode, p_level=p_level, seed=seed,
+        transitions=transitions,
+    )
     checkpoint_content = _checkpoint_bytes(metadata, trained["runner_state"])
     checkpoint_path.write_bytes(checkpoint_content)
     state_digest = hashlib.sha256(
@@ -1545,22 +1592,21 @@ def run_study(
     provenance = _provenance(manifest)
     study_identity = _study_identity(manifest)
     execution_identity = _execution_identity(study_identity, provenance)
-    requested_conditions = list(
-        itertools.product(
-            manifest["modes"],
-            manifest["initial_p_micromolar"],
-            manifest["seeds"],
-        )
-    )
+    requested_conditions = _condition_matrix(manifest)
     output_dir = (
         Path(manifest["output"]["directory"])
         / manifest["output"]["identity"]
     )
-    if manifest["stage"] in {"comparison-block-training", "phase-1-pilot"}:
+    if manifest["stage"] in {
+        "comparison-block-training", "phase-1-pilot",
+        "historical-grid-trade-only-pilot",
+    }:
         if stop_after_timesteps is not None:
             raise ValueError("comparison-block-training does not support selective stop boundaries")
         qualification_artifacts = None
-        if manifest["stage"] == "phase-1-pilot":
+        if manifest["stage"] in {
+            "phase-1-pilot", "historical-grid-trade-only-pilot",
+        }:
             qualification_artifacts = _passed_pilot_qualification_artifacts(
                 manifest["qualification_artifacts"], manifest_source,
             )
