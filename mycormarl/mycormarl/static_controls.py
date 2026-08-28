@@ -389,3 +389,151 @@ def run_static_controls(manifest: dict[str, Any]) -> dict[str, Any]:
             "requested": len(entries)
         }
     }
+
+
+def run_batched_static_controls(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Run one homogeneous static policy over all P levels in a single batch.
+
+    This narrow fast path is for controls such as the trade-only mixed baseline:
+    one consumer mode, one seed, no optional traces, and multiple initial-P
+    states.  Initial P is used only by ``reset``; all subsequent dynamics share
+    the same environment executable, so states can safely be vmapped.
+    """
+    required = ("horizon", "model", "modes", "initial_p_micromolar", "seeds", "static_policy")
+    missing = [field for field in required if field not in manifest]
+    if missing:
+        raise ValueError("static-control manifest missing: " + ", ".join(missing))
+    if len(manifest["modes"]) != 1 or len(manifest["seeds"]) != 1:
+        raise ValueError("batched static controls require exactly one mode and one seed")
+    if manifest.get("record_limitation_trace") or manifest.get("record_resource_accounting"):
+        raise ValueError("batched static controls do not support optional traces")
+    mode, seed = manifest["modes"][0], int(manifest["seeds"][0])
+    actions = _actions(manifest["static_policy"])
+    p_levels = [float(value) for value in manifest["initial_p_micromolar"]]
+    environments = [_environment(manifest, mode, p_level) for p_level in p_levels]
+    if any(env.config.initial_solution_p_depth_profile is not None for env in environments):
+        raise ValueError("batched static controls do not support P depth profiles")
+    states = []
+    initial_totals = []
+    initial_soils = []
+    for environment in environments:
+        _, state = environment.reset(jax.random.PRNGKey(seed))
+        states.append(state)
+        initial_soil = float(jnp.sum(state.soil_labile_p) * MICROMOL_P_TO_MG_P)
+        initial_p = float(
+            jnp.sum(state.plant_p_pool) + jnp.sum(state.fungus_p_pool)
+            + jnp.sum(state.plant_biomass) * environment.species.plant.gamma_p
+            + jnp.sum(state.fungus_biomass) * environment.species.fungus.gamma_p
+        )
+        initial_soils.append(initial_soil)
+        initial_totals.append(initial_soil + initial_p)
+    environment = environments[0]
+    batch_state = jax.tree.map(lambda *values: jnp.stack(values), *states)
+    batch_size = len(states)
+    batched_step = jax.vmap(environment.step_env, in_axes=(0, 0, None))
+
+    def retain_active(previous, updated, active):
+        shape = (active.shape[0],) + (1,) * (updated.ndim - 1)
+        return jnp.where(active.reshape(shape), updated, previous)
+
+    def rollout(initial_state):
+        def advance(_, carry):
+            current, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed = carry
+            active = ~current.terminal
+            keys = jnp.broadcast_to(jax.random.PRNGKey(seed + 1), (batch_size, 2))
+            _, updated, rewards, _, info = batched_step(keys, current, actions)
+            next_state = jax.tree.map(
+                lambda previous, next_value: retain_active(previous, next_value, active),
+                current, updated,
+            )
+            active_float = active.astype(jnp.float32)
+            uptake = uptake + jnp.stack((
+                info[PLANT]["direct_p_uptake_mg"][:, 0],
+                info[FUNGUS]["direct_p_uptake_mg"][:, 0],
+            ), axis=1) * active_float[:, None]
+            transfers = transfers + jnp.stack((
+                info[PLANT]["trade_out"][:, 0], info[FUNGUS]["trade_out"][:, 0],
+            ), axis=1) * active_float[:, None]
+            deaths = deaths + jnp.stack((
+                info["transitions"][PLANT].operational_at_start
+                & ~info["transitions"][PLANT].operational_at_end,
+                info["transitions"][FUNGUS].operational_at_start
+                & ~info["transitions"][FUNGUS].operational_at_end,
+            ), axis=1).astype(jnp.int32)
+            growth = growth + jnp.stack((
+                info[PLANT]["growth"][:, 0], info[FUNGUS]["growth"][:, 0],
+            ), axis=1) * active_float[:, None]
+            fitness = fitness + jnp.stack((rewards[PLANT], rewards[FUNGUS]), axis=1) * active_float[:, None]
+            carbon_fixed = carbon_fixed + info[PLANT]["carbon_fixed"][:, 0] * active_float
+            return next_state, steps + active.astype(jnp.int32), uptake, transfers, deaths, growth, fitness, carbon_fixed
+
+        return jax.lax.fori_loop(
+            0, environment.max_episode_steps, advance,
+            (initial_state, jnp.zeros(batch_size, dtype=jnp.int32),
+             jnp.zeros((batch_size, 2)), jnp.zeros((batch_size, 2)),
+             jnp.zeros((batch_size, 2), dtype=jnp.int32), jnp.zeros((batch_size, 2)),
+             jnp.zeros((batch_size, 2)), jnp.zeros(batch_size)),
+        )
+
+    state, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed = jax.jit(rollout)(batch_state)
+    entries = []
+    for index, (p_level, initial_soil, initial_total) in enumerate(
+        zip(p_levels, initial_soils, initial_totals, strict=True)
+    ):
+        final_soil = float(jnp.sum(state.soil_labile_p[index]) * MICROMOL_P_TO_MG_P)
+        final_pools = float(
+            jnp.sum(state.plant_p_pool[index]) + jnp.sum(state.fungus_p_pool[index])
+            + jnp.sum(jnp.where(state.plant_dead[index], 0.0, state.plant_biomass[index])) * environment.species.plant.gamma_p
+            + jnp.sum(jnp.where(state.fungus_dead[index], 0.0, state.fungus_biomass[index])) * environment.species.fungus.gamma_p
+        )
+        counters = {
+            "plant_mortality": float(jnp.sum(state.cumulative_plant_p_mortality_loss_mg[index])),
+            "fungus_mortality": float(jnp.sum(state.cumulative_fungus_p_mortality_loss_mg[index])),
+            "plant_maintenance": float(jnp.sum(state.cumulative_plant_p_maintenance_loss_mg[index])),
+            "fungus_maintenance": float(jnp.sum(state.cumulative_fungus_p_maintenance_loss_mg[index])),
+            "plant_reproduction": float(jnp.sum(state.cumulative_plant_p_reproduction_export_mg[index])),
+            "fungus_reproduction": float(jnp.sum(state.cumulative_fungus_p_reproduction_export_mg[index])),
+        }
+        losses = sum(counters.values())
+        residual = initial_total - final_soil - final_pools - losses
+        reasons = []
+        if float(jnp.min(state.soil_labile_p[index])) < -_POOL_TOLERANCE:
+            reasons.append("negative soil P pool")
+        for agent, dead in ((PLANT, state.plant_dead[index]), (FUNGUS, state.fungus_dead[index])):
+            if bool(jnp.any(dead)):
+                reasons.append(f"biological failure: {agent} died")
+        if any(bool(jnp.any(getattr(state, field)[index] < 0.0))
+               for field in ("plant_c_pool", "plant_p_pool", "fungus_c_pool", "fungus_p_pool")):
+            reasons.append("negative organism resource pool")
+        if abs(residual) > 1e-5 * max(1.0, initial_total):
+            reasons.append("resource-accounting failure: P residual is nonzero")
+        if initial_soil > 0.0 and final_soil <= 1e-12:
+            reasons.append("pathological depletion: soil inventory exhausted")
+        entries.append({
+            "mode": mode, "initial_p_micromolar": p_level, "seed": seed,
+            "status": "rejected" if reasons else "completed", "rejection_reasons": reasons,
+            "steps": int(steps[index]), "uniform_initial_p": True,
+            "initial_solution_p_profiled": False,
+            "biomass": {PLANT: float(state.plant_biomass[index, 0]), FUNGUS: float(state.fungus_biomass[index, 0])},
+            "final_living_biomass": {
+                PLANT: 0.0 if bool(state.plant_dead[index, 0]) else float(state.plant_biomass[index, 0]),
+                FUNGUS: 0.0 if bool(state.fungus_dead[index, 0]) else float(state.fungus_biomass[index, 0]),
+            },
+            "c_pools": {PLANT: float(state.plant_c_pool[index, 0]), FUNGUS: float(state.fungus_c_pool[index, 0])},
+            "p_pools": {PLANT: float(state.plant_p_pool[index, 0]), FUNGUS: float(state.fungus_p_pool[index, 0])},
+            "uptake": {PLANT: float(uptake[index, 0]), FUNGUS: float(uptake[index, 1])},
+            "transfers": {"plant_c_out": float(transfers[index, 0]), "fungus_p_out": float(transfers[index, 1])},
+            "biological_deaths": {PLANT: int(deaths[index, 0]), FUNGUS: int(deaths[index, 1])},
+            "commanded_rate_actions": {agent: [float(value) for value in actions[agent]] for agent in _AGENTS},
+            "cumulative_growth": {PLANT: float(growth[index, 0]), FUNGUS: float(growth[index, 1])},
+            "cumulative_reproductive_fitness": {PLANT: float(fitness[index, 0]), FUNGUS: float(fitness[index, 1])},
+            "cumulative_direct_p_uptake_mg": {PLANT: float(uptake[index, 0]), FUNGUS: float(uptake[index, 1])},
+            "cumulative_carbon_fixed": float(carbon_fixed[index]),
+            "soil_inventory_initial": initial_soil, "soil_inventory_final": final_soil,
+            "p_loss_or_export": losses, "p_loss_or_export_counters": counters,
+            "p_accounting_residual": residual, "terminated": bool(state.terminal[index]),
+        })
+    rejected = sum(entry["status"] == "rejected" for entry in entries)
+    return {"format": "mycormarl-static-controls", "format_version": 1,
+            "status": "rejected" if rejected else "complete", "entries": entries,
+            "completion": {"completed": len(entries) - rejected, "requested": len(entries)}}

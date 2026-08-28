@@ -4,7 +4,7 @@ from pathlib import Path
 import json
 
 import mycormarl.study as study_module
-from mycormarl.static_controls import run_static_controls
+from mycormarl.static_controls import run_batched_static_controls, run_static_controls
 from mycormarl.study import run_study
 
 
@@ -164,6 +164,24 @@ def test_static_controls_report_fixed_trade_as_a_transfer_observable():
 
     assert mixed["transfers"]["plant_c_out"] > 0.0
     assert mixed["transfers"]["fungus_p_out"] > 0.0
+
+
+def test_batched_static_controls_match_serial_controls_for_homogeneous_mixed_policy():
+    """P-specific resets share one vmapped rollout without changing endpoints."""
+    manifest = _manifest()
+    manifest["modes"] = ["mixed"]
+    manifest["static_policy"] = {
+        "plant": [0.05, 1.0, 0.0, 0.0],
+        "fungus": [0.75, 1.0, 0.0, 0.0],
+    }
+    serial = run_static_controls(manifest)
+    batched = run_batched_static_controls(manifest)
+
+    assert batched["completion"] == serial["completion"]
+    for expected, actual in zip(serial["entries"], batched["entries"], strict=True):
+        assert actual["initial_p_micromolar"] == expected["initial_p_micromolar"]
+        assert actual["transfers"] == pytest.approx(expected["transfers"])
+        assert actual["final_living_biomass"] == pytest.approx(expected["final_living_biomass"])
 
 
 def test_static_controls_record_gamma_normalized_limitation_trace():

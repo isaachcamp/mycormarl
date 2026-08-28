@@ -29,8 +29,11 @@ from mycormarl.plant.traits import PlantTraits
 from mycormarl.random_streams import derive_random_streams
 from mycormarl.trade_only import (
     GROWTH_FRACTION,
+    FUNGUS_MIXED_TRADE_FRACTION_PER_DAY,
+    PLANT_MIXED_TRADE_FRACTION_PER_DAY,
     REPRODUCTION_FRACTION,
     TOTAL_BIOLOGICAL_RATE_PER_DAY,
+    pool_fraction_to_rate,
     run_trade_only_baseline,
 )
 
@@ -294,9 +297,8 @@ def _evaluation_due(plan: TradeOnlyStudyPlan, completed_episodes: int) -> bool:
 def _has_matching_baseline(output_dir: Path, plan: TradeOnlyStudyPlan) -> bool:
     """Return whether ``output_dir`` already has the declared controls.
 
-    A rejected zero-trade mixed control is still an intentional, completed
-    control outcome, so compatibility is defined by its declared condition and
-    protocol rather than the bundle's aggregate status.
+    Compatibility is defined by the declared current-pool trade protocol as
+    well as the conditions and fixed biological allocation.
     """
     plan_path = output_dir / "study-plan.json"
     baseline_path = output_dir / "fixed-allocation-baseline.json"
@@ -317,9 +319,66 @@ def _has_matching_baseline(output_dir: Path, plan: TradeOnlyStudyPlan) -> bool:
         stored_plan == plan_payload(plan)
         and baseline.get("format") == "mycormarl-trade-only-baseline"
         and baseline.get("protocol", {}).get("fixed_allocation") == plan.fixed_allocation
+        and baseline.get("protocol", {}).get(
+            "mixed_trade_fraction_of_current_post_maintenance_pool_per_day"
+        ) == {
+            PLANT: PLANT_MIXED_TRADE_FRACTION_PER_DAY,
+            FUNGUS: FUNGUS_MIXED_TRADE_FRACTION_PER_DAY,
+        }
+        and baseline.get("protocol", {}).get("mixed_trade_rate_per_day") == {
+            PLANT: pool_fraction_to_rate(PLANT_MIXED_TRADE_FRACTION_PER_DAY),
+            FUNGUS: pool_fraction_to_rate(FUNGUS_MIXED_TRADE_FRACTION_PER_DAY),
+        }
         and actual_entries == expected_entries
         and len(baseline.get("entries", [])) == len(expected_entries)
     )
+
+
+def run_fixed_baseline(output_dir: Path, plan: TradeOnlyStudyPlan) -> Path:
+    """Replace mixed controls, preserving compatible completed plant-only controls."""
+    path = output_dir / "fixed-allocation-baseline.json"
+    try:
+        previous = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        previous = {"entries": []}
+    expected_plant_only = {
+        ("plant-only", p_micromolar, plan.seeds[0])
+        for p_micromolar in plan.initial_p_micromolar
+    }
+    retained = [
+        entry for entry in previous.get("entries", [])
+        if entry.get("mode") == "plant-only" and entry.get("status") == "completed"
+    ]
+    retained_keys = {
+        (entry.get("mode"), entry.get("initial_p_micromolar"), entry.get("seed"))
+        for entry in retained
+    }
+    if retained_keys == expected_plant_only and len(retained) == len(expected_plant_only):
+        replacement = run_trade_only_baseline(
+            initial_p_micromolar=plan.initial_p_micromolar, seeds=(plan.seeds[0],),
+            days=plan.horizon_days, timestep_days=plan.numerical_timestep_days,
+            include_plant_only=False,
+        )
+        entries = retained + replacement["entries"]
+        rejected = sum(entry["status"] == "rejected" for entry in entries)
+        baseline = {
+            **replacement,
+            "entries": entries,
+            "status": "rejected" if rejected else "complete",
+            "completion": {"completed": len(entries) - rejected, "requested": len(entries)},
+            "plant_only_control": "reused from the matching existing artifact",
+        }
+    else:
+        baseline = run_trade_only_baseline(
+            initial_p_micromolar=plan.initial_p_micromolar, seeds=(plan.seeds[0],),
+            days=plan.horizon_days, timestep_days=plan.numerical_timestep_days,
+        )
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(baseline, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    temporary.replace(path)
+    return path
 
 
 class _StudyProgress:
@@ -422,13 +481,7 @@ def run_study(
         json.dumps(plan_payload(plan), indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     if not have_baseline:
-        baseline = run_trade_only_baseline(
-            initial_p_micromolar=plan.initial_p_micromolar, seeds=(plan.seeds[0],),
-            days=plan.horizon_days, timestep_days=plan.numerical_timestep_days,
-        )
-        (output_dir / "fixed-allocation-baseline.json").write_text(
-            json.dumps(baseline, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        run_fixed_baseline(output_dir, plan)
     progress = _StudyProgress(output_dir, plan)
     with ThreadPoolExecutor(max_workers=plan.workers) as executor:
         futures = [
