@@ -222,13 +222,19 @@ def test_historical_trade_only_runner_keeps_controls_static_and_learners_seeded(
         return {"mode": mode, "initial_p_micromolar": p_level, "seed": seed,
                 "status": "completed", "execution_kind": "trade-only-ippo"}
 
-    def control(_manifest, _output, mode, p_level, seed):
-        controls.append((mode, p_level, seed))
-        return {"mode": mode, "initial_p_micromolar": p_level, "seed": seed,
-                "status": "completed", "execution_kind": "deterministic-static-control"}
+    def control(_manifest, conditions):
+        controls.extend(conditions)
+        return {
+            condition: {
+                "mode": condition[0], "initial_p_micromolar": condition[1],
+                "seed": condition[2], "status": "completed",
+                "execution_kind": "deterministic-static-control-vmapped",
+            }
+            for condition in conditions
+        }
 
     monkeypatch.setattr(study_module, "_run_condition_training", train)
-    monkeypatch.setattr(study_module, "_run_historical_trade_only_control", control)
+    monkeypatch.setattr(study_module, "_run_historical_trade_only_controls", control)
 
     result = run_study(_write_manifest(tmp_path, manifest))
     bundle = json.loads(result.bundle_path.read_text(encoding="utf-8"))
@@ -237,7 +243,7 @@ def test_historical_trade_only_runner_keeps_controls_static_and_learners_seeded(
     assert len(controls) == 6
     assert bundle["completion"] == {"completed": 36, "requested": 36}
     assert {entry["execution_kind"] for entry in bundle["entries"]} == {
-        "trade-only-ippo", "deterministic-static-control",
+        "trade-only-ippo", "deterministic-static-control-vmapped",
     }
 
 
@@ -298,11 +304,38 @@ def test_historical_trade_only_fixture_emits_a_standard_provenance_bundle(tmp_pa
 
     assert bundle["completion"] == {"completed": 2, "requested": 2}
     assert {entry["execution_kind"] for entry in bundle["entries"]} == {
-        "deterministic-static-control",
+        "deterministic-static-control-vmapped",
         "trade-only-ippo",
     }
     assert payload["metadata"]["actor_configuration"]["trade_only"] is True
     assert payload["metadata"]["policy_context"] == manifest["policy"]
+
+
+def test_comparison_worker_override_is_runtime_only(tmp_path, monkeypatch):
+    """Scheduling can be tuned without changing the frozen study manifest."""
+    manifest = _historical_trade_only_manifest(tmp_path)
+    manifest_path = _write_manifest(tmp_path, manifest)
+    captured = {}
+
+    def fake_comparison_runner(*args, **kwargs):
+        captured["manifest"] = args[0]
+        captured["workers"] = args[6]
+        return study_module.StudyResult(tmp_path / "bundle.json", tmp_path / "summary.md")
+
+    monkeypatch.setattr(
+        study_module, "_run_comparison_block_training", fake_comparison_runner,
+    )
+
+    run_study(manifest_path, parallel_workers=2)
+
+    assert captured["workers"] == 2
+    assert captured["manifest"]["training"].get("parallel_workers") is None
+
+
+@pytest.mark.parametrize("workers", [0, -1, True, 1.5])
+def test_parallel_worker_override_requires_positive_integer(tmp_path, workers):
+    with pytest.raises(ValueError, match="parallel_workers"):
+        run_study(_write_manifest(tmp_path, _manifest(tmp_path)), parallel_workers=workers)
 
 
 def test_checked_in_historical_trade_only_manifest_is_executable_protocol():

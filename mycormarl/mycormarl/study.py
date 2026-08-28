@@ -40,7 +40,7 @@ from mycormarl.environments.policy_interval import PolicyIntervalMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
-from mycormarl.static_controls import run_static_controls
+from mycormarl.static_controls import run_batched_static_controls, run_static_controls
 from mycormarl.domain_qualification import run_domain_qualification
 from mycormarl.trade_only import TOTAL_BIOLOGICAL_RATE_PER_DAY, plant_only_actions
 
@@ -1128,31 +1128,40 @@ def _checkpoint_bytes(metadata: dict[str, Any], runner_state: Any) -> bytes:
     })
 
 
-def _run_historical_trade_only_control(
+def _run_historical_trade_only_controls(
     manifest: dict[str, Any],
-    _output_dir: Path,
-    mode: str,
-    p_level: float,
-    seed: int,
-) -> dict[str, Any]:
-    """Evaluate the declared deterministic plant-only control once per P level."""
-    if mode != "plant-only":
+    conditions: list[tuple[str, float, int]],
+) -> dict[tuple[str, float, int], dict[str, Any]]:
+    """Evaluate pending plant-only controls in one vmapped rollout.
+
+    Initial P only affects reset for these homogeneous deterministic controls,
+    so the static-control runner can safely batch their state transitions.
+    """
+    if not conditions:
+        return {}
+    if any(mode != "plant-only" for mode, _, _ in conditions):
         raise ValueError("historical trade-only controls are plant-only")
+    seeds = {seed for _, _, seed in conditions}
+    if len(seeds) != 1:
+        raise ValueError("historical trade-only controls require one control seed")
+    seed = next(iter(seeds))
     actions = plant_only_actions()
-    controls = run_static_controls({
+    controls = run_batched_static_controls({
         **manifest,
-        "modes": [mode],
-        "initial_p_micromolar": [p_level],
+        "modes": ["plant-only"],
+        "initial_p_micromolar": [p_level for _, p_level, _ in conditions],
         "seeds": [seed],
         "static_policy": {
             agent: action.tolist() for agent, action in actions.items()
         },
     })
-    entry = controls["entries"][0]
     return {
-        **entry,
-        "execution_kind": "deterministic-static-control",
-        "policy": manifest["policy"],
+        (entry["mode"], entry["initial_p_micromolar"], entry["seed"]): {
+            **entry,
+            "execution_kind": "deterministic-static-control-vmapped",
+            "policy": manifest["policy"],
+        }
+        for entry in controls["entries"]
     }
 
 
@@ -1368,6 +1377,7 @@ def _run_comparison_block_training(
     execution_identity: str,
     output_dir: Path,
     qualification_artifacts: dict[str, str] | None = None,
+    parallel_workers: int | None = None,
 ) -> StudyResult:
     """Train every declared condition under one frozen, blind stopping protocol."""
     bundle_path = output_dir / "result-bundle.json"
@@ -1413,20 +1423,33 @@ def _run_comparison_block_training(
             entries_by_condition[(mode, p_level, seed)] = existing
             continue
         pending_conditions.append((mode, p_level, seed))
-    workers = min(manifest["training"].get("parallel_workers", 1), len(pending_conditions))
+    control_conditions = [
+        condition for condition in pending_conditions
+        if manifest["stage"] == "historical-grid-trade-only-pilot"
+        and condition[0] == "plant-only"
+    ]
+    entries_by_condition.update(
+        _run_historical_trade_only_controls(manifest, control_conditions)
+    )
+    training_conditions = [
+        condition for condition in pending_conditions
+        if condition not in control_conditions
+    ]
+    configured_workers = (
+        manifest["training"].get("parallel_workers", 1)
+        if parallel_workers is None else parallel_workers
+    )
+    workers = min(configured_workers, len(training_conditions))
     if workers:
         with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {
                 condition: executor.submit(
-                    _run_historical_trade_only_control
-                    if manifest["stage"] == "historical-grid-trade-only-pilot"
-                    and condition[0] == "plant-only"
-                    else _run_condition_training,
+                    _run_condition_training,
                     manifest,
                     output_dir,
                     *condition,
                 )
-                for condition in pending_conditions
+                for condition in training_conditions
             }
             for condition, future in futures.items():
                 entries_by_condition[condition] = future.result()
@@ -1584,8 +1607,19 @@ def run_study(
     manifest_path: str | Path,
     *,
     stop_after_timesteps: int | None = None,
+    parallel_workers: int | None = None,
 ) -> StudyResult:
-    """Run a declared study manifest and persist its versioned result bundle."""
+    """Run a declared study manifest and persist its versioned result bundle.
+
+    ``parallel_workers`` overrides only local scheduling for comparison blocks;
+    it never changes the frozen manifest or scientific study identity.
+    """
+    if parallel_workers is not None and (
+        isinstance(parallel_workers, bool)
+        or not isinstance(parallel_workers, int)
+        or parallel_workers <= 0
+    ):
+        raise ValueError("parallel_workers must be a positive integer when provided")
     manifest_source = Path(manifest_path)
     manifest = json.loads(manifest_source.read_text(encoding="utf-8"))
     _validate_required_declarations(manifest)
@@ -1617,6 +1651,7 @@ def run_study(
             execution_identity,
             output_dir,
             qualification_artifacts,
+            parallel_workers,
         )
     if manifest["stage"] == "phase-1-pilot-analysis":
         if stop_after_timesteps is not None:

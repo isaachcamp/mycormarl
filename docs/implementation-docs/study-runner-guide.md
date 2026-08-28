@@ -49,6 +49,21 @@ trade-only actor configuration. Stopping evaluates reproductive fitness and
 the learned trade-rate action only; it does not treat the fixed allocation as
 learned behaviour.
 
+Each learned condition vectorizes its PPO rollout over `training.num_envs`
+(16 in the published manifest), while independent learned conditions run in a
+bounded worker pool. The six deterministic `plant-only` controls are executed
+as one JAX-vmapped rollout over their initial-P states. Set the default worker
+limit in `training.parallel_workers`, or choose a machine-specific limit at
+launch without changing the frozen protocol:
+
+```python
+run_study("docs/studies/historical-grid-trade-only-pilot-manifest.json",
+          parallel_workers=2)
+```
+
+The runtime override affects scheduling only, not the manifest, result
+identity, seeds, or scientific provenance.
+
 ## Single-condition training
 
 Set `stage` to `single-condition-training` and declare one value on each of
