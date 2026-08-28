@@ -51,7 +51,7 @@
   "qualification_artifacts": {
     "plant_growth": "../qualification/plant-growth-qualification.json",
     "static_controls": "../../outputs/phase-1-static-controls/phase-1-static-controls/result-bundle.json",
-    "domain": "../../outputs/profile-depth-direct-uptake-qualification/profile-depth-direct-uptake-qualification/result-bundle.json"
+    "domain": "../qualification/rate-action-49/profile-depth-domain-qualification/result-bundle.json"
   },
   "output": {
     "directory": "outputs/historical-grid-trade-only-pilot",
