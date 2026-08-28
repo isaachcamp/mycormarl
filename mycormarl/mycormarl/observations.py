@@ -28,9 +28,8 @@ def actor_observation(
     maintenance_need: chex.Array,
     association: chex.Array,
     operational: chex.Array,
-    episode_clock: chex.Array | None = None,
 ) -> chex.Array:
-    """Build one actor's bounded state features, optionally with episode time."""
+    """Build one actor's ordered five-feature observation."""
     observation = jnp.concatenate(
         [
             bounded_saturating_ratio(biomass, biomass_reference),
@@ -40,8 +39,4 @@ def actor_observation(
             association.astype(jnp.float32),
         ]
     )
-    if episode_clock is not None:
-        observation = jnp.concatenate(
-            [observation, jnp.clip(episode_clock, 0.0, 1.0).reshape(-1)]
-        )
     return jnp.where(operational, observation, 0.0).astype(jnp.float32)

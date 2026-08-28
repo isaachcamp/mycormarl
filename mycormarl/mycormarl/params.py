@@ -30,7 +30,6 @@ class EnvConfig:
     max_steps: int = 14600
     dt: float = 0.025
     consumer_mode: str = "mixed"
-    include_episode_clock: bool = False
     soil_radius_cm: float = 50.0
     soil_depth_cm: float = 100.0
     radial_interval_cm: float = 0.1

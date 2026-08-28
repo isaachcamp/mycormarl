@@ -26,6 +26,14 @@ The policy wrapper holds the Rate action unchanged across numerical substeps.
 PPO records sampled latents, the executed Rate action, and likelihoods in
 latent space. Non-policy callers use `mycormarl.actions.rate_action`.
 
+### Finite-horizon PPO return
+
+The undiscounted sum of rewards up to a declared administrative episode
+boundary. Its terminal transition has zero continuation value: an
+administrative truncation is a return boundary in this experiment, rather than
+a bootstrap into the reset episode. This is distinct from the existing
+time-limit-bootstrap behaviour used for continuing tasks.
+
 ### Transition
 
 A stable, typed JAX PyTree produced by `BaseMycorMarl` for one agent during a
