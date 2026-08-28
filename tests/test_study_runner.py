@@ -387,6 +387,8 @@ def test_checked_in_historical_trade_only_manifest_is_executable_protocol():
 
     study_module._validate_required_declarations(manifest)
 
+    assert manifest["model"]["environment"]["soil_radius_cm"] == 40.0
+
 
 def test_reduced_phase_1_fixture_uses_the_pilot_matrix_path(tmp_path):
     """A reduced fixture retains the Phase 1 qualification and matrix contract."""

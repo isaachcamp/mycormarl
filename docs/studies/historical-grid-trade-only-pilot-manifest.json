@@ -4,7 +4,7 @@
   "pilot_fixture": false,
   "model": {
     "environment": {
-      "soil_radius_cm": 20.0,
+      "soil_radius_cm": 40.0,
       "soil_depth_cm": 60.0,
       "radial_interval_cm": 0.1,
       "depth_interval_cm": 0.1
