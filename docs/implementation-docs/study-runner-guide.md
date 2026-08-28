@@ -64,6 +64,15 @@ run_study("docs/studies/historical-grid-trade-only-pilot-manifest.json",
 The runtime override affects scheduling only, not the manifest, result
 identity, seeds, or scientific provenance.
 
+Every checkpoint evaluation also atomically replaces the condition's
+`training-returns.png` figure. It plots the PPO mean rollout return for each
+agent against PPO update number, giving a current learning-curve view without
+accumulating one image per checkpoint. The completed result-bundle entry
+records this figure path in `training_return_figure`. The paired
+`training-entropy.png` and `training-kl.png` plots expose each agent's latent
+policy entropy and approximate KL divergence on the same update axis; their
+paths are recorded in `training_diagnostic_figures`.
+
 ## Single-condition training
 
 Set `stage` to `single-condition-training` and declare one value on each of

@@ -300,6 +300,12 @@ def test_historical_trade_only_fixture_emits_a_standard_provenance_bundle(tmp_pa
         tmp_path / "outputs" / "historical-grid-trade-only" / "conditions"
         / "mixed-p0.3-seed7" / "checkpoints" / "checkpoint-00000001.msgpack"
     )
+    figure = (
+        tmp_path / "outputs" / "historical-grid-trade-only" / "conditions"
+        / "mixed-p0.3-seed7" / "training-returns.png"
+    )
+    entropy_figure = figure.with_name("training-entropy.png")
+    kl_figure = figure.with_name("training-kl.png")
     payload = serialization.msgpack_restore(checkpoint.read_bytes())
 
     assert bundle["completion"] == {"completed": 2, "requested": 2}
@@ -309,6 +315,16 @@ def test_historical_trade_only_fixture_emits_a_standard_provenance_bundle(tmp_pa
     }
     assert payload["metadata"]["actor_configuration"]["trade_only"] is True
     assert payload["metadata"]["policy_context"] == manifest["policy"]
+    assert figure.is_file()
+    assert entropy_figure.is_file()
+    assert kl_figure.is_file()
+    assert bundle["entries"][0]["training_return_figure"].endswith(
+        "training-returns.png"
+    )
+    assert bundle["entries"][0]["training_diagnostic_figures"] == {
+        "approx_kl": "conditions/mixed-p0.3-seed7/training-kl.png",
+        "latent_entropy": "conditions/mixed-p0.3-seed7/training-entropy.png",
+    }
 
 
 def test_comparison_worker_override_is_runtime_only(tmp_path, monkeypatch):
@@ -330,6 +346,32 @@ def test_comparison_worker_override_is_runtime_only(tmp_path, monkeypatch):
 
     assert captured["workers"] == 2
     assert captured["manifest"]["training"].get("parallel_workers") is None
+
+
+def test_training_diagnostic_figures_replace_the_previous_checkpoint_view(tmp_path):
+    """A condition retains one current learning-curve view for each diagnostic."""
+    figure = tmp_path / "condition" / "training-returns.png"
+    first_history = [{
+        "update": 1, "returns": {"plant": 0.1, "fungus": 0.2},
+        "latent_entropy": {"plant": 0.3, "fungus": 0.4},
+        "approx_kl": {"plant": 0.01, "fungus": 0.02},
+    }]
+    second_history = [
+        *first_history,
+        {"update": 2, "returns": {"plant": 0.3, "fungus": 0.4},
+         "latent_entropy": {"plant": 0.5, "fungus": 0.6},
+         "approx_kl": {"plant": 0.03, "fungus": 0.04}},
+    ]
+
+    study_module._write_training_diagnostic_figures(first_history, figure.parent)
+    first_bytes = figure.read_bytes()
+    study_module._write_training_diagnostic_figures(second_history, figure.parent)
+
+    assert figure.is_file()
+    assert figure.read_bytes() != first_bytes
+    assert list(figure.parent.glob("training-returns*")) == [figure]
+    assert (figure.parent / "training-entropy.png").is_file()
+    assert (figure.parent / "training-kl.png").is_file()
 
 
 @pytest.mark.parametrize("workers", [0, -1, True, 1.5])

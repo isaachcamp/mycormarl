@@ -13,6 +13,7 @@ from pathlib import Path
 import platform
 import re
 import subprocess
+import threading
 from typing import Any
 
 import jax
@@ -63,6 +64,7 @@ _REQUIRED_MANIFEST_FIELDS = (
     "evaluation",
     "output",
 )
+_FIGURE_WRITE_LOCK = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -1119,6 +1121,67 @@ def _training_diagnostics(chunks: list[dict[str, Any]]) -> dict[str, dict[str, f
     return diagnostics
 
 
+def _write_training_diagnostic_figure(
+    history: list[dict[str, Any]],
+    path: Path,
+    *,
+    metric: str,
+    title: str,
+    y_label: str,
+) -> None:
+    """Atomically replace one rolling PPO diagnostic figure."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+
+    updates = [point["update"] for point in history]
+    with _FIGURE_WRITE_LOCK:
+        figure = Figure(figsize=(7, 4), constrained_layout=True)
+        FigureCanvasAgg(figure)
+        axis = figure.subplots()
+        for agent, color in (("plant", "#2a9d8f"), ("fungus", "#7b2cbf")):
+            values = [point.get(metric, {}).get(agent) for point in history]
+            available = [
+                (update, value) for update, value in zip(updates, values, strict=True)
+                if value is not None
+            ]
+            if available:
+                x_values, y_values = zip(*available, strict=True)
+                axis.plot(x_values, y_values, marker="o", linewidth=1.5,
+                          markersize=3, label=agent, color=color)
+        axis.set(
+            title=title,
+            xlabel="Training update",
+            ylabel=y_label,
+        )
+        axis.grid(alpha=0.25)
+        axis.legend()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = path.with_suffix(path.suffix + ".tmp")
+        figure.savefig(temporary_path, format="png", dpi=160)
+        temporary_path.replace(path)
+
+
+def _write_training_diagnostic_figures(
+    history: list[dict[str, Any]], path: Path,
+) -> None:
+    """Replace the three complementary learning-curve diagnostics."""
+    _write_training_diagnostic_figure(
+        history, path / "training-returns.png",
+        metric="returns", title="PPO rollout return during training",
+        y_label="Mean rollout return",
+    )
+    _write_training_diagnostic_figure(
+        history, path / "training-entropy.png",
+        metric="latent_entropy", title="PPO latent policy entropy during training",
+        y_label="Mean latent entropy",
+    )
+    _write_training_diagnostic_figure(
+        history, path / "training-kl.png",
+        metric="approx_kl", title="PPO approximate KL during training",
+        y_label="Mean approximate KL",
+    )
+
+
 def _checkpoint_bytes(metadata: dict[str, Any], runner_state: Any) -> bytes:
     return serialization.msgpack_serialize({
         "format": TRAINING_CHECKPOINT_FORMAT,
@@ -1294,6 +1357,7 @@ def _run_condition_training(
     transitions = 0
     checkpoints = []
     training_metric_chunks = []
+    training_return_history = []
     stopping_decision = None
     while transitions < training["maximum_transition_budget"]:
         config = _training_config(manifest, update_size)
@@ -1303,6 +1367,21 @@ def _run_condition_training(
         state = trained["runner_state"]
         training_metric_chunks.append(trained["metrics"])
         transitions += update_size
+        training_return_history.append({
+            "update": transitions // update_size,
+            "returns": {
+                agent: float(jnp.mean(trained["metrics"][agent].raw_return_mean))
+                for agent in ("plant", "fungus")
+            },
+            "latent_entropy": {
+                agent: float(jnp.mean(trained["metrics"][agent].latent_entropy))
+                for agent in ("plant", "fungus")
+            },
+            "approx_kl": {
+                agent: float(jnp.mean(trained["metrics"][agent].approx_kl))
+                for agent in ("plant", "fungus")
+            },
+        })
         if transitions % training["checkpoint_interval_timesteps"]:
             continue
         metadata = _checkpoint_metadata(
@@ -1334,6 +1413,9 @@ def _run_condition_training(
             "metrics": evaluation_summary,
             "training_diagnostics": training_diagnostics,
         })
+        _write_training_diagnostic_figures(
+            training_return_history, condition_dir,
+        )
         training_metric_chunks = []
         stopping_decision = _stopping_decision(
             checkpoints, training, mode, trade_only=config.TRADE_ONLY,
@@ -1365,6 +1447,18 @@ def _run_condition_training(
         "random_streams": streams.to_dict(),
         "evaluation": {"protocol": manifest["evaluation"]["protocol"], "episodes": manifest["evaluation"]["episodes"]},
         "evaluation_artifacts": [checkpoint["evaluation"] for checkpoint in checkpoints],
+        "training_return_history": training_return_history,
+        "training_return_figure": str(
+            (condition_dir / "training-returns.png").relative_to(output_dir)
+        ),
+        "training_diagnostic_figures": {
+            "latent_entropy": str(
+                (condition_dir / "training-entropy.png").relative_to(output_dir)
+            ),
+            "approx_kl": str(
+                (condition_dir / "training-kl.png").relative_to(output_dir)
+            ),
+        },
         "stopping_decision": stopping_decision,
         "stopping_checkpoints": checkpoints,
     }
@@ -1506,6 +1600,10 @@ def _run_single_condition_training(
     env = _training_environment(manifest, mode, p_level)
     update_size = manifest["training"].get("num_steps", 1) * manifest["training"].get("num_envs", 1)
     completed = 0 if existing is None else existing["entries"][0].get("transitions", 0)
+    training_return_history = (
+        [] if existing is None
+        else list(existing["entries"][0].get("training_return_history", []))
+    )
     initial_state = None
     if completed:
         checkpoint_path = output_dir / existing["entries"][0]["checkpoint"]
@@ -1536,6 +1634,21 @@ def _run_single_condition_training(
         trained = jax.jit(make_train(env, config, streams, state))(jax.random.PRNGKey(seed))
         state = trained["runner_state"]
         transitions += update_size
+        training_return_history.append({
+            "update": transitions // update_size,
+            "returns": {
+                agent: float(jnp.mean(trained["metrics"][agent].raw_return_mean))
+                for agent in ("plant", "fungus")
+            },
+            "latent_entropy": {
+                agent: float(jnp.mean(trained["metrics"][agent].latent_entropy))
+                for agent in ("plant", "fungus")
+            },
+            "approx_kl": {
+                agent: float(jnp.mean(trained["metrics"][agent].approx_kl))
+                for agent in ("plant", "fungus")
+            },
+        })
         intermediate_metadata = _checkpoint_metadata(
             manifest, config, mode=mode, p_level=p_level, seed=seed,
             transitions=transitions,
@@ -1554,6 +1667,9 @@ def _run_single_condition_training(
             output_dir / f"evaluations/checkpoint-{transitions:08d}.json",
             evaluation,
             checkpoint=intermediate_path,
+        )
+        _write_training_diagnostic_figures(
+            training_return_history, output_dir,
         )
     checkpoint_name = f"checkpoints/checkpoint-{transitions:08d}.msgpack"
     checkpoint_path = output_dir / checkpoint_name
@@ -1586,6 +1702,12 @@ def _run_single_condition_training(
             f"evaluations/checkpoint-{checkpoint_step:08d}.json"
             for checkpoint_step in range(update_size, transitions + 1, update_size)
         ],
+        "training_return_history": training_return_history,
+        "training_return_figure": "training-returns.png",
+        "training_diagnostic_figures": {
+            "latent_entropy": "training-entropy.png",
+            "approx_kl": "training-kl.png",
+        },
     }
     bundle = {
         "format": TRAINING_CHECKPOINT_FORMAT,
