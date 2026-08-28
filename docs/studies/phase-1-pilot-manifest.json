@@ -24,15 +24,16 @@
   },
   "horizon": {
     "days": 120.0,
-    "timestep_days": 0.025
+    "timestep_days": 0.025,
+    "decision_interval_days": 0.25
   },
   "modes": ["mixed", "plant-only"],
   "initial_p_micromolar": [0.1, 0.3, 1.0, 3.0],
   "seeds": [0, 1, 2, 3, 4],
   "training": {
     "minimum_transition_budget": 49152,
-    "maximum_transition_budget": 196608,
-    "checkpoint_interval_timesteps": 12288,
+    "maximum_transition_budget": 239616,
+    "checkpoint_interval_timesteps": 6144,
     "num_steps": 128,
     "num_envs": 16,
     "parallel_workers": 4,

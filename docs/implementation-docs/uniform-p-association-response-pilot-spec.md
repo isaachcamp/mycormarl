@@ -63,12 +63,17 @@ epsilon denominator, if mean `plant-only` biomass is zero.
 - Initial solution-P grid: `0.1`, `0.3`, `1.0`, and `3.0 µM`.
 - Uniformity: homogeneous concentration within the configured P-bearing region
   at reset; normal finite-inventory diffusion, depletion, and uptake afterward.
-- Horizon: 120 days, or 4,800 transitions at `dt = 0.025 day`.
+- Horizon: 120 days at `dt = 0.025 day`, with one policy decision every
+  `0.25 day` (10 numerical substeps): 480 policy transitions per episode.
 - Day 120 is administrative truncation, not biological death.
 - Continue after one partner dies while the other remains operational; stop
   early only if both organisms are dead.
 - Training replication: five independent master seed IDs per P level and mode,
   giving 40 initial runs.
+- Maximum training budget: 239,616 policy transitions per condition, equal to
+  499.2 120-day episode-equivalents at the declared policy interval. This is
+  the closest lower whole number of the declared 2,048-transition PPO updates
+  to the 240,000-transition target.
 - Train every policy from scratch at its fixed P level; do not train one
   P-generalist policy in this phase.
 

@@ -369,14 +369,11 @@ def _validate_required_declarations(manifest: Any) -> None:
             manifest["modes"] != ["mixed", "plant-only"]
             or manifest["initial_p_micromolar"] != [0.1, 0.3, 1.0, 3.0]
             or len(manifest["seeds"]) != 5
-            or manifest["horizon"] not in (
-                {"days": 120.0, "timestep_days": 0.025},
-                {
-                    "days": 120.0,
-                    "timestep_days": 0.025,
-                    "decision_interval_days": 0.025,
-                },
-            )
+            or manifest["horizon"] != {
+                "days": 120.0,
+                "timestep_days": 0.025,
+                "decision_interval_days": 0.25,
+            }
         ):
             raise ValueError(
                 "Phase 1 pilot requires the fixed 40-run range-finding design"

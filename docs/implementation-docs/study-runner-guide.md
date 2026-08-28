@@ -19,8 +19,9 @@ checkpoints.
 `phase-1-pilot` runs through the comparison-block training path but makes the
 scientific range-finding design explicit. A non-fixture manifest must declare
 exactly `mixed` and `plant-only`, P levels `0.1`, `0.3`, `1.0`, and `3.0` µM,
-five unique master seed IDs, and a 120-day horizon at `dt = 0.025 day`; this
-produces 40 conditions. `pilot_fixture: true` permits reduced automated
+five unique master seed IDs, and a 120-day horizon with `dt = 0.025 day` and
+a `0.25 day` policy-decision interval; this produces 40 conditions.
+`pilot_fixture: true` permits reduced automated
 fixtures while preserving the same qualification and matrix path.
 
 Before any condition starts, the manifest must name JSON artifacts for the

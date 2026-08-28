@@ -197,6 +197,42 @@ def test_scientific_phase_1_manifest_fixes_the_range_finding_design(tmp_path):
     assert not (tmp_path / "outputs").exists()
 
 
+def test_scientific_phase_1_manifest_pins_the_quarter_day_policy_interval(tmp_path):
+    """The named pilot cannot silently change its policy-action clock."""
+    manifest = _pilot_manifest(tmp_path, fixture=False)
+    manifest["initial_p_micromolar"] = [0.1, 0.3, 1.0, 3.0]
+    manifest["seeds"] = [11, 12, 13, 14, 15]
+    manifest["horizon"] = {
+        "days": 120.0,
+        "timestep_days": 0.025,
+        "decision_interval_days": 0.25,
+    }
+    manifest["training"] = {
+        "minimum_transition_budget": 49152,
+        "maximum_transition_budget": 239616,
+        "checkpoint_interval_timesteps": 6144,
+        "num_steps": 128,
+        "num_envs": 16,
+        "update_epochs": 4,
+        "num_minibatches": 8,
+        "parallel_workers": 4,
+        "stopping": {
+            "evaluation_window_checkpoints": 3,
+            "plateau_tolerances": {
+                "fitness_absolute_floor": 0.0001,
+                "fitness_relative": 0.2,
+                "action_absolute": 0.01,
+            },
+        },
+    }
+
+    study_module._validate_required_declarations(manifest)
+    manifest["horizon"]["decision_interval_days"] = 0.025
+
+    with pytest.raises(ValueError, match="Phase 1 pilot"):
+        study_module._validate_required_declarations(manifest)
+
+
 def test_phase_1_training_environment_uses_the_declared_depth_profile(tmp_path):
     """The qualified soil profile reaches PPO rather than only static controls."""
     manifest = _pilot_manifest(tmp_path)
