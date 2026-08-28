@@ -4,6 +4,7 @@ import jax
 from flax import serialization
 from flax.core import freeze, unfreeze
 
+import mycormarl.checkpoint_evaluation as checkpoint_evaluation_module
 from mycormarl.algos.ppo import ActorCritic
 from mycormarl.checkpoint_evaluation import (
     LatentLocationEvaluation,
@@ -161,6 +162,15 @@ def test_checkpoint_evaluation_reconstructs_the_saved_actor_activation(tmp_path)
     actual = evaluate_checkpoint(checkpoint, environment, episodes=1, seed=8)
 
     assert actual == expected
+
+
+def test_checkpoint_evaluation_reconstructs_the_saved_trade_only_actor():
+    """Scalar trade checkpoints must not be evaluated as full allocation actors."""
+    actor = checkpoint_evaluation_module._actor_from_checkpoint_metadata({
+        "actor_configuration": {"activation": "tanh", "trade_only": True},
+    })
+
+    assert actor.trade_only is True
 
 
 def test_checkpoint_summary_artifact_includes_final_biomass_for_post_analysis(tmp_path):

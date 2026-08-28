@@ -70,7 +70,10 @@ def _actor_from_checkpoint_metadata(metadata: Mapping[str, Any]) -> ActorCritic:
     activation = configuration.get("activation")
     if activation not in {"relu", "tanh"}:
         raise ValueError("training checkpoint actor activation is unsupported")
-    return ActorCritic(activation=activation)
+    trade_only = configuration.get("trade_only", False)
+    if not isinstance(trade_only, bool):
+        raise ValueError("training checkpoint trade-only actor setting is invalid")
+    return ActorCritic(activation=activation, trade_only=trade_only)
 
 
 def _plain(value: Any) -> Any:
