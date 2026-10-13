@@ -364,6 +364,24 @@ def evaluate_policy_parameters(
                     for agent in (PLANT, FUNGUS)
                 },
                 "reproductive_fitness": _plain(rewards),
+                # Store the resource terms in the same biomass-equivalent
+                # units used by the Cobb--Douglas reward.  This makes the
+                # reported fitness independently decomposable.
+                "reproductive_resources": {
+                    agent: {
+                        "carbon": _scalar(infos[agent]["reproduction_c"])
+                        / getattr(environment.species, agent).gamma_c,
+                        "phosphorus": _scalar(infos[agent]["reproduction_p"])
+                        / getattr(environment.species, agent).gamma_p,
+                    }
+                    for agent in (PLANT, FUNGUS)
+                },
+                "reproductive_fitness_from_components": {
+                    agent: _scalar(
+                        infos[agent]["reproductive_fitness_from_components"]
+                    )
+                    for agent in (PLANT, FUNGUS)
+                },
                 "gross_growth": {agent: _scalar(infos[agent]["growth"]) for agent in (PLANT, FUNGUS)},
                 "interval_rgr_per_day": {
                     agent: _relative_growth_rate(

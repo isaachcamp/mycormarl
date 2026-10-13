@@ -75,7 +75,7 @@ class PolicyIntervalMycorMarl(MultiAgentEnv):
             }
             return (key, state, rewards, trade_executed), (observations, dones, infos)
 
-        (_, state, rewards, trade_executed), (observations, dones, infos) = jax.lax.scan(
+        (_, state, rewards, trade_executed), (observations, dones, infos_history) = jax.lax.scan(
             numerical_substep,
             (key, state, {PLANT: jnp.asarray(0.0), FUNGUS: jnp.asarray(0.0)},
              {PLANT: jnp.asarray(False), FUNGUS: jnp.asarray(False)}),
@@ -84,7 +84,30 @@ class PolicyIntervalMycorMarl(MultiAgentEnv):
         )
         observations = jax.tree.map(lambda values: values[-1], observations)
         dones = jax.tree.map(lambda values: values[-1], dones)
-        infos = jax.tree.map(lambda values: values[-1], infos)
+        infos = jax.tree.map(lambda values: values[-1], infos_history)
+        # The reward is accumulated over every numerical substep.  Preserve
+        # the same accounting convention for flow-like diagnostics rather
+        # than silently retaining only the final substep's values.
+        for agent in AGENTS:
+            for field in (
+                "reproduction_c", "reproduction_p", "direct_p_uptake_mg",
+                "trade_in", "trade_out", "proposed_trade_out", "growth",
+            ):
+                infos[agent][field] = jnp.sum(infos_history[agent][field], axis=0)
+            if agent == PLANT:
+                infos[agent]["carbon_fixed"] = jnp.sum(
+                    infos_history[agent]["carbon_fixed"], axis=0
+                )
+            alpha = self.config.alpha
+            c = infos_history[agent]["reproduction_c"] / getattr(
+                self.species, agent
+            ).gamma_c
+            p = infos_history[agent]["reproduction_p"] / getattr(
+                self.species, agent
+            ).gamma_p
+            infos[agent]["reproductive_fitness_from_components"] = jnp.sum(
+                (c ** alpha) * (p ** (1.0 - alpha)), axis=0
+            )
         for agent, active in ((PLANT, self.numerical_environment.plant_active), (FUNGUS, self.numerical_environment.fungus_active)):
             start = jnp.logical_and(active, ~getattr(initial_state, f"{agent}_dead")).squeeze()
             end = jnp.logical_and(active, ~getattr(state, f"{agent}_dead")).squeeze()
