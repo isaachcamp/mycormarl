@@ -174,9 +174,15 @@ Analytical limits, bounded surface concentration, and JIT compatibility are
 tested in [`test_sparse_phosphate_uptake.py`](../tests/test_sparse_phosphate_uptake.py#L28-L206).
 
 A depletion zone here means a region whose solution P is lower than the
-far-field value; it need not be totally depleted. `T_ref=1 day` is a provisional
-static exposure scale for this first model, not root/hyphal lifetime and not a
-numerical timestep.
+far-field value; it need not be totally depleted. We set the provisional
+reference density $\lambda_{ref}$ away from the default root and hyphal
+densities, where the time-independent blend is negligibly different from a
+blend using a dynamic depletion timescale. The largest divergence between the
+time-dependent and time-independent schemes occurs near
+$\lambda\approx\lambda_{ref}$. At $\lambda=1{,}000\;\mathrm{cm\;cm^{-3}}$,
+the default soil parameters give $t_{diff}\approx0.90$ day; we rounded this to
+`T_ref=1 day`. This is a provisional static exposure scale for this first
+model, not root/hyphal lifetime and not a numerical timestep.
 
 ## Sparse-to-continuous transition
 

@@ -158,26 +158,121 @@ mortality and reproduction are explicit exports from the represented system.
 
 ## Assumptions and limitations
 
-- **Assumption:** The geometry is axisymmetric and does not represent explicit
-  branching topology or angular heterogeneity.
-- **Assumption:** Mycelium grows as saturated hemisphere.
-- **Assumption:** Plant roots grow as stacked discs with uniform root density,
-  and follow exponential depth distribution.
-- **Assumption:** Root and fungal geometry is held fixed across all numerical
-  soil substeps within one biological step.
-- **Assumption:** Newly acquired P is delayed until the next allocation, while
-  newly realised biomass changes uptake geometry immediately.
-- **Limitation:** Every represented root or hyphal segment remains active
-  indefinitely; tissue age, turnover, and growth-front-only absorption are not
+### Soil
+
+- **Assumption:** The soil is represented by an axisymmetric cylindrical
+  domain; radial and angular heterogeneity are not represented.
+- **Assumption:** Only finite labile inorganic P is modelled. Organic P,
+  occluded P, mineralisation, immobilisation, weathering, and fertiliser input
+  are omitted.
+- **Assumption:** Labile P is related to solution concentration by an
+  instantaneous linear buffer. Sorption/desorption kinetics and nonlinear
+  buffering are omitted.
+- **Assumption:** Soil water content, buffer power, diffusion coefficient,
+  impedance, and uptake parameters are spatially and temporally constant.
+- **Assumption:** P moves through soil only by diffusion, with no convective
+  transport or preferential flow.
+- **Assumption:** The top, bottom, outer radial, and symmetry-axis boundaries
+  are closed to P. There is no leaching or external P renewal.
+- **Assumption:** Grid cells are homogenised; sub-cell depletion around roots
+  and hyphae is represented only by the sparse and continuous uptake closures.
+- **Assumption:** Roots and fungi compete for the same local P inventory, and
+  cellwise uptake cannot exceed that inventory.
+- **Limitation:** Soil properties are not altered by roots, hyphae, exudates,
+  microbial activity, pH, or depletion history.
+
+### Fungus
+
+- **Assumption:** Fungal biomass is represented as living, extraradical,
+  uptake-active hyphae. Spores, vesicles, arbuscules, and intraradical
+  mycelium are omitted from the geometry.
+- **Assumption:** Mycelium grows as a centred, isotropic saturated hemisphere.
+  Explicit branching, network topology, anastomosis, gaps, and directional
+  growth are not represented.
+- **Assumption:** Hyphal radius, tissue density, structural C:P stoichiometry,
+  and uptake parameters are constant.
+- **Assumption:** Hyphal density is independent of fungal age, C status, P
+  status, plant signalling, and local soil conditions.
+- **Limitation:** Existing hyphae remain active indefinitely unless the fungal
+  organism dies; local senescence, turnover, fragmentation, and abandoned
+  territory are not represented.
+- **Limitation:** Fungal biomass is converted directly to hyphal length,
+  without a construction delay or a distinction between structural and
+  metabolically active biomass.
+- **Limitation:** Fungal mortality is represented as an organism-level event,
+  rather than spatially or tissue-specific mortality.
+
+### Plant
+
+- **Assumption:** All represented fine-root length is living, uniformly
+  distributed within each disc, and equally active for P uptake.
+- **Assumption:** Root length is a static allometric conversion from whole-
+  plant biomass and follows the prescribed depth profile throughout plant
+  development.
+- **Limitation:** Root age, turnover, senescence, damage, branching
+  topology, root hairs, and local physiological differences are not
   represented.
-- **Limitation:** Mortality P leaves the system and reproduction P is exported;
-  there is no litter, mineralisation, or recycling pool.
-- **Limitation:** Plant and fungal `kappa_p` are represented as irreversible
-  free-P losses rather than recyclable biological or soil pools. The plant
-  value is a deliberately small abstraction for herbivory, leakage, and
-  unrecovered turnover; experiments record minimal irrecoverable loss in
-  carrot and do not directly estimate this coefficient. Structural P is
-  represented separately by `gamma_p`.
+- **Limitation:** Roots outside the simulated soil domain remain included in
+  whole-plant biomass and maintenance costs but cannot contribute to uptake.
+- **Assumption:** Plant biomass compartments, structural C:P composition,
+  root allocation, and allometry are fixed.
+- **Assumption:** Photosynthetic carbon input is proportional to leaf biomass
+  and constant per unit leaf biomass.
+- **Limitation:** Irradiance, photoperiod, temperature, CO2, water status,
+  leaf age, P status, and canopy development do not affect photosynthesis.
+- **Limitation:** Carbon fixation is an external input; atmospheric CO2 and
+  carbon supply are not finite state variables.
+- **Limitation:** Biosynthetic or growth-respiration costs are not represented
+  separately from structural carbon requirements.
+- **Assumption:** The plant biomass cap is a fixed numerical/genetic limit,
+  not an emergent physiological carrying capacity.
+
+### Growth, storage, and mortality
+
+- **Assumption:** C and P are essential resources with fixed stoichiometric
+  requirements. Luxury P uptake, resource substitution, remobilisation, and
+  internal recycling are omitted.
+- **Assumption:** Maintenance is paid before trade, growth, reproduction, and
+  storage; a maintenance deficit is converted immediately into biomass loss
+  according to the more severe resource deficit.
+- **Limitation:** Structural P lost through mortality is exported or discarded
+  rather than returned to soil.
+- **Assumption:** Reproduction is an instantaneous resource export and reward,
+  not offspring production with establishment, survival, or demographic
+  feedback.
+- **Assumption:** Storage means retention in a free resource pool, not a
+  distinct reserve tissue or compartment.
+- **Assumption:** Newly acquired resources cannot finance growth in the same
+  timestep, while newly realised biomass changes uptake geometry immediately.
+- **Limitation:** Age structure, lifespan, dormancy, developmental stage, and
+  seasonal phenology are not represented.
+- **Limitation:** Plant and fungal `kappa_p` are irreversible free-P losses
+  rather than recyclable biological or soil pools. The plant value is a
+  deliberately small abstraction for herbivory, leakage, and unrecovered
+  turnover; experiments record minimal irrecoverable loss in carrot and do not
+  directly estimate this coefficient. Structural P is represented separately
+  by `gamma_p`.
+
+### Plant-fungal interaction and agent objective
+
+- **Assumption:** The symbiosis is pre-established. Colonisation, recognition,
+  infection, arbuscule formation, compatibility, and initiation costs are
+  omitted.
+- **Assumption:** Trade is represented as direct resource transfer, with no
+  explicit transport delay, exchange-interface capacity, or spatial separation
+  between plant and fungus.
+- **Assumption:** Trade does not require a minimum local contact or
+  colonisation threshold beyond both organisms being operational.
+- **Limitation:** Conflict over exchange rates, sanctions, cheating, and
+  partner choice are represented only indirectly through learned policies.
+- **Assumption:** Reproductive reward is an adequate proxy for evolutionary
+  success. Policies optimise expected cumulative reward over a finite episode,
+  rather than lifetime reproductive value, geometric-mean fitness, or
+  long-run population persistence.
+- **Interpretation:** A learned policy is a behavioural strategy produced by
+  optimisation, not evidence of a globally optimal strategy or an
+  evolutionarily stable equilibrium.
+
 - **Interpretation:** The shared grid is a coupling abstraction, not a claim
   that root and fungal architectures are physically continuous at all scales.
 
