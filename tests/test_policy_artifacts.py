@@ -130,6 +130,7 @@ def test_training_cli_selects_consumer_mode_and_writes_versioned_policy(tmp_path
             "2",
             "--num-envs",
             "1",
+            "--finite-horizon-returns",
             "--mode",
             "plant-only",
             "--output",

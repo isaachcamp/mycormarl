@@ -33,6 +33,10 @@ def main() -> None:
     parser.add_argument(
         "--output", type=Path, default=Path("outputs/ppo_parameters.msgpack")
     )
+    parser.add_argument(
+        "--finite-horizon-returns", action="store_true",
+        help="Treat the declared episode horizon as the PPO return boundary.",
+    )
     args = parser.parse_args()
     config = EnvConfig(
         max_steps=args.num_steps,
@@ -51,6 +55,7 @@ def main() -> None:
         NUM_ENVS=args.num_envs,
         NUM_MINIBATCHES=1,
         UPDATE_EPOCHS=1,
+        FINITE_HORIZON_RETURNS=args.finite_horizon_returns,
     )
     random_streams = derive_random_streams(args.seed)
     output = jax.jit(make_train(env, ppo, random_streams))(jax.random.PRNGKey(args.seed))

@@ -10,7 +10,7 @@ import jax.numpy as jnp
 import pytest
 
 from mycormarl.actions import rate_action as physical_action
-from mycormarl.algos.ppo import make_train
+from mycormarl.algos.ppo import PPOConfig, make_train
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
@@ -121,7 +121,7 @@ def test_absorbing_death_removes_real_root_geometry_and_uptake():
 def test_ppo_stack_accepts_current_agent_identifiers():
     """A minimal PPO update uses the environment's plant/fungus keys."""
     env = BaseMycorMarl(_small_config(), _species())
-    cfg = SimpleNamespace(
+    cfg = PPOConfig(
         TOTAL_TIMESTEPS=2,
         NUM_STEPS=2,
         NUM_ENVS=1,

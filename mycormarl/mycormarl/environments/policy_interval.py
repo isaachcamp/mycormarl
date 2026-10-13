@@ -9,13 +9,14 @@ import chex
 import jax
 import jax.numpy as jnp
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
+from mycormarl.environments.autoreset import AutoResetMixin
 
 from mycormarl.environments.base_mycor import AGENTS, FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.state import State
 from mycormarl.transition import Transition
 
 
-class PolicyIntervalMycorMarl(MultiAgentEnv):
+class PolicyIntervalMycorMarl(AutoResetMixin, MultiAgentEnv):
     """Hold one policy decision across integral numerical timesteps.
 
     ``BaseMycorMarl`` remains the numerical environment. This wrapper is the

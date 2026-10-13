@@ -7,6 +7,7 @@ from enum import IntEnum
 
 import chex
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
+from mycormarl.environments.autoreset import AutoResetMixin
 from jaxmarl.environments.spaces import Box
 import jax
 import jax.numpy as jnp
@@ -50,7 +51,7 @@ class Actions(IntEnum):
     storage = 3
 
 
-class BaseMycorMarl(MultiAgentEnv):
+class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
     def __init__(
         self,
         config: Optional[EnvConfig] = None,
@@ -727,6 +728,7 @@ class BaseMycorMarl(MultiAgentEnv):
             "growth_p_used": growth_p_used,
             "reproduction_c": reproduction_c,
             "reproduction_p": reproduction_p,
+            "reproductive_fitness_from_components": reward,
         }
         return {
             "growth": growth,

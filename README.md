@@ -41,7 +41,7 @@ Run a small reproducible PPO development job and save a versioned bundle with
 both policy parameter trees:
 
 ```bash
-uv run python scripts/train_ppo.py \
+uv run python scripts/train_ppo.py --finite-horizon-returns \
   --mode mixed --total-timesteps 256 --num-steps 128 --num-envs 1 --seed 42
 ```
 
