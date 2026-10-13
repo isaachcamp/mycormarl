@@ -136,6 +136,23 @@ The diagnostic's global time coordinate is not colony propagation, organism
 age, or a production-model approximation for the ages of roots and hyphae.
 Using cohort age in the full model is a separate modelling problem.
 
+### Time-dependent finite-inventory hyphal-density sweep
+
+An isolated, single-cell closure diagnostic that holds one fungal absorber
+fixed, sweeps hyphal length density, advances the global diagnostic clock for
+30 days, and deducts accepted phosphate uptake from a finite reservoir. The
+elapsed clock controls the existing depletion-gradient resistance and
+sparse/continuous blend. It reports both absolute P uptake and P uptake per
+structural hyphal construction carbon. It is not a production-model spatial
+simulation and does not include diffusion from neighbouring cells.
+
+### Structural hyphal construction carbon
+
+The carbon physically represented by the fixed hyphal cylinder in the
+diagnostic: represented hyphal length times cylindrical cross-sectional area
+times fungal hyphal tissue carbon density. It excludes carbon-use-efficiency
+losses, maintenance, host transfer, and whole-fungus budgets.
+
 ### Cumulative reproductive fitness
 
 The time-sum of an organism's per-transition Cobb–Douglas reproduction reward
