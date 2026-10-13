@@ -55,13 +55,13 @@ def plot(records: list[dict[str, float]], output: Path) -> None:
     plant_only = [record["plant_only"] for record in records]
 
     fig, (delta_axis, biomass_axis) = plt.subplots(
-        2, 1, figsize=(7.2, 7.2), sharex=True, constrained_layout=True,
+        1, 2, figsize=(14.4, 4.8), sharex=True, constrained_layout=True,
     )
     delta_axis.axhline(1, color="#555555", linewidth=0.8, zorder=0)
     delta_axis.scatter(p, delta_am, color="#2878b5", s=54, zorder=2)
     delta_axis.plot(p, delta_am, color="#2878b5", linewidth=1.1, zorder=1)
-    delta_axis.set_ylabel(r"$\Delta_{AM}$ (mixed / plant-only)")
-    delta_axis.set_title("Static controls: mycorrhizal plant biomass ratio")
+    delta_axis.set_xlabel("Initial solution P (µM)")
+    delta_axis.set_ylabel("Mycorrhizal dependency")
     delta_axis.grid(axis="y", color="#dddddd", linewidth=0.6)
 
     biomass_axis.scatter(p, mixed, color="#2878b5", marker="o", s=54, label="Mixed")
@@ -76,7 +76,6 @@ def plot(records: list[dict[str, float]], output: Path) -> None:
     biomass_axis.tick_params(axis="x", which="minor", length=3)
     biomass_axis.set_xlabel("Initial solution P (µM)")
     biomass_axis.set_ylabel("Final plant biomass (g)")
-    biomass_axis.set_title("Final plant biomass")
     biomass_axis.grid(axis="y", color="#dddddd", linewidth=0.6)
     biomass_axis.legend(frameon=False)
 

@@ -491,8 +491,8 @@ def _plot_learned_seed_points(
 def plot_ippo(records: dict[str, dict[str, list[float]]], output: Path) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(11.0, 7.4), sharex="col", constrained_layout=True)
     endpoints = (
-        ("biomass", "Final living plant biomass (g)", "Plant biomass (g)"),
-        ("fitness", "Cumulative reproductive fitness", "Plant fitness"),
+        ("biomass", "Final living plant biomass (g)", "Mycorrhizal dependency – plant biomass"),
+        ("fitness", "Cumulative reproductive fitness", "Mycorrhizal dependency – plant fitness"),
     )
     for row, (metric, absolute_label, ratio_label) in enumerate(endpoints):
         p = records[metric]["p"]
@@ -512,11 +512,7 @@ def plot_ippo(records: dict[str, dict[str, list[float]]], output: Path) -> None:
             p, fixed_mixed_ratios, color=_GREEN, marker="^", edgecolor="white",
             linewidth=0.55, s=70, label="Fixed mixed trade control", zorder=4,
         )
-        ratio_axis.set_ylabel(rf"{ratio_label}\n$\Delta_{{AM}}$ (mixed / plant-only)")
-        ratio_axis.set_title(
-            r"$\Delta_{AM}$ ratio (IPPO median + IQR)" if row == 0 else "",
-            fontsize=14,
-        )
+        ratio_axis.set_ylabel(ratio_label)
 
         _plot_learned_seed_points(absolute_axis, p, learned)
         _plot_learned_medians(absolute_axis, p, learned)
@@ -535,17 +531,19 @@ def plot_ippo(records: dict[str, dict[str, list[float]]], output: Path) -> None:
             linewidth=0.55, s=70, label="Fixed mixed trade control", zorder=4,
         )
         absolute_axis.set_ylabel(absolute_label)
-        absolute_axis.set_title(
-            "Absolute (IPPO seeds + median/IQR; control)"
-            if row == 0 else "",
-            fontsize=14,
-        )
 
         for axis in (ratio_axis, absolute_axis):
             _format_p_axis(axis)
 
     for axis in axes[-1]:
         axis.set_xlabel("Initial solution P (µM)")
+    for axis, label in zip(axes.flat, ("a.", "b.", "c.", "d."), strict=True):
+        axis.text(
+            -0.14, 1.02, label,
+            transform=axis.transAxes,
+            ha="right", va="bottom",
+            fontsize=12, color="black",
+        )
     handles, labels = axes[0, 1].get_legend_handles_labels()
     axes[0, 1].legend(
         [Line2D([], [], color=_BLUE, marker="o", linestyle="-", markersize=6), *handles],
@@ -622,7 +620,7 @@ def plot_trade_fitness_legacy(records, baselines, rates, direction: str, output:
                              edgecolor="white", linewidth=0.55, s=66, zorder=4)
             axis.set_title(f"P = {p_level:g} µM — {label}")
             axis.set_xlabel(label)
-            axis.set_ylabel("Mean commanded trade rate (day⁻¹)")
+            axis.set_ylabel("Mean fraction of current pool per policy interval")
             axis.grid(color="#dddddd", linewidth=0.6); axis.set_axisbelow(True)
     # Baseline fitness values are attached by main after loading.
     from matplotlib.lines import Line2D
@@ -632,7 +630,7 @@ def plot_trade_fitness_legacy(records, baselines, rates, direction: str, output:
                 Line2D([], [], color="#555", marker="^", linestyle="None", markersize=7, label="Fixed mixed trade")]
     axes[0, 3].legend(handles=handles, loc="best", fontsize=8)
     direction_label = "Fungal → plant" if direction == "fungus_to_plant" else "Plant → fungal"
-    fig.suptitle(f"{direction_label} trade rate versus fitness, stratified by initial P\nAbsolute fitness; IPPO medians ± IQR; translucent points are individual seeds")
+    fig.suptitle(f"{direction_label} policy-interval pool fraction versus fitness, stratified by initial P\nAbsolute fitness; IPPO medians ± IQR; translucent points are individual seeds")
     fig.savefig(output, dpi=220); plt.close(fig)
 
 
@@ -663,7 +661,7 @@ def plot_overlay(records, baselines, rates, direction: str, output: Path) -> Non
         axis.set_title(f"Initial solution P = {p_level:g} µM")
         axis.set_xlabel("Plant fitness", color=plant_colour)
         direction_label = "Fungal → plant" if direction == "fungus_to_plant" else "Plant → fungus"
-        axis.set_ylabel(f"{direction_label}\nmean commanded trade rate (day⁻¹)")
+        axis.set_ylabel(f"{direction_label}\nmean fraction per policy interval")
         axis.tick_params(axis="x", colors=plant_colour)
         fungus_axis.set_xlabel("Fungal fitness", color=fungus_colour)
         fungus_axis.tick_params(axis="x", colors=fungus_colour)
@@ -713,7 +711,7 @@ def plot_fixed_reference_overlay(records, baselines, rates, direction: str, outp
                 )
         axis.set_title(f"Initial solution P = {p_level:g} µM")
         axis.set_xlabel("Plant fitness − fixed mixed", color=plant_colour)
-        axis.set_ylabel(f"{rate_label}\nmean commanded trade rate − fixed mixed (day⁻¹)")
+        axis.set_ylabel(f"{rate_label}\nmean policy-interval fraction − fixed mixed")
         axis.tick_params(axis="x", colors=plant_colour)
         fungus_axis.set_xlabel("Fungal fitness − fixed mixed", color=fungus_colour)
         fungus_axis.tick_params(axis="x", colors=fungus_colour)
@@ -818,15 +816,15 @@ def plot_trade_rates(records: dict[float, dict[str, np.ndarray]], output: Path) 
     for axis, p_level in zip(axes.flat, p_levels, strict=True):
         record = records[p_level]
         _plot_rate(axis, record["time_days"], record["plant"], _PLANT_COLOUR,
-                   "Plant C-trade rate")
+                   "Plant C-trade fraction")
         _plot_rate(axis, record["time_days"], record["fungus"], _FUNGUS_COLOUR,
-                   "Fungal P-trade rate")
+                   "Fungal P-trade fraction")
         axis.set_title(f"Initial solution P = {p_level:g} µM")
         axis.grid(axis="y", color="#dddddd", linewidth=0.6)
         axis.set_xlim(record["time_days"][0], record["time_days"][-1])
 
     for axis in axes[:, 0]:
-        axis.set_ylabel("Commanded trade rate (day⁻¹)")
+        axis.set_ylabel("Fraction of current pool traded per policy interval")
     for axis in axes[-1]:
         axis.set_xlabel("Time (days; one point per day)")
     axes[0, 0].legend(
@@ -1011,4 +1009,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

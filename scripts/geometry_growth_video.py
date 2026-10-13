@@ -1,10 +1,10 @@
 """Render side-by-side root and mycelial geometry growth as an animated GIF.
 
 The animation deliberately uses the production growth-geometry functions. Each
-frame target is a successive radial grid edge, so a 0.1 cm radial interval
-advances the fungal radius and the largest root-disc radius by exactly 1 mm
-per frame. Grid construction requires that the interval divide the maximum
-radius exactly. Deeper root discs retain their beta-derived smaller radii.
+frame target is a successive radial grid edge, so the radial interval advances
+the fungal radius and the largest root-disc radius by exactly that amount.
+Grid construction requires that the interval divide the maximum radius
+exactly. Deeper root discs retain their beta-derived smaller radii.
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ def render_growth_video(
         max_radius_cm: float = 10.0,
         max_depth_cm: float = 25.0,
         radial_interval_cm: float = 0.1,
-        depth_interval_cm: float = 0.1,
+    depth_interval_cm: float = 0.5,
         fps: int = 12,
         dpi: int = 120,
     ) -> Path:
@@ -117,6 +117,7 @@ def render_growth_video(
     import matplotlib.animation as animation
     import matplotlib.pyplot as plt
     import numpy as np
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
     r_edges_np = np.asarray(r_edges)
     z_edges_np = np.asarray(z_edges)
@@ -149,62 +150,106 @@ def render_growth_video(
             float(fungal_biomass),
         )
 
-    final_root, _, _, _ = geometry_at_radius(float(radii_np[-1]))
-    root_vmax = max(float(np.max(final_root)), 1e-12)
-    first_root, first_fungus, first_plant_mass, first_fungus_mass = (
-        geometry_at_radius(float(radii_np[0]))
+    _, _, first_plant_mass, first_fungus_mass = geometry_at_radius(
+        float(radii_np[0])
     )
 
-    fig, axes = plt.subplots(1, 2, figsize=(10, 5), constrained_layout=True)
-    root_mesh = axes[0].pcolormesh(
-        r_edges_np,
-        z_edges_np,
-        first_root,
-        shading="flat",
-        cmap="YlGn",
-        vmin=0.0,
-        vmax=root_vmax,
-    )
-    fungus_mesh = axes[1].pcolormesh(
-        r_edges_np,
-        z_edges_np,
-        first_fungus,
-        shading="flat",
-        cmap="Purples",
-        vmin=0.0,
-        vmax=fungus_traits.saturation_density,
-    )
-    fig.colorbar(root_mesh, ax=axes[0], label=r"Root length density (cm cm$^{-3}$)")
-    fig.colorbar(
-        fungus_mesh,
-        ax=axes[1],
-        label=r"Hyphal length density (cm cm$^{-3}$)",
-    )
-    axes[0].set_title("Plant roots: stacked discs")
-    axes[1].set_title("Mycelium: saturated hemisphere")
-    for axis in axes:
-        axis.set_xlabel("Radial distance (cm)")
-        axis.set_ylabel("Depth (cm)")
-        axis.set_xlim(0.0, max_radius_cm)
-        axis.set_ylim(max_depth_cm, 0.0)
-        axis.set_aspect("equal")
+    # Render the axisymmetric primitives themselves, so the animation shows
+    # the hemisphere and the beta-weighted stack of discs in 3-D.
+    fig = plt.figure(figsize=(12, 6.5), constrained_layout=True)
+    axes = [
+        fig.add_subplot(1, 2, 1, projection="3d"),
+        fig.add_subplot(1, 2, 2, projection="3d"),
+    ]
+    theta = np.linspace(0.0, 2.0 * np.pi, 48)
+    root_colour = "#4c9a57"
+    root_edge = "#286336"
+    fungus_colour = "#8e63b6"
+    fungus_edge = "#513276"
 
+    def style_axis(axis, title):
+        axis.set_title(title, pad=12, fontsize=12, fontweight="medium")
+        axis.set_xlabel("x (cm)", labelpad=5)
+        axis.set_ylabel("y (cm)", labelpad=5)
+        axis.set_zlabel("depth z (cm)", labelpad=5)
+        axis.set_xlim(-max_radius_cm, max_radius_cm)
+        axis.set_ylim(-max_radius_cm, max_radius_cm)
+        axis.set_zlim(max_depth_cm, 0.0)
+        axis.set_box_aspect((2.0 * max_radius_cm, 2.0 * max_radius_cm, max_depth_cm))
+        axis.view_init(elev=25, azim=-55)
+        axis.grid(True, alpha=0.22)
+
+    def add_root_disc(axis, radius, depth, thickness):
+        if radius <= 0.0:
+            return
+        radial = np.linspace(0.0, radius, 6)
+        rr, tt = np.meshgrid(radial, theta)
+        x = rr * np.cos(tt)
+        y = rr * np.sin(tt)
+        z_top = np.full_like(x, max(0.0, depth - thickness / 2.0))
+        z_bottom = np.full_like(x, depth + thickness / 2.0)
+        axis.plot_surface(x, y, z_top, color=root_colour, alpha=0.22,
+                          linewidth=0, shade=True)
+        axis.plot_surface(x, y, z_bottom, color=root_colour, alpha=0.10,
+                          linewidth=0, shade=True)
+        x_side = radius * np.cos(theta)
+        y_side = radius * np.sin(theta)
+        z_side = np.vstack((
+            np.full(theta.shape, max(0.0, depth - thickness / 2.0)),
+            np.full(theta.shape, depth + thickness / 2.0),
+        ))
+        axis.add_collection3d(Poly3DCollection(
+            [list(zip(x_side, y_side, z_side[0])),
+             list(zip(x_side, y_side, z_side[1]))],
+            facecolors=root_colour, edgecolors=root_edge, linewidths=0.15,
+            alpha=0.18,
+        ))
+
+    def add_hemisphere(axis, radius):
+        if radius <= 0.0:
+            return
+        radial = np.linspace(0.0, radius, 28)
+        rr, tt = np.meshgrid(radial, theta)
+        x = rr * np.cos(tt)
+        y = rr * np.sin(tt)
+        z = np.sqrt(np.maximum(radius ** 2 - rr ** 2, 0.0))
+        axis.plot_surface(x, y, z, color=fungus_colour, alpha=0.58,
+                          edgecolor=fungus_edge, linewidth=0.15, shade=True)
+
+    def draw_frame(frame_index: int):
+        radius_cm = float(radii_np[frame_index])
+        root_radii = np.asarray(root_disc_radii_from_biomass(
+            root_biomass_for_max_disc_radius(radius_cm, plant_traits, z_edges),
+            plant_traits,
+            z_edges,
+        ))
+        for axis in axes:
+            axis.cla()
+        style_axis(axes[0], "Plant: beta-weighted stacked root discs")
+        style_axis(axes[1], "Fungus: saturated hemispherical mycelium")
+        layer_thickness = float(depth_interval_cm) * 0.82
+        layer_depths = 0.5 * (z_edges_np[:-1] + z_edges_np[1:])
+        for depth, root_radius in zip(layer_depths, root_radii):
+            add_root_disc(axes[0], float(root_radius), float(depth), layer_thickness)
+        add_hemisphere(axes[1], radius_cm)
+
+    draw_frame(0)
     status = fig.suptitle(
-        f"Radius {radii_np[0] * 10:.1f} mm | "
-        f"plant {first_plant_mass:.3g} g | fungus {first_fungus_mass:.3g} g"
+        f"Geometric growth | radius {radii_np[0] * 10:.1f} mm | "
+        f"plant {first_plant_mass:.3g} g | fungus {first_fungus_mass:.3g} g",
+        fontsize=13,
     )
 
     def update(frame_index: int):
         """Update both panels at the next radial grid edge."""
         radius_cm = float(radii_np[frame_index])
-        root, fungus, plant_mass, fungus_mass = geometry_at_radius(radius_cm)
-        root_mesh.set_array(root.ravel())
-        fungus_mesh.set_array(fungus.ravel())
+        _, _, plant_mass, fungus_mass = geometry_at_radius(radius_cm)
+        draw_frame(frame_index)
         status.set_text(
-            f"Radius {radius_cm * 10:.1f} mm | "
+            f"Geometric growth | radius {radius_cm * 10:.1f} mm | "
             f"plant {plant_mass:.3g} g | fungus {fungus_mass:.3g} g"
         )
-        return root_mesh, fungus_mesh, status
+        return (status,)
 
     video = animation.FuncAnimation(
         fig,
@@ -225,12 +270,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("plots/growing_geometries.gif"),
+        default=Path("plots/growing_geometries_3d.gif"),
     )
     parser.add_argument("--max-radius-cm", type=float, default=10.0)
     parser.add_argument("--max-depth-cm", type=float, default=25.0)
-    parser.add_argument("--radial-interval-cm", type=float, default=0.1)
-    parser.add_argument("--depth-interval-cm", type=float, default=0.1)
+    parser.add_argument("--radial-interval-cm", type=float, default=0.2)
+    parser.add_argument("--depth-interval-cm", type=float, default=0.5)
     parser.add_argument("--fps", type=int, default=12)
     parser.add_argument("--dpi", type=int, default=120)
     return parser.parse_args()
