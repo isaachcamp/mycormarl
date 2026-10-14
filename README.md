@@ -60,3 +60,11 @@ partner permanently dormant.
 The PPO command is an interface and numerical smoke check. It does not by
 itself establish learning convergence, cooperation, robustness, or biological
 optimality.
+
+## Research and animations
+
+[REDbyRBD](https://github.com/isaachcamp/REDbyRBD) owns studies, uncertainty screens,
+foraging diagnostics, figures and the reproducible report.
+[mycormarl-animations](https://github.com/isaachcamp/mycormarl-animations) owns
+all animation scenes and builders. Both install an immutable core Git revision.
+See [source version conventions](docs/reproducibility/version-control.md).

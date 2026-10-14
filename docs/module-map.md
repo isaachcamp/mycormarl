@@ -45,7 +45,7 @@ configuration and organism traits
 |---|---|
 | `scripts/phosphate_examples.py` | Runs small deterministic plant-only, fungus-only, or mixed uptake examples. |
 | `scripts/phosphate_qualification.py` | Regenerates the convergence, conservation, sensitivity, and performance evidence. |
-| `scripts/geometry_growth_video.py` | Visualises the production root and fungal geometry mappings. |
+| [mycormarl-animations](https://github.com/isaachcamp/mycormarl-animations) | Owns geometry/video preparation, scenes and validators against installed core. |
 | `scripts/train_ppo.py` | Runs a reproducible JIT PPO development job in mixed or single-consumer mode and saves a versioned policy bundle. |
 | `tests/test_policy_artifacts.py` | Protects saved-policy compatibility and the public training CLI. |
 | `tests/test_phosphate_*.py` | Protects units, state, diffusion, uptake, competition, and qualification contracts. |
@@ -67,3 +67,12 @@ configuration and organism traits
 - Production evolution and numerical qualification share the same uptake
   transaction, preventing the diagnostic calculations from becoming a second
   model.
+
+## Repository boundaries
+
+Named studies, parameter screens, foraging experiments, empirical qualifications
+and their figures live in [REDbyRBD](https://github.com/isaachcamp/REDbyRBD).
+Core owns generic `static_rollout`, checkpoint/policy execution, action conversion
+and RNG contracts. Legacy study/static manifest forwarders were removed at
+cutover; invoke the research package directly. The animation repository owns
+all scenes/builders, including the growing-geometries GIF builder.

@@ -250,7 +250,7 @@ The general defaults are declared in `PPOConfig`:
 The reduced trade-only study overrides this to one environment, 120 steps per
 rollout, one minibatch, four epochs, finite-horizon returns, and 500 episodes
 of 120 policy decisions per seed. The authoritative values are in
-[`trade_only_study.py`](../../mycormarl/mycormarl/trade_only_study.py).
+[`trade_only_study.py`](https://github.com/isaachcamp/REDbyRBD/blob/main/src/redbyrbd/trade_only_study.py).
 
 ## Primary references
 

@@ -1,4 +1,4 @@
-"""Fixed-allocation action contracts for the reduced-control trade study."""
+"""Reusable fixed-allocation Rate action contracts for reduced-control actors."""
 
 from __future__ import annotations
 
@@ -12,8 +12,6 @@ from mycormarl.environments.base_mycor import FUNGUS, PLANT
 TOTAL_BIOLOGICAL_RATE_PER_DAY = 6.907755
 GROWTH_FRACTION = 0.9
 REPRODUCTION_FRACTION = 0.1
-PLANT_MIXED_TRADE_FRACTION_PER_DAY = 0.05
-FUNGUS_MIXED_TRADE_FRACTION_PER_DAY = 0.75
 
 
 def pool_fraction_to_rate(fraction_per_day: float) -> float:
@@ -50,12 +48,3 @@ def plant_only_actions() -> dict[str, jnp.ndarray]:
         PLANT: fixed_allocation_rate_action(jnp.asarray(0.0)),
         FUNGUS: jnp.zeros(4, dtype=jnp.float32),
     }
-
-
-def run_trade_only_baseline(**kwargs):
-    """Temporary legacy forwarding entry point; requires installed REDbyRBD."""
-    try:
-        from redbyrbd.trade_only import run_trade_only_baseline as run
-    except ImportError as error:
-        raise ImportError("Named trade baselines moved to REDbyRBD; install that research project.") from error
-    return run(**kwargs)

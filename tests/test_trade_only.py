@@ -18,8 +18,6 @@ from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
 from mycormarl.trade_only import (
-    FUNGUS_MIXED_TRADE_FRACTION_PER_DAY,
-    PLANT_MIXED_TRADE_FRACTION_PER_DAY,
     TOTAL_BIOLOGICAL_RATE_PER_DAY,
     fixed_allocation_rate_action,
     plant_only_actions,

@@ -60,5 +60,5 @@ continuous plant and fungal trade policies operate unchanged.
 
 ## Related studies
 
-- [`uniform-p-association-response-pilot-spec.md`](../implementation-docs/uniform-p-association-response-pilot-spec.md)
+- [`uniform-p-association-response-pilot-spec.md`](https://github.com/isaachcamp/REDbyRBD/blob/main/docs/implementation-docs/uniform-p-association-response-pilot-spec.md)
 - [`spatial-p-heterogeneity-pilot-spec.md`](../implementation-docs/spatial-p-heterogeneity-pilot-spec.md)
