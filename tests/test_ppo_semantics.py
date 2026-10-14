@@ -54,7 +54,7 @@ def test_ordinary_transition_is_valid_for_both_actor_factors_and_critic():
     fields = transition_to_ppo_fields(_transition())
 
     assert fields.critic_valid
-    assert fields.allocation_actor_valid
+    assert fields.biological_rate_actor_valid
     assert fields.trade_actor_valid
     assert not fields.terminated
     assert fields.bootstrap_valid
@@ -73,7 +73,7 @@ def test_death_transition_keeps_critic_sample_but_rejects_unexecuted_action():
     )
 
     assert fields.critic_valid
-    assert not fields.allocation_actor_valid
+    assert not fields.biological_rate_actor_valid
     assert not fields.trade_actor_valid
     assert fields.terminated
     assert not fields.bootstrap_valid
@@ -91,7 +91,7 @@ def test_dead_or_absent_padding_is_invalid_for_all_learning():
     )
 
     assert not fields.critic_valid
-    assert not fields.allocation_actor_valid
+    assert not fields.biological_rate_actor_valid
     assert not fields.trade_actor_valid
     assert not fields.terminated
     assert not fields.bootstrap_valid
@@ -109,11 +109,24 @@ def test_truncated_survivor_bootstraps_from_final_observation_but_stops_trace():
     assert jnp.array_equal(fields.bootstrap_observation, jnp.arange(5))
 
 
+def test_finite_horizon_truncation_has_zero_continuation_value():
+    """A declared return boundary is terminal even when the plant survives."""
+    fields = transition_to_ppo_fields(
+        _transition(truncated=True),
+        finite_horizon_returns=True,
+    )
+
+    assert fields.critic_valid
+    assert fields.truncated
+    assert not fields.bootstrap_valid
+    assert not fields.gae_trace_continues
+
+
 def test_cancelled_trade_does_not_mask_executed_allocation():
     fields = transition_to_ppo_fields(_transition(trade_executed=False))
 
     assert fields.critic_valid
-    assert fields.allocation_actor_valid
+    assert fields.biological_rate_actor_valid
     assert not fields.trade_actor_valid
 
 
@@ -182,7 +195,6 @@ def test_rollout_carries_per_species_transition_validity():
             soil_depth_cm=0.2,
             radial_interval_cm=0.1,
             depth_interval_cm=0.1,
-            topsoil_depth_cm=0.2,
         ),
         SpeciesParams(plant=PlantTraits(), fungus=FungusTraits()),
     )
@@ -196,6 +208,7 @@ def test_rollout_carries_per_species_transition_validity():
                 NUM_MINIBATCHES=1,
                 UPDATE_EPOCHS=1,
                 LR=0.0,
+                DISCOUNT_HALF_LIFE_DAYS=30.0,
             ),
         )
     )(jax.random.PRNGKey(0))
@@ -204,10 +217,10 @@ def test_rollout_carries_per_species_transition_validity():
     assert plant.critic_valid.shape == (1, 2, 1)
     assert fungus.critic_valid.shape == (1, 2, 1)
     assert jnp.all(plant.critic_valid)
-    assert jnp.all(plant.allocation_actor_valid)
+    assert jnp.all(plant.biological_rate_actor_valid)
     assert not jnp.any(plant.trade_actor_valid)
     assert not jnp.any(fungus.critic_valid)
-    assert not jnp.any(fungus.allocation_actor_valid)
+    assert not jnp.any(fungus.biological_rate_actor_valid)
     assert not jnp.any(fungus.trade_actor_valid)
     train_states = output["runner_state"][0]
     assert train_states[PLANT].step == 1
@@ -215,13 +228,48 @@ def test_rollout_carries_per_species_transition_validity():
     plant_metrics = output["metrics"][PLANT]
     fungus_metrics = output["metrics"][FUNGUS]
     assert plant_metrics.critic_valid_count == 2
-    assert plant_metrics.allocation_actor_valid_count == 2
+    assert plant_metrics.biological_rate_actor_valid_count == 2
     assert plant_metrics.trade_actor_valid_count == 0
-    assert plant_metrics.allocation_actor_valid_fraction == 1.0
+    assert plant_metrics.biological_rate_actor_valid_fraction == 1.0
     assert fungus_metrics.critic_valid_count == 0
-    assert fungus_metrics.allocation_actor_valid_count == 0
+    assert fungus_metrics.biological_rate_actor_valid_count == 0
     assert fungus_metrics.trade_actor_valid_count == 0
-    assert fungus_metrics.allocation_actor_valid_fraction == 0.0
+    assert fungus_metrics.biological_rate_actor_valid_fraction == 0.0
+
+
+def test_critic_target_normalization_is_per_agent_and_ignores_absent_partners():
+    """The plant-only rollout advances only the operational plant critic scale."""
+    environment = BaseMycorMarl(
+        EnvConfig(
+            max_steps=2,
+            dt=0.05,
+            consumer_mode="plant-only",
+            soil_radius_cm=0.2,
+            soil_depth_cm=0.2,
+            radial_interval_cm=0.1,
+            depth_interval_cm=0.1,
+        ),
+        SpeciesParams(plant=PlantTraits(), fungus=FungusTraits()),
+    )
+
+    output = jax.jit(
+        make_train(
+            environment,
+            PPOConfig(
+                TOTAL_TIMESTEPS=2,
+                NUM_STEPS=2,
+                NUM_ENVS=1,
+                NUM_MINIBATCHES=1,
+                UPDATE_EPOCHS=1,
+                LR=0.0,
+                DISCOUNT_HALF_LIFE_DAYS=30.0,
+            ),
+        )
+    )(jax.random.PRNGKey(8))
+    train_states = output["runner_state"][0]
+
+    assert train_states[PLANT].critic_normalizer.count == 2
+    assert train_states[FUNGUS].critic_normalizer.count == 0
 
 
 def test_undiscounted_training_rejects_indefinitely_viable_configured_consumer():
@@ -232,7 +280,6 @@ def test_undiscounted_training_rejects_indefinitely_viable_configured_consumer()
             soil_depth_cm=0.2,
             radial_interval_cm=0.1,
             depth_interval_cm=0.1,
-            topsoil_depth_cm=0.2,
         ),
         SpeciesParams(
             plant=PlantTraits(kappa_p=0.0),
@@ -244,6 +291,36 @@ def test_undiscounted_training_rejects_indefinitely_viable_configured_consumer()
         make_train(environment, PPOConfig(DISCOUNT_HALF_LIFE_DAYS=None))
 
 
+def test_declared_finite_horizon_allows_undiscounted_viable_consumer():
+    """A finite administrative return boundary makes gamma=1 well-defined."""
+    environment = BaseMycorMarl(
+        EnvConfig(
+            max_steps=1,
+            consumer_mode="plant-only",
+            soil_radius_cm=0.2,
+            soil_depth_cm=0.2,
+            radial_interval_cm=0.1,
+            depth_interval_cm=0.1,
+        ),
+        SpeciesParams(
+            plant=PlantTraits(kappa_p=0.0),
+            fungus=FungusTraits(),
+        ),
+    )
+
+    make_train(
+        environment,
+        PPOConfig(
+            TOTAL_TIMESTEPS=1,
+            NUM_STEPS=1,
+            NUM_ENVS=1,
+            NUM_MINIBATCHES=1,
+            DISCOUNT_HALF_LIFE_DAYS=None,
+            FINITE_HORIZON_RETURNS=True,
+        ),
+    )
+
+
 def test_rollout_distinguishes_death_transition_from_dead_padding():
     environment = BaseMycorMarl(
         EnvConfig(
@@ -253,7 +330,6 @@ def test_rollout_distinguishes_death_transition_from_dead_padding():
             soil_depth_cm=0.2,
             radial_interval_cm=0.1,
             depth_interval_cm=0.1,
-            topsoil_depth_cm=0.2,
         ),
         SpeciesParams(
             plant=PlantTraits(
@@ -275,13 +351,14 @@ def test_rollout_distinguishes_death_transition_from_dead_padding():
                 NUM_MINIBATCHES=1,
                 UPDATE_EPOCHS=1,
                 LR=1e-2,
+                DISCOUNT_HALF_LIFE_DAYS=30.0,
             ),
         )
     )(jax.random.PRNGKey(2))
     plant = output["trajectories"][0]
 
     assert jnp.array_equal(plant.critic_valid[0, :, 0], jnp.array([True, False]))
-    assert not jnp.any(plant.allocation_actor_valid)
+    assert not jnp.any(plant.biological_rate_actor_valid)
     assert not jnp.any(plant.trade_actor_valid)
     assert jnp.array_equal(plant.terminated[0, :, 0], jnp.array([True, False]))
     assert not jnp.any(plant.bootstrap_valid)
@@ -297,13 +374,15 @@ def test_rollout_distinguishes_death_transition_from_dead_padding():
     )
     assert jnp.allclose(
         fungus_parameters["trade_head"]["bias"],
-        jnp.log(0.1 / 0.9),
+        jnp.log(jnp.expm1(0.75)),
     )
     assert jnp.array_equal(
         fungus_parameters["trade_log_std"],
         jnp.zeros_like(fungus_parameters["trade_log_std"]),
     )
-    assert jnp.any(fungus_parameters["allocation_head"]["kernel"] != 0.0)
+    assert jnp.any(
+        fungus_parameters["biological_rate_head"]["kernel"] != 0.0
+    )
 
 
 def test_jitted_truncation_targets_use_final_observation_and_stop_gae_trace():
@@ -315,7 +394,6 @@ def test_jitted_truncation_targets_use_final_observation_and_stop_gae_trace():
             soil_depth_cm=0.2,
             radial_interval_cm=0.1,
             depth_interval_cm=0.1,
-            topsoil_depth_cm=0.2,
         ),
         SpeciesParams(plant=PlantTraits(), fungus=FungusTraits()),
     )
@@ -326,9 +404,12 @@ def test_jitted_truncation_targets_use_final_observation_and_stop_gae_trace():
         NUM_MINIBATCHES=1,
         UPDATE_EPOCHS=1,
         LR=0.0,
+        DISCOUNT_HALF_LIFE_DAYS=30.0,
+        NORMALIZE_CRITIC_TARGETS=False,
     )
     output = jax.jit(make_train(environment, config))(jax.random.PRNGKey(3))
     train_states = output["runner_state"][0]
+    gamma = discount_from_half_life(0.05, 30.0)
 
     for agent, trajectory in zip(
         (PLANT, FUNGUS), output["trajectories"], strict=True
@@ -337,13 +418,55 @@ def test_jitted_truncation_targets_use_final_observation_and_stop_gae_trace():
             train_states[agent].params,
             trajectory.bootstrap_observation,
         )
-        expected_advantages = trajectory.reward + final_values - trajectory.value
+        expected_advantages = (
+            trajectory.reward + gamma * final_values - trajectory.value
+        )
 
         assert jnp.all(trajectory.truncated)
         assert jnp.all(trajectory.bootstrap_valid)
         assert not jnp.any(trajectory.gae_trace_continues)
-        assert jnp.allclose(output["advantages"][agent], expected_advantages)
+        assert jnp.allclose(
+            output["advantages"][agent], expected_advantages, atol=1e-7
+        )
         assert jnp.allclose(
             output["targets"][agent],
-            trajectory.reward + final_values,
+            trajectory.reward + gamma * final_values,
+            atol=1e-7,
         )
+
+
+def test_jitted_finite_horizon_targets_have_zero_administrative_continuation():
+    """The final 120-day-style boundary excludes its final-observation value."""
+    environment = BaseMycorMarl(
+        EnvConfig(
+            max_steps=1,
+            dt=0.05,
+            soil_radius_cm=0.2,
+            soil_depth_cm=0.2,
+            radial_interval_cm=0.1,
+            depth_interval_cm=0.1,
+        ),
+        SpeciesParams(plant=PlantTraits(), fungus=FungusTraits()),
+    )
+    config = PPOConfig(
+        TOTAL_TIMESTEPS=2,
+        NUM_STEPS=2,
+        NUM_ENVS=1,
+        NUM_MINIBATCHES=1,
+        UPDATE_EPOCHS=1,
+        LR=0.0,
+        DISCOUNT_HALF_LIFE_DAYS=None,
+        FINITE_HORIZON_RETURNS=True,
+    )
+
+    output = jax.jit(make_train(environment, config))(jax.random.PRNGKey(4))
+    for agent, trajectory in zip(
+        (PLANT, FUNGUS), output["trajectories"], strict=True
+    ):
+        assert jnp.all(trajectory.truncated)
+        assert not jnp.any(trajectory.bootstrap_valid)
+        assert not jnp.any(trajectory.gae_trace_continues)
+        assert jnp.allclose(
+            output["advantages"][agent], trajectory.reward - trajectory.value
+        )
+        assert jnp.allclose(output["targets"][agent], trajectory.reward)

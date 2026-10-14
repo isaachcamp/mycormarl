@@ -20,7 +20,8 @@ class EnvConfig:
     explicit domains should be used for tests and development runs.
     Spatial values use cm. Radial and depth intervals must divide their
     corresponding extents into uniform cells; invalid requests are rejected
-    with the nearest valid interval. ``dt`` uses days, the phosphate diffusion
+    with the nearest valid interval. ``dt`` is the numerical integration
+    timestep in days. The phosphate diffusion
     coefficient uses cm² s⁻¹, and its dimensionless impedance factor and CFL
     safety are applied by the soil scheduler. The uptake-regime reference time
     uses days; its positive transition exponent is dimensionless.
@@ -33,8 +34,10 @@ class EnvConfig:
     soil_depth_cm: float = 100.0
     radial_interval_cm: float = 0.1
     depth_interval_cm: float = 0.1
-    topsoil_depth_cm: float | None = None
     initial_solution_p_um: float = 1.0
+    # ``None`` means uniform solution P throughout the configured domain.
+    # Otherwise, knots give a relative concentration factor by depth (cm).
+    initial_solution_p_depth_profile: tuple[tuple[float, float], ...] | None = None
     phosphate_diffusion_coefficient_cm2_s: float = 1e-5
     b_p: float = 239.0  # linear volumetric P buffer power
     phosphate_impedance_factor: float = 0.308

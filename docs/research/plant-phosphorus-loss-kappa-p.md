@@ -6,16 +6,17 @@
 
 ## Recommendation
 
-Use **`kappa_p = 0.001 mg P g⁻¹ whole-plant dry biomass d⁻¹`** as a deliberately
-small positive model abstraction for herbivory, leakage, and unrecovered
-tissue turnover. Retain **`0–0.002 mg P g⁻¹ DM d⁻¹`** as the ordinary
-sensitivity range and `0.005` only as an exploratory high-turnover case.
+Use **`kappa_p = 0 mg P g⁻¹ whole-plant dry biomass d⁻¹`** as the default,
+which preserves P conservation in the absence of an explicit loss process.
+Use `0.001–0.002 mg P g⁻¹ DM d⁻¹` as small positive sensitivities for
+herbivory, leakage, and unrecovered tissue turnover; `0.005` remains an
+exploratory high-turnover case.
 
 The selected value is not a measured carrot maintenance rate. No primary
 carrot study recovered a constant irreversible P-loss flux, and the available
-experiments record minimal identifiable irrecoverable loss. Zero remains the
-conservation-preserving limiting case; `0.001` is selected because the current
-model omits several small ecological export pathways.
+experiments record minimal identifiable irrecoverable loss. Zero is therefore
+the default; positive values remain explicit approximations for small
+ecological export pathways omitted by the current model.
 
 This is a recommendation about model semantics, not a claim that real plants
 never lose P. Real losses occur mainly with tissue death, abscission, root
@@ -182,6 +183,5 @@ leaching or herbivory, but its name and documentation should say so.
    mass loss over time; similarly quantify fine-root turnover and P recovery.
 3. Decide whether AMF recapture of root/rhizosphere P occurs inside the model
    boundary before interpreting root efflux as loss.
-4. Until those data exist, retain the selected `kappa_p = 0.001` only as an
-   explicit abstraction and include zero as the conservation-preserving
-   sensitivity case.
+4. Until those data exist, retain zero as the default and report any positive
+   `kappa_p` as an explicit loss sensitivity.

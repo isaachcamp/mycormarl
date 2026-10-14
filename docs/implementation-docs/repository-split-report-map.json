@@ -1,0 +1,593 @@
+{
+  "format": "mycormarl-report-preservation-map",
+  "version": 1,
+  "preservation_directory": "/Users/campbelli/Documents/MARL-community-assembly/code/mycormarl-data/preservation/report-2026-10-13",
+  "overleaf_project_id": "6a58fe9fc046d5559b8a6537",
+  "source_archive_sha256": "4e51a2002284331715d758f75ca70d345cfda048047a3ccf83a6b0d20abe8596",
+  "reference_pdf_sha256": "0e9134ace3250c5b20814f71f1187af1ea4733b86e163058cc675147c6766e18",
+  "report_source_revision": "export checksum; Overleaf Git revision unknown",
+  "figures": [
+    {
+      "asset": "figures/ToS-gantt-IC.png",
+      "sha256": "27c7fc601d3845619a045f4a5f88a40f8b9f2f5427a857a923f8a4ca2898b454",
+      "matched_local_outputs": [],
+      "source_references": [
+        {
+          "file": "sections/chapter-outlines.tex",
+          "line": 52,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [],
+      "script_attribution": "static asset",
+      "notes": [
+        "Static asset preserved from Overleaf; no matching generated local output."
+      ]
+    },
+    {
+      "asset": "figures/depletion_gradient_cumulative_uptake.png",
+      "sha256": "537d64c927e972501b4da33ff9d085dccb351400aeb56ea29ecdaaed06ce2361",
+      "matched_local_outputs": [
+        "outputs/depletion-gradient-diagnostics/depletion_gradient_cumulative_uptake.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/fungal-foraging-adv.tex",
+          "line": 28,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/depletion_gradient_diagnostic.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/env-schematic.png",
+      "sha256": "670348f9a24e1b082905110994d0667b6e63973e9892c9be069a685a4fa6244a",
+      "matched_local_outputs": [],
+      "source_references": [
+        {
+          "file": "sections/methods.tex",
+          "line": 17,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [],
+      "script_attribution": "static asset",
+      "notes": [
+        "Static asset preserved from Overleaf; no matching generated local output."
+      ]
+    },
+    {
+      "asset": "figures/episode-time-allocation-p-sweep-summary.png",
+      "sha256": "06f58fc71f792ee5d23fea88e81c7da4b0cc3797022694d3d2c697d5f5d7b655",
+      "matched_local_outputs": [
+        "outputs/episode-time-allocation-plant-only-p-sweep/episode-time-allocation-p-sweep-summary.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/supplementary-figures.tex",
+          "line": 40,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/plot_episode_time_allocation_p_sweep.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/finite_inventory_foraging_synthesis.png",
+      "sha256": "60a1584f775ecbbc5e4687480be3ab23d684ebba38e1ad94947b69aef9ef4d0e",
+      "matched_local_outputs": [
+        "outputs/construction-costs-diagnostic/finite_inventory_foraging_synthesis.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/fungal-foraging-adv.tex",
+          "line": 13,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/absorber_construction_carbon_diagnostic.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/iecdt-logo.png",
+      "sha256": "35335268fa9b7f997f3cd5ddc683d9ab126ef24b9345f6ee9fce2915941489ad",
+      "matched_local_outputs": [],
+      "source_references": [
+        {
+          "file": "main.tex",
+          "line": 107,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [],
+      "script_attribution": "static asset",
+      "notes": [
+        "Static asset preserved from Overleaf; no matching generated local output."
+      ]
+    },
+    {
+      "asset": "figures/native_geometry_closure_comparison_panels.png",
+      "sha256": "1ce3834f527f838c3d2f67c295f998c2fb4599b96b84ae22cae286bbfd24c0c7",
+      "matched_local_outputs": [
+        "outputs/depletion-gradient-diagnostics/native_geometry_closure_comparison_panels.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/supplementary-figures.tex",
+          "line": 31,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/depletion_gradient_diagnostic.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": [
+        "Matching CSV inputs and reference PNG exist; exact panels-composition script is not identified in current tracked source. Related generator emits a differently named comparison figure."
+      ]
+    },
+    {
+      "asset": "figures/resource-pressure-canonical-factor-effects-fungal-biomass-all-factors.png",
+      "sha256": "e338551fc5225509c97ed746c68da724fdad68acecc6065de4d2b136435cfeb1",
+      "matched_local_outputs": [
+        "outputs/resource-pressure-canonical-screen/figures/resource-pressure-canonical-factor-effects-fungal-biomass-all-factors.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/supplementary-figures.tex",
+          "line": 58,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/analyse_resource_pressure_canonical_screen.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/resource-pressure-canonical-factor-effects-plant-biomass-all-factors.png",
+      "sha256": "ee77fe44bfc45715d782dff1bda76b2190d8e0c212171bc8b17a329b01479e81",
+      "matched_local_outputs": [
+        "outputs/resource-pressure-canonical-screen/figures/resource-pressure-canonical-factor-effects-plant-biomass-all-factors.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/supplementary-figures.tex",
+          "line": 51,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/analyse_resource_pressure_canonical_screen.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/resource-pressure-factorial-biomass-heatmaps-by-initial-p.png",
+      "sha256": "7694294727095468633d867df44b69e1d4b2ae2d25ca3a5534da3eaac8912906",
+      "matched_local_outputs": [
+        "outputs/resource-pressure-factorial-plant-boundary/figures/resource-pressure-factorial-biomass-heatmaps-by-initial-p.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/limitation-regimes.tex",
+          "line": 85,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/analyse_resource_pressure_factorial_plant_boundary.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/resource-pressure-factorial-boundary-heatmap.png",
+      "sha256": "797506df7e7bf1008d24173e9d2434046931571a43ed943d2713177f92109bcd",
+      "matched_local_outputs": [
+        "outputs/resource-pressure-factorial-plant-boundary/figures/resource-pressure-factorial-boundary-heatmap.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/supplementary-figures.tex",
+          "line": 88,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/analyse_resource_pressure_factorial_plant_boundary.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/resource-pressure-initial-p-biomass-response.png",
+      "sha256": "c92a1e367b7d47438b2a5297d93ff91843ce997905c85392223e5e2cef36e84b",
+      "matched_local_outputs": [
+        "outputs/resource-pressure-canonical-screen/figures/resource-pressure-initial-p-biomass-response.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/limitation-regimes.tex",
+          "line": 61,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/analyse_resource_pressure_canonical_screen.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/resource-pressure-joint-regimes.png",
+      "sha256": "57a5b0024840f8409fd885740635258fadfd0b146c06bff8342a1bc81af6c197",
+      "matched_local_outputs": [
+        "outputs/resource-pressure-canonical-screen/figures/resource-pressure-joint-regimes.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/supplementary-figures.tex",
+          "line": 70,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/analyse_resource_pressure_canonical_screen.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/resource-pressure-low-p-gamma-summary.png",
+      "sha256": "539ea1dd27b78b69aaf3a9547e7dc498ed176b95a240002003cafb55bbbbe801",
+      "matched_local_outputs": [
+        "outputs/resource-pressure-low-p-gamma-paired/figures/resource-pressure-low-p-gamma-summary.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/limitation-regimes.tex",
+          "line": 74,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/plot_low_p_gamma_analysis.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/resource-pressure-plant-limitation-pressure-through-time.png",
+      "sha256": "af7c275d484456d08c051266e011bbc65b6aa1ce11770a8e2e623ff5506228fc",
+      "matched_local_outputs": [
+        "outputs/resource-pressure-canonical-screen/figures/resource-pressure-plant-limitation-pressure-through-time.png"
+      ],
+      "source_references": [],
+      "related_scripts": [
+        "scripts/analyse_resource_pressure_canonical_screen.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/resource-pressure-plant-limitation-sign-through-time.png",
+      "sha256": "d9dde756290889b9c89ce062750b81446bb9a8676202bad4c38b6b6ae8cba752",
+      "matched_local_outputs": [
+        "outputs/resource-pressure-canonical-screen/figures/resource-pressure-plant-limitation-sign-through-time.png"
+      ],
+      "source_references": [],
+      "related_scripts": [
+        "scripts/analyse_resource_pressure_canonical_screen.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/resource-pressure-plant-p-uptake-ratio-ordered-by-biomass.png",
+      "sha256": "40b413e730bfbd2f525c61e128e82f042a0ad54516821667c15ccf79427fdd92",
+      "matched_local_outputs": [
+        "outputs/resource-pressure-canonical-screen/figures/resource-pressure-plant-p-uptake-ratio-ordered-by-biomass.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/supplementary-figures.tex",
+          "line": 79,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/analyse_resource_pressure_canonical_screen.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/static-controls-am-biomass.png",
+      "sha256": "9551fcbaaae1fd4458875a43a713b1e1a9397869cc60204bb2247c11576440c0",
+      "matched_local_outputs": [
+        "docs/qualification/rate-action-49/phase-1-static-controls/figures/static-controls-am-biomass.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/limitation-regimes.tex",
+          "line": 96,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/plot_static_controls.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/trade-only-feedback-diagnostic.png",
+      "sha256": "5af7b4a48a2d41cee4abc41a0d0bd37761c9b3dae2dd17b8f049093ec1a8f96e",
+      "matched_local_outputs": [
+        "outputs/historical-grid-trade-only-pilot/historical-grid-trade-only-pilot/figures/trade-only-feedback-diagnostic.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/supplementary-figures.tex",
+          "line": 106,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/plot_trade_feedback_diagnostic.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/trade-only-ippo-best-seed-trade-fractions.png",
+      "sha256": "990c2930ceebf931059ef7afd399f1a406623012e48363fd1133cd7df4fd924b",
+      "matched_local_outputs": [
+        "outputs/historical-grid-trade-only-pilot/historical-grid-trade-only-pilot/figures/trade-only-ippo-best-seed-trade-fractions.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/supplementary-figures.tex",
+          "line": 97,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/plot_historical_grid_trade_pool_fractions.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/trade-only-ippo-checkpoint-phosphorus-fitness-contribution.png",
+      "sha256": "582a20a7a90e13ee4a771b31947895bf08878649dce10654794889e5ef97443b",
+      "matched_local_outputs": [
+        "outputs/historical-grid-trade-only-pilot/historical-grid-trade-only-pilot/figures/trade-only-ippo-checkpoint-phosphorus-fitness-contribution.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/supplementary-figures.tex",
+          "line": 124,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/plot_historical_grid_checkpoint_resource_trajectories.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/trade-only-ippo-checkpoint-plant-phosphorus-intake.png",
+      "sha256": "14f09c4436681c70a05f7c466df20b68badf5842d5fa12f26ba16b6787ed238c",
+      "matched_local_outputs": [
+        "outputs/historical-grid-trade-only-pilot/historical-grid-trade-only-pilot/figures/trade-only-ippo-checkpoint-plant-phosphorus-intake.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/supplementary-figures.tex",
+          "line": 115,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/plot_historical_grid_checkpoint_resource_trajectories.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/trade-only-ippo-plant-performance.png",
+      "sha256": "943ccacb6769b23071074a0dbe486712a61b366d02ba36c39ee86c35d84aa601",
+      "matched_local_outputs": [
+        "outputs/historical-grid-trade-only-pilot/historical-grid-trade-only-pilot/figures/trade-only-ippo-plant-performance.png"
+      ],
+      "source_references": [
+        {
+          "file": "sections/trade-only-rl.tex",
+          "line": 13,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [
+        "scripts/plot_historical_grid_trade_only.py"
+      ],
+      "script_attribution": "candidate; exact rendering revision not established",
+      "notes": []
+    },
+    {
+      "asset": "figures/uoo_biologylogo_green_lockup.png",
+      "sha256": "34311a2a08b444501001f9e01a3d210672ec72be426e9ba81d75bc2855c28a5f",
+      "matched_local_outputs": [],
+      "source_references": [
+        {
+          "file": "main.tex",
+          "line": 106,
+          "commented_line": false
+        }
+      ],
+      "related_scripts": [],
+      "script_attribution": "static asset",
+      "notes": [
+        "Static asset preserved from Overleaf; no matching generated local output."
+      ]
+    }
+  ],
+  "selected_inputs": [
+    {
+      "source": "outputs/construction-costs-diagnostic/absorber_geometry_sweep.csv",
+      "preserved_as": "selected-report-inputs/outputs/construction-costs-diagnostic/absorber_geometry_sweep.csv",
+      "sha256": "eda782789b41356a7ac77b70aeaf1bc448589793ee88a24d53a23210d5c072f6",
+      "bytes": 1643148
+    },
+    {
+      "source": "outputs/depletion-gradient-diagnostics/depletion_gradient_time_series.csv",
+      "preserved_as": "selected-report-inputs/outputs/depletion-gradient-diagnostics/depletion_gradient_time_series.csv",
+      "sha256": "1cddff45338ac983fe97b1c59074bd617d9aba4d93565794075f7bea994da8b8",
+      "bytes": 1142223
+    },
+    {
+      "source": "outputs/depletion-gradient-diagnostics/depletion_gradient_summary.csv",
+      "preserved_as": "selected-report-inputs/outputs/depletion-gradient-diagnostics/depletion_gradient_summary.csv",
+      "sha256": "5b0b2db61494bfdd085464bc63b01cc045b61d81e8c6b75c64808c999e522930",
+      "bytes": 453
+    },
+    {
+      "source": "outputs/depletion-gradient-diagnostics/native_geometry_closure_comparison.csv",
+      "preserved_as": "selected-report-inputs/outputs/depletion-gradient-diagnostics/native_geometry_closure_comparison.csv",
+      "sha256": "65aaf5cef7369c068593418c80d137058709e5324c8b4c1e6a4df0541b720154",
+      "bytes": 840323
+    },
+    {
+      "source": "outputs/depletion-gradient-diagnostics/native_geometry_closure_comparison_summary.csv",
+      "preserved_as": "selected-report-inputs/outputs/depletion-gradient-diagnostics/native_geometry_closure_comparison_summary.csv",
+      "sha256": "cfe22a9debe4168f2592da6ba1702d649d80a2aa850373c0501349c2b0a4557a",
+      "bytes": 959
+    },
+    {
+      "source": "outputs/historical-grid-trade-only-pilot/historical-grid-trade-only-pilot/result-bundle.json",
+      "preserved_as": "selected-report-inputs/outputs/historical-grid-trade-only-pilot/historical-grid-trade-only-pilot/result-bundle.json",
+      "sha256": "2417845c76554b4a54299fb7ee267a04998780c6821a2daa193feefe640441fc",
+      "bytes": 4269864,
+      "recorded_provenance": {
+        "actor_interface_version": "two-head-latent-v1",
+        "dependency_lock_sha256": "ede9da69229b285ceb5ffe48e5d13f1b8e787394db16f31c39bb35b7aa4f1f0a",
+        "environment_state_schema_version": "state-v2",
+        "execution_kind": "contract-fixture",
+        "git_commit": "95d36e1c25fd61f413ccf1ca5f17595595c35a3f",
+        "git_dirty": false,
+        "jax_version": "0.9.0",
+        "jaxlib_version": "0.9.0",
+        "manifest_schema_version": 1,
+        "mycormarl_version": "0.1.0",
+        "numerical_timestep_days": 0.025,
+        "policy_decision_interval_days": 0.25,
+        "python_version": "3.12.9",
+        "result_format_version": 2
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "source": "outputs/historical-grid-trade-only-pilot/historical-grid-trade-only-pilot/fixed-bilateral-trade-control.json",
+      "preserved_as": "selected-report-inputs/outputs/historical-grid-trade-only-pilot/historical-grid-trade-only-pilot/fixed-bilateral-trade-control.json",
+      "sha256": "0541534decdd1b4bf42d93d15b03de5db9b2931ee66bdeffdee4200b35d54f64",
+      "bytes": 13824,
+      "recorded_provenance": {},
+      "seeds": null
+    },
+    {
+      "source": "outputs/historical-grid-trade-only-pilot/historical-grid-trade-only-pilot/checkpoint-resource-trajectories.json",
+      "preserved_as": "selected-report-inputs/outputs/historical-grid-trade-only-pilot/historical-grid-trade-only-pilot/checkpoint-resource-trajectories.json",
+      "sha256": "05b8e8928dc77fa70a6997561a171e340b605049158ee2866a23972d6de8485c",
+      "bytes": 54353,
+      "recorded_provenance": {},
+      "seeds": null
+    },
+    {
+      "source": "outputs/episode-time-allocation-plant-only-p-sweep/result-bundle.json",
+      "preserved_as": "selected-report-inputs/outputs/episode-time-allocation-plant-only-p-sweep/result-bundle.json",
+      "sha256": "5dffa6c11cf5ad4ede49ebdccc09e1e683ffc7ae61cfb2306ddac064ae534f84",
+      "bytes": 221585,
+      "recorded_provenance": {},
+      "seeds": null
+    },
+    {
+      "source": "docs/qualification/rate-action-49/phase-1-static-controls/result-bundle.json",
+      "preserved_as": "selected-report-inputs/docs/qualification/rate-action-49/phase-1-static-controls/result-bundle.json",
+      "sha256": "4229e2eb4eb12130d304474eb68c914c215eecfa8a6da6d653c77e48af59d7f4",
+      "bytes": 43607,
+      "recorded_provenance": {
+        "actor_interface_version": "two-head-latent-v1",
+        "dependency_lock_sha256": "ede9da69229b285ceb5ffe48e5d13f1b8e787394db16f31c39bb35b7aa4f1f0a",
+        "environment_state_schema_version": "state-v2",
+        "execution_kind": "contract-fixture",
+        "git_commit": "35b8a4520718638e3b9742c80985df6a8a36295b",
+        "git_dirty": false,
+        "jax_version": "0.9.0",
+        "jaxlib_version": "0.9.0",
+        "manifest_schema_version": 1,
+        "mycormarl_version": "0.1.0",
+        "numerical_timestep_days": 0.025,
+        "policy_decision_interval_days": 0.025,
+        "python_version": "3.12.9",
+        "result_format_version": 2
+      },
+      "seeds": [
+        0
+      ]
+    },
+    {
+      "source": "outputs/resource-pressure-canonical-screen/result-bundle-progress.json",
+      "preserved_as": "selected-report-inputs/outputs/resource-pressure-canonical-screen/result-bundle-progress.json",
+      "sha256": "522e564c95075b37888847904af646ab9d8d73571e6dfdc52aa48c547631fd5c",
+      "bytes": 188750,
+      "recorded_provenance": {},
+      "seeds": null
+    },
+    {
+      "source": "outputs/resource-pressure-low-p-gamma-paired/result-bundle-progress.json",
+      "preserved_as": "selected-report-inputs/outputs/resource-pressure-low-p-gamma-paired/result-bundle-progress.json",
+      "sha256": "e1ae6b9c9f36e9a94930617c28fbc956981710f276df9a62c0ac77791b9bf134",
+      "bytes": 127854,
+      "recorded_provenance": {},
+      "seeds": null
+    },
+    {
+      "source": "outputs/resource-pressure-factorial-plant-boundary/result-bundle-progress.json",
+      "preserved_as": "selected-report-inputs/outputs/resource-pressure-factorial-plant-boundary/result-bundle-progress.json",
+      "sha256": "677b4a5012c05f64b0a919c822981b9e5537b656968afe5e9017fc1e85c890b1",
+      "bytes": 171508,
+      "recorded_provenance": {},
+      "seeds": null
+    }
+  ],
+  "original_run_commits": [
+    "35b8a4520718638e3b9742c80985df6a8a36295b",
+    "95d36e1c25fd61f413ccf1ca5f17595595c35a3f"
+  ],
+  "limitations": [
+    "Static-screen outputs retain conditions, traits, policies and seeds but do not record original Git commits.",
+    "Run-level code provenance does not identify the exact rendering revision.",
+    "Some assets/sections in the source archive may be unused by the main report.",
+    "Full per-condition/per-checkpoint data and weights remain at existing locations; selected compact copies do not replace them."
+  ]
+}

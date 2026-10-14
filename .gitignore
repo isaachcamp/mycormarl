@@ -11,7 +11,10 @@ wheels/
 
 outputs/
 plots/
-
+lessons/
+media/
+docs/analysis/
+docs/investigations/
 .vscode/
 
 .DS_store

@@ -11,8 +11,6 @@ from mycormarl.plant.traits import PlantTraits
 from mycormarl.soil.phosphate_grid import (
     axisymmetric_cylindrical_cell_volumes,
     axisymmetric_radial_face_areas,
-    axisymmetric_topsoil_fractions,
-    axisymmetric_uniform_p_conc,
     axisymmetric_edges_from_intervals,
     axisymmetric_vertical_face_areas,
     validate_axisymmetric_grid_parameters,
@@ -118,16 +116,6 @@ def test_axisymmetric_face_areas_have_expected_geometry_and_axis_face_is_zero():
     )
 
 
-def test_topsoil_fractions_volume_average_a_crossed_layer():
-    """Ensures a non-aligned topsoil boundary preserves physical inventory."""
-    fractions = axisymmetric_topsoil_fractions(
-        z_edges=jnp.array([0.0, 10.0, 30.0, 50.0]),
-        topsoil_depth_cm=25.0,
-    )
-
-    assert jnp.allclose(fractions, jnp.array([1.0, 0.75, 0.0]))
-
-
 @pytest.mark.parametrize(
     ("radius_cm", "depth_cm", "radial_interval_cm", "depth_interval_cm"),
     [
@@ -148,23 +136,6 @@ def test_invalid_axisymmetric_grid_parameters_fail_fast(
             radial_interval_cm,
             depth_interval_cm,
         )
-
-
-def test_axisymmetric_uniform_p_conc_with_partial_topsoil_layer():
-    """Checks the transient reset concentration field is volume averaged."""
-    r_edges = jnp.array([0.0, 1.0, 2.0])
-    z_edges = jnp.array([0.0, 1.0, 3.0])
-
-    soil_p = axisymmetric_uniform_p_conc(
-        r_edges, z_edges, conc=2.0, topsoil_depth=1.5
-    )
-
-    expected = jnp.array([
-        [2.0, 0.5],
-        [2.0, 0.5],
-    ])
-    assert soil_p.shape == (2, 2)
-    assert jnp.allclose(soil_p, expected)
 
 
 def test_hemisphere_cell_fractions_use_annular_volume_fraction():

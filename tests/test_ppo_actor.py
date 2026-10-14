@@ -6,7 +6,7 @@ import jax
 from mycormarl.algos.ppo import (
     ActorCritic,
     PPOConfig,
-    latent_to_physical_action,
+    latent_to_rate_action,
     make_train,
     normal_log_probability,
 )
@@ -26,7 +26,6 @@ def _small_environment():
             soil_depth_cm=0.2,
             radial_interval_cm=0.1,
             depth_interval_cm=0.1,
-            topsoil_depth_cm=0.2,
         ),
         SpeciesParams(
             plant=PlantTraits(kappa_c=0.0, kappa_p=0.0),
@@ -35,57 +34,23 @@ def _small_environment():
     )
 
 
-def test_zero_latents_map_to_half_trade_and_uniform_allocation():
-    """The centred policy origin has the agreed biologically neutral action."""
-    action = latent_to_physical_action(
+def test_zero_latents_map_to_independent_nonnegative_per_day_rates():
+    action = latent_to_rate_action(
         trade_latent=jnp.array(0.0),
-        allocation_latent=jnp.array([0.0, 0.0]),
+        biological_rate_latent=jnp.zeros(3, dtype=jnp.float32),
     )
 
     assert action.dtype == jnp.float32
-    assert jnp.allclose(action, jnp.array([0.5, 1 / 3, 1 / 3, 1 / 3]))
+    assert jnp.allclose(action, jnp.full(4, jnp.log(2.0)))
 
 
-def test_allocation_transform_is_orthonormal_zero_sum_and_vectorised():
-    """The two latent allocation axes span the simplex symmetrically."""
-    actions = jax.jit(latent_to_physical_action)(
-        trade_latent=jnp.array([-100.0, 100.0]),
-        allocation_latent=jnp.eye(2, dtype=jnp.float32),
-    )
-    centred_log_allocations = jnp.log(actions[:, 1:]) - jnp.mean(
-        jnp.log(actions[:, 1:]), axis=-1, keepdims=True
-    )
-
-    assert actions.shape == (2, 4)
-    assert jnp.all(jnp.isfinite(actions))
-    assert jnp.allclose(
-        jnp.sum(centred_log_allocations, axis=-1), 0.0, atol=1e-6
-    )
-    assert jnp.allclose(
-        centred_log_allocations @ centred_log_allocations.T,
-        jnp.eye(2),
-        atol=1e-6,
-    )
-    assert jnp.allclose(
-        centred_log_allocations.T @ centred_log_allocations,
-        jnp.array(
-            [
-                [2 / 3, -1 / 3, -1 / 3],
-                [-1 / 3, 2 / 3, -1 / 3],
-                [-1 / 3, -1 / 3, 2 / 3],
-            ]
-        ),
-        atol=1e-6,
-    )
-
-
-def test_transformed_physical_actions_reach_the_environment_unchanged():
+def test_transformed_rate_actions_reach_the_environment_unchanged():
     """The environment observes and executes each transformed policy action exactly."""
     environment = _small_environment()
     _, state = environment.reset(jax.random.PRNGKey(1))
     actions = {
-        PLANT: latent_to_physical_action(0.25, jnp.array([0.5, -0.75])),
-        FUNGUS: latent_to_physical_action(-0.5, jnp.array([-0.25, 1.0])),
+        PLANT: latent_to_rate_action(0.25, jnp.array([0.5, -0.75, 0.0])),
+        FUNGUS: latent_to_rate_action(-0.5, jnp.array([-0.25, 1.0, 0.0])),
     }
 
     _, _, _, _, info = environment.step_env(
@@ -108,13 +73,23 @@ def test_actor_initialises_two_gaussian_heads_and_a_local_critic():
 
     assert policy.trade_loc.shape == (3,)
     assert policy.trade_log_std.shape == (3,)
-    assert policy.allocation_loc.shape == (3, 2)
-    assert policy.allocation_log_std.shape == (3, 2)
+    assert policy.biological_rate_loc.shape == (3, 3)
+    assert policy.biological_rate_log_std.shape == (3, 3)
     assert values.shape == (3,)
-    assert jnp.allclose(jax.nn.sigmoid(policy.trade_loc), 0.1)
-    assert jnp.allclose(policy.allocation_loc, 0.0)
+    assert jnp.allclose(jax.nn.softplus(policy.trade_loc), 0.1)
+    assert jnp.allclose(policy.biological_rate_loc, 0.0)
     assert jnp.allclose(policy.trade_log_std, 0.0)
-    assert jnp.allclose(policy.allocation_log_std, 0.0)
+    assert jnp.allclose(policy.biological_rate_log_std, 0.0)
+
+
+def test_actor_trade_head_can_be_preconditioned_at_requested_per_day_rate():
+    """The zero-feature trade latent maps exactly to the configured rate."""
+    observations = jnp.zeros((2, 5), dtype=jnp.float32)
+    for initial_trade in (0.05, 0.75):
+        actor_critic = ActorCritic(initial_trade=initial_trade)
+        parameters = actor_critic.init(jax.random.PRNGKey(11), observations)
+        policy, _ = actor_critic.apply(parameters, observations)
+        assert jnp.allclose(jax.nn.softplus(policy.trade_loc), initial_trade)
 
 
 def test_standard_normal_log_probability_matches_known_density():
@@ -148,28 +123,29 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
         (PLANT, FUNGUS), output["trajectories"], strict=True
     ):
         assert trajectory.latent_trade_action.shape == (1, 2, 2)
-        assert trajectory.latent_allocation_action.shape == (1, 2, 2, 2)
-        assert trajectory.physical_action.shape == (1, 2, 2, 4)
+        assert trajectory.latent_biological_rate_action.shape == (1, 2, 2, 3)
+        assert trajectory.rate_action.shape == (1, 2, 2, 4)
         assert trajectory.critic_valid.shape == (1, 2, 2)
-        assert trajectory.allocation_actor_valid.shape == (1, 2, 2)
+        assert trajectory.biological_rate_actor_valid.shape == (1, 2, 2)
         assert trajectory.trade_actor_valid.shape == (1, 2, 2)
         assert trajectory.bootstrap_observation.shape == (1, 2, 2, 5)
         for values in (
             trajectory.latent_trade_action,
-            trajectory.latent_allocation_action,
-            trajectory.physical_action,
+            trajectory.latent_biological_rate_action,
+            trajectory.rate_action,
             trajectory.trade_log_probability,
-            trajectory.allocation_log_probability,
+            trajectory.biological_rate_log_probability,
             trajectory.value,
         ):
             assert jnp.all(jnp.isfinite(values))
-        assert jnp.all(
-            (trajectory.physical_action[..., 0] >= 0.0)
-            & (trajectory.physical_action[..., 0] <= 1.0)
-        )
-        assert jnp.all(trajectory.physical_action[..., 1:] >= 0.0)
+        assert jnp.all(trajectory.rate_action[..., 0] >= 0.0)
+        assert jnp.all(trajectory.rate_action[..., 1:] >= 0.0)
         assert jnp.allclose(
-            jnp.sum(trajectory.physical_action[..., 1:], axis=-1), 1.0
+            trajectory.rate_action,
+            latent_to_rate_action(
+                trajectory.latent_trade_action,
+                trajectory.latent_biological_rate_action,
+            ),
         )
 
         policy, _ = ActorCritic(activation=config.ACTIVATION).apply(
@@ -180,11 +156,11 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
             policy.trade_loc,
             policy.trade_log_std,
         )
-        recomputed_allocation = jnp.sum(
+        recomputed_biological_rate = jnp.sum(
             normal_log_probability(
-                trajectory.latent_allocation_action,
-                policy.allocation_loc,
-                policy.allocation_log_std,
+                trajectory.latent_biological_rate_action,
+                policy.biological_rate_loc,
+                policy.biological_rate_log_std,
             ),
             axis=-1,
         )
@@ -192,8 +168,8 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
             recomputed_trade, trajectory.trade_log_probability, atol=1e-6
         )
         assert jnp.allclose(
-            recomputed_allocation,
-            trajectory.allocation_log_probability,
+            recomputed_biological_rate,
+            trajectory.biological_rate_log_probability,
             atol=1e-6,
         )
 
@@ -224,3 +200,135 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
         for state in train_states.values()
         for leaf in jax.tree.leaves(state.params)
     )
+
+
+def test_ppo_minibatches_flatten_time_and_environment_samples_together():
+    """Multiple vector environments must train without mask/likelihood shape drift."""
+    environment = _small_environment()
+    config = PPOConfig(
+        TOTAL_TIMESTEPS=32,
+        NUM_STEPS=2,
+        NUM_ENVS=16,
+        NUM_MINIBATCHES=1,
+        UPDATE_EPOCHS=1,
+        LR=0.0,
+        DISCOUNT_HALF_LIFE_DAYS=30.0,
+    )
+
+    output = jax.jit(make_train(environment, config))(jax.random.PRNGKey(17))
+
+    for agent in (PLANT, FUNGUS):
+        assert jnp.all(jnp.isfinite(output["metrics"][agent].total_loss))
+
+
+def test_resumed_training_anneals_learning_rate_over_the_global_budget():
+    """A resumed PPO chunk continues, rather than restarts, LR annealing."""
+    environment = _small_environment()
+    config = PPOConfig(
+        TOTAL_TIMESTEPS=4,
+        RUN_TIMESTEPS=2,
+        NUM_STEPS=2,
+        NUM_ENVS=1,
+        NUM_MINIBATCHES=1,
+        UPDATE_EPOCHS=1,
+        LR=1.0,
+        DISCOUNT_HALF_LIFE_DAYS=30.0,
+    )
+
+    first = jax.jit(make_train(environment, config))(jax.random.PRNGKey(9))
+    second = jax.jit(make_train(
+        environment, config, initial_runner_state=first["runner_state"],
+    ))(jax.random.PRNGKey(9))
+
+    for output, expected_rate in ((first, 0.5), (second, 0.0)):
+        for agent in (PLANT, FUNGUS):
+            assert jnp.isclose(
+                output["metrics"][agent].learning_rate[-1], expected_rate
+            )
+
+
+def test_critic_normalization_is_resumable_and_exposes_finite_scales():
+    """Chunking a fixed random stream preserves each agent's critic scale."""
+    environment = _small_environment()
+    full_config = PPOConfig(
+        TOTAL_TIMESTEPS=4,
+        NUM_STEPS=2,
+        NUM_ENVS=1,
+        NUM_MINIBATCHES=1,
+        UPDATE_EPOCHS=1,
+        LR=0.0,
+        DISCOUNT_HALF_LIFE_DAYS=30.0,
+    )
+    chunk_config = PPOConfig(
+        TOTAL_TIMESTEPS=4,
+        RUN_TIMESTEPS=2,
+        NUM_STEPS=2,
+        NUM_ENVS=1,
+        NUM_MINIBATCHES=1,
+        UPDATE_EPOCHS=1,
+        LR=0.0,
+        DISCOUNT_HALF_LIFE_DAYS=30.0,
+    )
+
+    full = jax.jit(make_train(environment, full_config))(jax.random.PRNGKey(12))
+    first = jax.jit(make_train(environment, chunk_config))(jax.random.PRNGKey(12))
+    resumed = jax.jit(make_train(
+        environment, chunk_config, initial_runner_state=first["runner_state"],
+    ))(jax.random.PRNGKey(12))
+
+    for agent in (PLANT, FUNGUS):
+        full_state = full["runner_state"][0][agent]
+        resumed_state = resumed["runner_state"][0][agent]
+        assert jax.tree.all(
+            jax.tree.map(
+                lambda left, right: jnp.allclose(left, right, rtol=1e-5, atol=1e-8),
+                full_state.critic_normalizer,
+                resumed_state.critic_normalizer,
+            )
+        )
+        metrics = full["metrics"][agent]
+        for value in (
+            metrics.raw_return_mean,
+            metrics.normalized_return_mean,
+            metrics.raw_critic_mean,
+            metrics.normalized_critic_mean,
+            metrics.critic_target_scale,
+        ):
+            assert jnp.all(jnp.isfinite(value))
+
+
+def test_per_agent_critic_normalization_stays_finite_for_widely_scaled_rewards():
+    """Mixed agents retain finite independent critic scales despite a 10^6 pool gap."""
+    environment = BaseMycorMarl(
+        EnvConfig(
+            max_steps=2,
+            dt=0.05,
+            soil_radius_cm=0.2,
+            soil_depth_cm=0.2,
+            radial_interval_cm=0.1,
+            depth_interval_cm=0.1,
+        ),
+        SpeciesParams(
+            plant=PlantTraits(initial_c_pool=1_000.0, initial_p_pool=1_000.0),
+            fungus=FungusTraits(initial_c_pool=0.001, initial_p_pool=0.001),
+        ),
+    )
+    output = jax.jit(make_train(
+        environment,
+        PPOConfig(
+            TOTAL_TIMESTEPS=2,
+            NUM_STEPS=2,
+            NUM_ENVS=1,
+            NUM_MINIBATCHES=1,
+            UPDATE_EPOCHS=1,
+            LR=0.0,
+            DISCOUNT_HALF_LIFE_DAYS=30.0,
+        ),
+    ))(jax.random.PRNGKey(21))
+
+    plant_metrics = output["metrics"][PLANT]
+    fungus_metrics = output["metrics"][FUNGUS]
+    assert abs(plant_metrics.raw_return_mean) > abs(fungus_metrics.raw_return_mean) * 100
+    for metrics in (plant_metrics, fungus_metrics):
+        assert jnp.all(jnp.isfinite(metrics.critic_target_scale))
+        assert jnp.all(jnp.isfinite(metrics.normalized_return_mean))

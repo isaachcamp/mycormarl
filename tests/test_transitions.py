@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from mycormarl.actions import physical_action
+from mycormarl.actions import rate_action as physical_action
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
@@ -47,7 +47,6 @@ def config():
         radial_interval_cm=0.5,
         soil_depth_cm=1.0,
         depth_interval_cm=0.5,
-        topsoil_depth_cm=0.5,
         initial_solution_p_um=0.0,
     )
 

@@ -13,7 +13,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from mycormarl.actions import physical_action
+from mycormarl.actions import rate_action
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.mycelium import (
     colony_radius_from_length_axisymmetric,
@@ -31,20 +31,20 @@ from mycormarl.soil.soil import uptake_geometry_coefficients
 
 @dataclass(frozen=True)
 class StaticPolicy:
-    """One constant valid Physical action used during qualification."""
+    """One constant valid Rate action in ``d^-1`` used during qualification."""
 
     trade: float
     growth: float
     reproduction: float
-    reserve: float
+    storage: float
 
     def action(self):
         """Construct the policy's action through the public action boundary."""
-        return physical_action(
+        return rate_action(
             self.trade,
             self.growth,
             self.reproduction,
-            self.reserve,
+            self.storage,
         )
 
 
@@ -116,8 +116,8 @@ def _policy_record(policy: StaticPolicy) -> dict:
         "trade": policy.trade,
         "growth": policy.growth,
         "reproduction": policy.reproduction,
-        "reserve": policy.reserve,
-        "physical_action": [float(value) for value in policy.action()],
+        "storage_rate_per_day": policy.storage,
+        "rate_action_per_day": [float(value) for value in policy.action()],
     }
 
 

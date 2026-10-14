@@ -23,6 +23,7 @@ class PolicyArtifact:
     consumer_mode: str
     actor_interface_version: str
     environment_state_schema_version: str
+    random_streams: Mapping[str, Any] | None = None
 
 
 def save_policy_artifact(
@@ -30,6 +31,7 @@ def save_policy_artifact(
     parameters: Mapping[str, Any],
     *,
     consumer_mode: str,
+    random_streams: Any = None,
 ) -> None:
     """Save policy parameters with explicit interface compatibility metadata."""
     payload = {
@@ -40,6 +42,12 @@ def save_policy_artifact(
         "consumer_mode": consumer_mode,
         "parameters": parameters,
     }
+    if random_streams is not None:
+        payload["random_streams"] = (
+            random_streams.to_dict()
+            if hasattr(random_streams, "to_dict")
+            else random_streams
+        )
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(serialization.msgpack_serialize(payload))
@@ -80,4 +88,5 @@ def load_policy_artifact(path: str | Path) -> PolicyArtifact:
         environment_state_schema_version=payload[
             "environment_state_schema_version"
         ],
+        random_streams=payload.get("random_streams"),
     )

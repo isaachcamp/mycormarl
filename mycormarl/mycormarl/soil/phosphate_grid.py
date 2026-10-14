@@ -1,6 +1,5 @@
 
 import math
-from typing import Optional
 
 import chex
 import jax.numpy as jnp
@@ -156,45 +155,37 @@ def axisymmetric_vertical_face_areas(
     )
 
 
-def axisymmetric_topsoil_fractions(
-        z_edges: chex.Array,
-        topsoil_depth_cm: float,
-    ) -> chex.Array:
-    """Return the fraction of every depth cell lying above the topsoil limit.
-
-    Fractional occupancy prevents initial inventory from changing when the
-    physical topsoil boundary cuts through a finite grid cell.
-    
-    ### This can be avoided if the topsoil depth is an integer multiple of the
-    depth interval.
-    """
-    z_edges = jnp.asarray(z_edges, dtype=jnp.float32)
-    dz = z_edges[1:] - z_edges[:-1]
-    return jnp.clip((topsoil_depth_cm - z_edges[:-1]) / dz, 0.0, 1.0)
-
-
-def axisymmetric_uniform_p_conc(
+def axisymmetric_profile_p_concentration(
         r_edges: chex.Array,
         z_edges: chex.Array,
-        conc: float,
-        topsoil_depth: Optional[float] = None,
+        surface_concentration_um: float,
+        depth_profile: tuple[tuple[float, float], ...] | list[list[float]],
     ) -> chex.Array:
-    """Construct a uniform phosphorus concentration on an r-z cylindrical grid.
+    """Return a radial-uniform, linearly interpolated solution-P field.
 
-    When ``topsoil_depth`` is provided, subsoil cells are zero and a crossed
-    cell stores its volume-averaged concentration. This is an intermediate
-    reset field only: the concentration is immediately converted to canonical
-    labile amount and is not stored in environment state.
+    ``depth_profile`` contains ``(depth_cm, relative_factor)`` knots. The
+    configured surface concentration is the value at the first knot; shallower
+    cell centres retain that first factor. Domain construction validates that
+    the final knot covers the represented depth, so this helper never silently
+    extrapolates into unobserved subsoil.
     """
-    r_edges = jnp.asarray(r_edges, dtype=jnp.float32)
-    z_edges = jnp.asarray(z_edges, dtype=jnp.float32)
-
-    soil_p = jnp.full((r_edges.shape[0] - 1, z_edges.shape[0] - 1), conc, dtype=jnp.float32)
-    if topsoil_depth is None:
-        return soil_p
-
-    topsoil_fraction = axisymmetric_topsoil_fractions(z_edges, topsoil_depth)
-    return soil_p * topsoil_fraction[None, :]
+    knots = jnp.asarray(depth_profile, dtype=jnp.float32)
+    z_centres = (jnp.asarray(z_edges[:-1]) + jnp.asarray(z_edges[1:])) / 2.0
+    factors = jnp.interp(
+        z_centres,
+        knots[:, 0],
+        knots[:, 1],
+        left=knots[0, 1],
+        right=knots[-1, 1],
+    )
+    concentration = (
+        jnp.asarray(surface_concentration_um, dtype=jnp.float32)
+        * factors
+        * 1e-3
+    )
+    return jnp.broadcast_to(
+        concentration[None, :], (len(r_edges) - 1, len(z_centres))
+    )
 
 
 def solution_concentration_to_labile_amount(
@@ -236,24 +227,32 @@ def initial_labile_p_from_micromolar(
         r_edges: chex.Array,
         z_edges: chex.Array,
         concentration_um: float,
-        topsoil_depth_cm: Optional[float],
         theta_water: float,
         b_p: float,
+        depth_profile: tuple[tuple[float, float], ...] | list[list[float]] | None = None,
     ) -> chex.Array:
     """Build the reset-time canonical labile-P field from configured µM.
 
-    It takes in a uniform concentration in micromolar, converts to 
-    canonical labile amount, and returns a 2D array of shape (n_r, n_z).
+    With no depth profile it applies one uniform concentration in micromolar
+    to every cell; otherwise it scales that concentration by the profile.
+    It returns canonical labile amount with shape ``(n_r, n_z)``.
 
-    The function composes unit conversion, partial-topsoil concentration,
-    annular cell volumes, and linear buffering. Its output is stored directly
+    The function composes unit conversion, depth treatment, annular cell
+    volumes, and linear buffering. Its output is stored directly
     as ``State.soil_labile_p``.
     """
-    concentration = axisymmetric_uniform_p_conc(
-        r_edges,
-        z_edges,
-        conc=micromolar_to_micromol_per_cm3(concentration_um),
-        topsoil_depth=topsoil_depth_cm,
+    concentration = (
+        axisymmetric_profile_p_concentration(
+            r_edges,
+            z_edges,
+            concentration_um,
+            depth_profile,
+        )
+        if depth_profile is not None
+        else jnp.full(
+            (len(r_edges) - 1, len(z_edges) - 1),
+            micromolar_to_micromol_per_cm3(concentration_um),
+        )
     )
     volumes = axisymmetric_cylindrical_cell_volumes(r_edges, z_edges)
     return solution_concentration_to_labile_amount(

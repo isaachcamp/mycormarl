@@ -148,6 +148,10 @@ def _apply_blended_uptake_with_diagnostics(
         soil_labile_p=remaining,
         plant_p_pool=state.plant_p_pool + plant_gain_mg,
         fungus_p_pool=state.fungus_p_pool + fungus_gain_mg,
+        cumulative_direct_plant_p_uptake_micromol=(
+            state.cumulative_direct_plant_p_uptake_micromol
+            + jnp.sum(accepted_root)
+        ),
     ), diagnostics
 
 

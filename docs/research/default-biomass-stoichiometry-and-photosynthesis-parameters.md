@@ -6,33 +6,39 @@ initial plant and fungal biomass, initial resource pools, and plant `amass`.
 This note records evidence and the resulting parameter decisions; runtime
 changes are implemented in the corresponding trait definitions.
 
-**Supersession (6 August 2026):** the runtime defaults now represent an
-early-established resource-exchange fixture: plant biomass `0.01 g` with
-`0.00402 g C` and `0.0192 mg P` free pools, and living external fungal biomass
-`0.0001 g` with `0.00005 g C` and `0.0002 mg P` free pools. The propagule and
-one-spore values documented below remain provenance and sensitivity cases, not
-the active defaults.
+**Supersession (20 August 2026):** the runtime defaults represent an
+early-established resource-exchange fixture with plant biomass `0.01 g` and
+living external fungal biomass `0.001 g`. Default P loss is disabled
+(`kappa_p=0`), so unspecified default free-P pools are zero; unspecified free-C
+pools fund exactly one configured next-step maintenance payment (`kappa_c × biomass × dt`); numeric
+pool values remain explicit provenance, qualification, or sensitivity
+overrides. The propagule and one-spore values documented below remain
+provenance and sensitivity cases, not active defaults.
 
 ## Accepted decisions
 
-### Fungal `gamma_p`: use the ordinary spore value
+### Fungal `gamma_p`: use the low-P spore value
 
-Use **`gamma_p = 2 mg P g⁻¹ dry biomass`** as the provisional fungal
-default. Olsson et al. describe approximately `2,000 µg P g⁻¹`
-(`2 mg P g⁻¹`) as an ordinary concentration inside *Glomus intraradices*
-spores. The isolate lineage was subsequently called *G. irregulare* and is now
+Use **`gamma_p = 1.3 mg P g⁻¹ dry biomass`** as the evidence-led fungal
+default. Low-P spores of *Glomus intraradices* contained `1.3 ± 0.35 mg P g⁻¹`.
+The isolate lineage was subsequently called *G. irregulare* and is now
 *Rhizophagus irregularis* ([Olsson et al. 2008](https://doi.org/10.1128/AEM.00376-08)).
-The value is therefore an approximate spore P-content measurement, not a direct
-measurement of whole-mycelium structural stoichiometry or maintenance
-expenditure.
+The value is a low-P spore P-content proxy, not a direct measurement of
+whole-extraradical-mycelium structural stoichiometry or maintenance expenditure.
 
-The selection uses the paper's ordinary spore-level concentration rather than
-the lower `1.3 ± 0.35 mg P g⁻¹` treatment mean. In the current model,
+The selection uses the directly measured low-P treatment mean. In the current model,
 `gamma_p` is the structural P cost used for growth and for converting an unmet
 maintenance-P deficit into lost biomass. It does **not** set maintenance
 demand; that rate is `kappa_p`. Consequently, lowering `gamma_p` reduces the P
 cost of growth but increases the biomass lost for a given unmet P-maintenance
 deficit.
+
+Spores should not be described as generally more P- or nutrient-dense than
+extraradical mycelium. Spores are storage and survival structures, and their P
+content was P-plastic; however, the same study measured `2.4–9.6 mg P g⁻¹` in
+four selected young-hypha regions. Those observations do not provide a matched
+whole-extraradical-mycelium comparison and do not establish a universal
+spore-versus-hypha concentration ordering.
 
 ### Fungal saturation density: use the lower observed upper-profile estimate
 
@@ -89,21 +95,21 @@ fractions, then converting dry biomass with `gamma_c = 0.402`, gives
 from the apparent-gross `amass` input, all fitted standing-biomass maintenance
 is assigned to `kappa_c` rather than partitioned between the two parameters.
 
-At the accepted `amass = 0.05` and `kleaf = 0.30`, carbon supply is `0.015 g C
+At the accepted `amass = 0.05` and `kleaf = 0.68`, carbon supply is `0.034 g C
 g⁻¹ whole-plant DM d⁻¹`. Subtracting `kappa_c = 0.007` leaves
-`0.008 g C g⁻¹ whole-plant DM d⁻¹` before growth and fungal trade.
+`0.027 g C g⁻¹ whole-plant DM d⁻¹` before growth and fungal trade.
 
 ## Executive findings
 
 | Model quantity | Closest primary evidence | Recommendation for planning |
 |---|---|---|
-| Fungal `gamma_p` | *Glomus intraradices* (the isolate was subsequently called *G. irregulare*, now *Rhizophagus irregularis*) spores contained **1.3 ± 0.35 mg P g⁻¹** under low P and **8.0 ± 1.6 mg P g⁻¹** under high P; four selected young-hypha regions contained **2.4–9.6 mg P g⁻¹** ([Olsson et al. 2008](https://doi.org/10.1128/AEM.00376-08)). | **Selected provisionally: `2 mg P g⁻¹`**, the paper's approximate ordinary spore concentration. It is not an invariant whole-fungus stoichiometry or a direct maintenance-rate measurement. |
+| Fungal `gamma_p` | *Glomus intraradices* (the isolate was subsequently called *G. irregulare*, now *Rhizophagus irregularis*) spores contained **1.3 ± 0.35 mg P g⁻¹** under low P and **8.0 ± 1.6 mg P g⁻¹** under high P; four selected young-hypha regions contained **2.4–9.6 mg P g⁻¹** ([Olsson et al. 2008](https://doi.org/10.1128/AEM.00376-08)). | **Selected: `1.3 mg P g⁻¹`**, the directly measured low-P spore mean. It is not an invariant whole-fungus stoichiometry or a direct maintenance-rate measurement; the hyphal measurements do not support claiming spores are generally P-denser than extraradical mycelium. |
 | Fungal saturation density | Jakobsen et al.'s external-hypha profiles reach approximately **20–25 m hypha cm⁻³ soil**, i.e. **2,000–2,500 cm cm⁻³**, while later mechanistic work summarizes the measurements as order `10³ cm cm⁻³` ([Jakobsen et al. 1992](https://doi.org/10.1111/j.1469-8137.1992.tb01077.x); [Schnepf & Roose 2006](https://doi.org/10.1111/j.1469-8137.2006.01771.x)). | **Selected: `2,000 cm cm⁻³`**, the lower observed upper-profile estimate. It is not a universal AMF constant. |
 | Plant initial biomass | A 40-population study found *Daucus carota* population means spanning **0.7–3.3 mg** ([Vandelook et al. 2024](https://doi.org/10.1017/S0960258524000230)). | **Selected: `0.001 g dry mass`**, a representative low-end one-milligram propagule, with one structural-biomass equivalent in each free pool. This is literature-bounded rather than a directly reported species mean. |
 | Fungal initial biomass | No direct numerical *R. irregularis* dry mass per spore was recovered. The strongest fallback is a counted-and-dried five-species AMF calibration, `M = 0.4458e-5 d^2.5372`, where `M` is µg dry mass spore⁻¹ and `d` is mean diameter in µm ([Sieverding et al. 1989](https://doi.org/10.1016/0038-0717(89)90013-8)). Applying it to the reported *R. irregularis* diameter limits gives **0.214–1.885 µg spore⁻¹**. | **Selected: `7.97e-7 g`**, the regression evaluated at the 117.5-µm range midpoint. This is an empirical cross-species estimate, not a measured *R. irregularis* mean. |
 | Plant `amass` | Carrot net light-response curves plus their fitted respiration intercepts give an apparent-gross **7.79–11.17 µmol CO₂ m⁻² s⁻¹** at the study's 450 µmol m⁻² s⁻¹ irradiance and 16-h photoperiod ([Kyei-Boahen et al. 2003](https://ps.ueb.cas.cz/pdfs/phs/2003/02/30.pdf)). Independent carrot accessions had SLA **66–94 cm² g⁻¹ leaf DM** ([Acosta-Motos et al. 2021](https://doi.org/10.3390/agronomy11122460)). | **Selected: `0.05 g C g⁻¹ leaf DM d⁻¹`**, the rounded midpoint of the `0.036–0.073` apparent-gross reference-day range. This is not true biochemical gross photosynthesis. |
 | Plant `kappa_c` | A carrot growth model fitted `q_s.maint = 0.021 d⁻¹` and `q_r.maint = 0.015 d⁻¹` at 20 °C, with `Q10 = 2` ([Reid 2019](https://doi.org/10.1080/01140671.2019.1588134)). A full-day, 20 °C whole-plant conversion is `0.00694 g C g⁻¹ DM d⁻¹`. | **Selected: `0.007 g C g⁻¹ whole-plant DM d⁻¹`**, charging all fitted standing-biomass maintenance separately from apparent-gross carbon input. |
-| Plant `kappa_p` | Carrot time courses show continued P accumulation and redistribution to the storage root, while no primary carrot study recovered a sustained irreversible P-loss rate ([Fernández-Pérez et al. 2023](https://doi.org/10.17584/rcch.2023v17i3.16508); [Cecílio Filho et al. 2013](https://acervodigital.unesp.br/handle/11449/75622)). | **Selected: `0.001 mg P g⁻¹ whole-plant DM d⁻¹`** as a small positive abstraction for herbivory, leakage, and unrecovered turnover—not measured carrot maintenance. Sensitivity: `0`, `0.001`, `0.002`; exploratory high-turnover case `0.005`. |
+| Plant `kappa_p` | Carrot time courses show continued P accumulation and redistribution to the storage root, while no primary carrot study recovered a sustained irreversible P-loss rate ([Fernández-Pérez et al. 2023](https://doi.org/10.17584/rcch.2023v17i3.16508); [Cecílio Filho et al. 2013](https://acervodigital.unesp.br/handle/11449/75622)). | **Selected: `0 mg P g⁻¹ whole-plant DM d⁻¹`** as the conservation default. Positive `0.001` and `0.002` values remain explicit loss sensitivities; `0.005` is exploratory. |
 
 ## 1. Preserve the repository contracts
 
@@ -143,10 +149,10 @@ not establish fixed structural P demand. The paper itself describes about
 `2,000 µg g⁻¹` (2 mg g⁻¹) as the usual spore-level concentration
 ([Olsson et al. 2008](https://doi.org/10.1128/AEM.00376-08)).
 
-**Decision:** use `2 mg P g⁻¹`, the paper's approximate ordinary spore
-concentration, as the fixed P-content assumption. The low-P treatment mean
-(`1.3 mg P g⁻¹`) and high-P treatment mean (`8 mg P g⁻¹`) should remain
-sensitivity cases because the model treats `gamma_p` as fixed stoichiometry.
+**Decision:** use `1.3 mg P g⁻¹`, the directly measured low-P spore mean, as
+the fixed P-content assumption. The high-P treatment mean (`8 mg P g⁻¹`) and
+the lower exploratory screen values remain sensitivity cases because the model
+treats `gamma_p` as fixed stoichiometry.
 
 ## 3. Saturated external-hyphal density
 
@@ -259,8 +265,8 @@ Once a fungal mass `M_f` is chosen, pools follow without ambiguity:
 - `initial_p_pool = M_f * gamma_p` in mg P.
 
 At the accepted `M_f = 7.97e-7 g`, `gamma_c = 0.5` gives exactly
-`3.985e-7 g C`, and the selected `gamma_p = 2 mg g⁻¹` gives exactly
-`1.594e-6 mg P`.
+`3.985e-7 g C`, and the selected `gamma_p = 1.3 mg g⁻¹` gives exactly
+`1.0361e-6 mg P`.
 
 ## 5. `amass`: area-based observations versus the model's mass-based rate
 

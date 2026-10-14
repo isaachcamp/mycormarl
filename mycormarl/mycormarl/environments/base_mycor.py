@@ -7,6 +7,7 @@ from enum import IntEnum
 
 import chex
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
+from mycormarl.environments.autoreset import AutoResetMixin
 from jaxmarl.environments.spaces import Box
 import jax
 import jax.numpy as jnp
@@ -43,14 +44,14 @@ FUNGUS = "fungus"
 AGENTS = (PLANT, FUNGUS)
 
 class Actions(IntEnum):
-    # Physical action: independent trade plus a biological allocation simplex.
+    # Rate action: independent first-order rates in d^-1.
     trade = 0
     growth = 1
     reproduction = 2
-    reserve = 3
+    storage = 3
 
 
-class BaseMycorMarl(MultiAgentEnv):
+class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
     def __init__(
         self,
         config: Optional[EnvConfig] = None,
@@ -121,17 +122,17 @@ class BaseMycorMarl(MultiAgentEnv):
         obs_dim = 5
 
         self.action_set = jnp.array(
-            [Actions.trade, Actions.growth, Actions.reproduction, Actions.reserve]
+            [Actions.trade, Actions.growth, Actions.reproduction, Actions.storage]
         )
 
         self.observation_spaces = {
             PLANT: Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=jnp.float32),
             FUNGUS: Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=jnp.float32),
         }
-        # Physical action: trade, growth, reproduction, reserve.
+        # Rate action in d^-1: trade, growth, reproduction, storage.
         self.action_spaces = {
-            PLANT: Box(low=0.0, high=1.0, shape=self.action_set.shape, dtype=jnp.float32),
-            FUNGUS: Box(low=0.0, high=1.0, shape=self.action_set.shape, dtype=jnp.float32),
+            PLANT: Box(low=0.0, high=jnp.inf, shape=self.action_set.shape, dtype=jnp.float32),
+            FUNGUS: Box(low=0.0, high=jnp.inf, shape=self.action_set.shape, dtype=jnp.float32),
         }
 
         # Environment parameters
@@ -216,9 +217,9 @@ class BaseMycorMarl(MultiAgentEnv):
             self.r_edges,
             self.z_edges,
             self.config.initial_solution_p_um,
-            self.config.topsoil_depth_cm,
             self.config.theta_water,
             self.config.b_p,
+            self.config.initial_solution_p_depth_profile,
         )
 
         # Positive initial biomass only if the organism is active.
@@ -243,6 +244,15 @@ class BaseMycorMarl(MultiAgentEnv):
             self.z_edges,
         )
 
+        def reset_pool(
+            pool: float | None, kappa: float, biomass: float, active: bool
+        ) -> float:
+            if not active:
+                return 0.0
+            if pool is not None:
+                return pool
+            return kappa * biomass * self.config.dt
+
         return State(
             terminal=False,
             step=0,
@@ -250,23 +260,28 @@ class BaseMycorMarl(MultiAgentEnv):
             fungus_biomass=fungus_biomass,
             plant_history_max_biomass=plant_biomass,
             fungus_history_max_biomass=fungus_biomass,
-            plant_c_pool=jnp.array([
-                self.species.plant.initial_c_pool if self.plant_active else 0.0
-            ]),
-            plant_p_pool=jnp.array([
-                self.species.plant.initial_p_pool if self.plant_active else 0.0
-            ]),
-            fungus_c_pool=jnp.array([
-                self.species.fungus.initial_c_pool if self.fungus_active else 0.0
-            ]),
-            fungus_p_pool=jnp.array([
-                self.species.fungus.initial_p_pool if self.fungus_active else 0.0
-            ]),
+            plant_c_pool=jnp.array([reset_pool(
+                self.species.plant.initial_c_pool, self.species.plant.kappa_c,
+                self.species.plant.initial_biomass, self.plant_active,
+            )]),
+            plant_p_pool=jnp.array([reset_pool(
+                self.species.plant.initial_p_pool, self.species.plant.kappa_p,
+                self.species.plant.initial_biomass, self.plant_active,
+            )]),
+            fungus_c_pool=jnp.array([reset_pool(
+                self.species.fungus.initial_c_pool, self.species.fungus.kappa_c,
+                self.species.fungus.initial_biomass, self.fungus_active,
+            )]),
+            fungus_p_pool=jnp.array([reset_pool(
+                self.species.fungus.initial_p_pool, self.species.fungus.kappa_p,
+                self.species.fungus.initial_biomass, self.fungus_active,
+            )]),
             plant_last_p_received=jnp.array([0.0]),
             fungus_last_c_received=jnp.array([0.0]),
             soil_labile_p=soil_labile_p,
             root_length_density=root_length_density,
             hyphae_length_density=hyphae_length_density,
+            cumulative_direct_plant_p_uptake_micromol=jnp.array([0.0]),
             cumulative_plant_p_mortality_loss_mg=jnp.array([0.0]),
             cumulative_fungus_p_mortality_loss_mg=jnp.array([0.0]),
             cumulative_plant_p_maintenance_loss_mg=jnp.array([0.0]),
@@ -356,14 +371,20 @@ class BaseMycorMarl(MultiAgentEnv):
         trading_enabled = jnp.logical_and(
             plant_operational_at_end, fungus_operational_at_end
         )
+        plant_trade_fraction = -jnp.expm1(
+            -actions[PLANT][Actions.trade] * self.config.dt
+        )
+        fungus_trade_fraction = -jnp.expm1(
+            -actions[FUNGUS][Actions.trade] * self.config.dt
+        )
         plant_c_trade_proposed = jnp.where(
             plant_operational_at_start,
-            actions[PLANT][Actions.trade] * plant_maintenance["c_pool"],
+            plant_trade_fraction * plant_maintenance["c_pool"],
             0.0,
         )
         fungus_p_trade_proposed = jnp.where(
             fungus_operational_at_start,
-            actions[FUNGUS][Actions.trade] * fungus_maintenance["p_pool"],
+            fungus_trade_fraction * fungus_maintenance["p_pool"],
             0.0,
         )
         plant_c_trade_out = jnp.where(
@@ -488,7 +509,11 @@ class BaseMycorMarl(MultiAgentEnv):
                 self.z_edges,
             ),
         )
+        plant_p_before_uptake = state.plant_p_pool
+        fungus_p_before_uptake = state.fungus_p_pool
         state = self.step_phosphorus_field(state)
+        plant_direct_uptake_mg = state.plant_p_pool - plant_p_before_uptake
+        fungus_direct_uptake_mg = state.fungus_p_pool - fungus_p_before_uptake
 
         state = state.replace(step=state.step + 1)
 
@@ -551,6 +576,9 @@ class BaseMycorMarl(MultiAgentEnv):
                 "trade_out": plant_c_trade_out,
                 "trade_in": fungus_p_trade_out,
                 "trade_cancelled": trade_cancelled,
+                "direct_p_uptake_mg": plant_direct_uptake_mg,
+                "carbon_fixed": plant_carbon_fixed,
+                "maintenance_p_required_mg": plant_maintenance["info"]["maint_p"],
             },
             FUNGUS: {
                 **fungus_step["info"],
@@ -562,6 +590,8 @@ class BaseMycorMarl(MultiAgentEnv):
                 "trade_out": fungus_p_trade_out,
                 "trade_in": plant_c_trade_out,
                 "trade_cancelled": trade_cancelled,
+                "direct_p_uptake_mg": fungus_direct_uptake_mg,
+                "maintenance_p_required_mg": fungus_maintenance["info"]["maint_p"],
             },
             "transitions": {
                 PLANT: completed_transition(
@@ -654,10 +684,18 @@ class BaseMycorMarl(MultiAgentEnv):
         operational: chex.Array,
         biomass_cap: float | None = None,
     ) -> dict:
-        """Apply growth/reproduction/reserve fractions to disposable C and P."""
+        """Apply competing growth/reproduction/storage rates to free C and P."""
         action = jnp.where(operational, action, jnp.zeros_like(action))
-        growth_alloc = action[Actions.growth]
-        reproduction_alloc = action[Actions.reproduction]
+        biological_rates = action[Actions.growth :]
+        total_rate = jnp.sum(biological_rates)
+        selected_fraction = -jnp.expm1(-total_rate * self.config.dt)
+        rate_shares = jnp.where(
+            total_rate > 0.0,
+            biological_rates / jnp.maximum(total_rate, 1e-12),
+            jnp.zeros_like(biological_rates),
+        )
+        growth_alloc = selected_fraction * rate_shares[0]
+        reproduction_alloc = selected_fraction * rate_shares[1]
 
         growth_c_alloc = growth_alloc * c_pool
         growth_p_alloc = growth_alloc * p_pool
@@ -690,6 +728,7 @@ class BaseMycorMarl(MultiAgentEnv):
             "growth_p_used": growth_p_used,
             "reproduction_c": reproduction_c,
             "reproduction_p": reproduction_p,
+            "reproductive_fitness_from_components": reward,
         }
         return {
             "growth": growth,
@@ -733,10 +772,9 @@ class BaseMycorMarl(MultiAgentEnv):
     def _validate_soil_config(config: EnvConfig) -> None:
         """Validate all reset-critical soil scalars before allocating arrays.
 
-        This is the configuration boundary for grid geometry, topsoil extent,
-        non-negative initial solution P, linear buffering, diffusion, and CFL
-        safety. Numerical helpers can therefore stay branch-free and
-        JAX-compatible.
+        This is the configuration boundary for grid geometry, the initial
+        solution-P treatment, linear buffering, diffusion, and CFL safety.
+        Numerical helpers can therefore stay branch-free and JAX-compatible.
         """
         validate_axisymmetric_grid_parameters(
             config.soil_radius_cm,
@@ -779,18 +817,27 @@ class BaseMycorMarl(MultiAgentEnv):
             raise ValueError(
                 "uptake_transition_exponent must be finite and greater than zero"
             )
-        if not math.isfinite(config.topsoil_depth_cm) or not (
-            0.0 <= config.topsoil_depth_cm <= config.soil_depth_cm
-        ):
-            raise ValueError(
-                "topsoil_depth_cm must be finite and within the soil domain"
-            )
         if not math.isfinite(config.initial_solution_p_um) or (
             config.initial_solution_p_um < 0.0
         ):
             raise ValueError(
                 "initial_solution_p_um must be finite and non-negative"
             )
+        profile = config.initial_solution_p_depth_profile
+        if profile is not None:
+            try:
+                knots = tuple((float(depth), float(factor)) for depth, factor in profile)
+            except (TypeError, ValueError) as error:
+                raise ValueError("initial_solution_p_depth_profile must contain depth/factor pairs") from error
+            if len(knots) < 2:
+                raise ValueError("initial_solution_p_depth_profile requires at least two knots")
+            if knots[-1][0] < config.soil_depth_cm:
+                raise ValueError("initial_solution_p_depth_profile does not cover soil_depth_cm")
+            if any(
+                not math.isfinite(depth) or not math.isfinite(factor) or factor < 0.0
+                for depth, factor in knots
+            ) or any(right[0] <= left[0] for left, right in zip(knots, knots[1:])):
+                raise ValueError("initial_solution_p_depth_profile requires increasing finite depths and non-negative factors")
 
     def _cobb_douglas(self, c: chex.Array, p: chex.Array, alpha: float) -> chex.Array:
         """Compute Cobb-Douglas rewarding for reproduction based on phosphorus and carbon."""

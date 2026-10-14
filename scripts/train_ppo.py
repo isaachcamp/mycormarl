@@ -13,6 +13,7 @@ from mycormarl.environments.base_mycor import BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
+from mycormarl.random_streams import derive_random_streams
 from mycormarl.policy_artifacts import save_policy_artifact
 
 
@@ -32,6 +33,10 @@ def main() -> None:
     parser.add_argument(
         "--output", type=Path, default=Path("outputs/ppo_parameters.msgpack")
     )
+    parser.add_argument(
+        "--finite-horizon-returns", action="store_true",
+        help="Treat the declared episode horizon as the PPO return boundary.",
+    )
     args = parser.parse_args()
     config = EnvConfig(
         max_steps=args.num_steps,
@@ -40,7 +45,6 @@ def main() -> None:
         soil_depth_cm=1.0,
         radial_interval_cm=0.1,
         depth_interval_cm=0.1,
-        topsoil_depth_cm=1.0,
         consumer_mode=args.mode,
     )
     species = SpeciesParams(plant=PlantTraits(), fungus=FungusTraits())
@@ -51,11 +55,18 @@ def main() -> None:
         NUM_ENVS=args.num_envs,
         NUM_MINIBATCHES=1,
         UPDATE_EPOCHS=1,
+        FINITE_HORIZON_RETURNS=args.finite_horizon_returns,
     )
-    output = jax.jit(make_train(env, ppo))(jax.random.PRNGKey(args.seed))
+    random_streams = derive_random_streams(args.seed)
+    output = jax.jit(make_train(env, ppo, random_streams))(jax.random.PRNGKey(args.seed))
     train_state = output["runner_state"][0]
     parameters = {name: state.params for name, state in train_state.items()}
-    save_policy_artifact(args.output, parameters, consumer_mode=args.mode)
+    save_policy_artifact(
+        args.output,
+        parameters,
+        consumer_mode=args.mode,
+        random_streams=random_streams,
+    )
     print(json.dumps({
         "agents": list(env.agents),
         "consumer_mode": args.mode,
