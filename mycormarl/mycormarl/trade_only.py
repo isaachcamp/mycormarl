@@ -7,7 +7,6 @@ import math
 import jax.numpy as jnp
 
 from mycormarl.environments.base_mycor import FUNGUS, PLANT
-from mycormarl.static_controls import run_batched_static_controls, run_static_controls
 
 
 TOTAL_BIOLOGICAL_RATE_PER_DAY = 6.907755
@@ -53,52 +52,10 @@ def plant_only_actions() -> dict[str, jnp.ndarray]:
     }
 
 
-def run_trade_only_baseline(
-    *, initial_p_micromolar: tuple[float, ...], seeds: tuple[int, ...],
-    days: float, timestep_days: float, include_plant_only: bool = True,
-) -> dict:
-    """Evaluate plant-only and bidirectional current-pool trade controls."""
-    no_trade = fixed_allocation_rate_action(jnp.asarray(0.0)).tolist()
-    mixed_trade_rates = {
-        PLANT: pool_fraction_to_rate(PLANT_MIXED_TRADE_FRACTION_PER_DAY),
-        FUNGUS: pool_fraction_to_rate(FUNGUS_MIXED_TRADE_FRACTION_PER_DAY),
-    }
-    shared = {
-        "horizon": {"days": days, "timestep_days": timestep_days},
-        "initial_p_micromolar": list(initial_p_micromolar), "seeds": list(seeds),
-        "model": {"environment": {}, "species": {"plant": {}, "fungus": {}}},
-    }
-    plant_only_entries = []
-    if include_plant_only:
-        plant_only_entries = run_static_controls({
-            **shared, "modes": ["plant-only"],
-            "static_policy": {PLANT: no_trade, FUNGUS: jnp.zeros(4).tolist()},
-        })["entries"]
-    mixed = run_batched_static_controls({
-        **shared, "modes": ["mixed"],
-        "static_policy": {
-            PLANT: fixed_allocation_rate_action(jnp.asarray(mixed_trade_rates[PLANT])).tolist(),
-            FUNGUS: fixed_allocation_rate_action(jnp.asarray(mixed_trade_rates[FUNGUS])).tolist(),
-        },
-    })
-    entries = plant_only_entries + mixed["entries"]
-    rejected = sum(entry["status"] == "rejected" for entry in entries)
-    return {
-        "format": "mycormarl-trade-only-baseline", "format_version": 1,
-        "status": "rejected" if rejected else "complete", "entries": entries,
-        "completion": {"completed": len(entries) - rejected, "requested": len(entries)},
-        "protocol": {
-            "fixed_allocation": {
-                "total_biological_rate_per_day": TOTAL_BIOLOGICAL_RATE_PER_DAY,
-                "growth_fraction": GROWTH_FRACTION,
-                "reproduction_fraction": REPRODUCTION_FRACTION,
-                "storage_rate_per_day": 0.0,
-            },
-            "plant_only_trade_rate_per_day": 0.0,
-            "mixed_trade_fraction_of_current_post_maintenance_pool_per_day": {
-                PLANT: PLANT_MIXED_TRADE_FRACTION_PER_DAY,
-                FUNGUS: FUNGUS_MIXED_TRADE_FRACTION_PER_DAY,
-            },
-            "mixed_trade_rate_per_day": mixed_trade_rates,
-        },
-    }
+def run_trade_only_baseline(**kwargs):
+    """Temporary legacy forwarding entry point; requires installed REDbyRBD."""
+    try:
+        from redbyrbd.trade_only import run_trade_only_baseline as run
+    except ImportError as error:
+        raise ImportError("Named trade baselines moved to REDbyRBD; install that research project.") from error
+    return run(**kwargs)
