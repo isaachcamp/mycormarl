@@ -1,0 +1,16 @@
+{
+  "original_feature_source": "e858202d4b2b01d733ae710fd3690f9bfcee3964",
+  "preserved_feature_checkpoint": "2236bc2d17872096434a2c5c1ab3121f193e48a9",
+  "extraction_commit": "e3cde22d2045450d3e51dedf47b63569a1b63ae4",
+  "core_squash_commit": "522e0e74bb9cb5de5ab33e7d861e0667dcdf96b6",
+  "core_pr": "https://github.com/isaachcamp/mycormarl/pull/70",
+  "original_learned_policy_core": "95d36e1c25fd61f413ccf1ca5f17595595c35a3f",
+  "original_static_control_core": "35b8a4520718638e3b9742c80985df6a8a36295b",
+  "provenance_policy": "Original archived results retain original source identities; current dependency pin identifies new execution only.",
+  "reproduction_source_commit": "50eadbfdc3e2e89cd0369b82c2d5200ac997a534",
+  "reproduction_tag": "report-2026-10-13-v2",
+  "publication_bundle_identity": "report-2026-10-13-v1",
+  "publication_archive_sha256": "e8440c20ef47d0da483cf0026a35d4e9420b6ca9786336446c31ec36b8b8b661",
+  "research_ci": "https://github.com/isaachcamp/REDbyRBD/actions/runs/38597736927",
+  "animations_ci": "https://github.com/isaachcamp/mycormarl-animations/actions/runs/38597034187"
+}

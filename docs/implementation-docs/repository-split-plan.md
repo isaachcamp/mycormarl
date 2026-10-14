@@ -9,7 +9,7 @@ installed-core-to-figure workflow first, then extract the remaining studies
 and animations. Keep detailed exploration records available outside Git and
 publish selected evidence sufficient for reproducible reporting.
 
-**Status:** In progress; P0–P5 verified. P6 in progress.
+**Status:** Complete; P0–P6 verified.
 **Created:** 13 October 2026.
 **Authoritative decisions:** [ADR-0014](../adr/0014-organize-repositories-around-core-and-scientific-studies.md)
 and [ADR-0015](../adr/0015-pin-core-dependencies-and-retain-executable-policy-evidence.md).
@@ -28,13 +28,14 @@ canonical external diary. No constrained plan or assessment was persisted,
 and no rejected artifact is being reused. Record progress both here and in
 the diary. All original scientific preservation constraints still apply.
 
-**Current phase:** P6 in progress; resumed by user 14 October 2026.
+**Current phase:** P6 verified; migration complete, no remaining phases.
 **P0 evidence:** [Preservation phase record](repository-split-p0.md).
 **P1 evidence:** [Installed-core workflow verification](repository-split-p1.md).
 **P2 evidence:** [Research orchestration extraction](repository-split-p2.md).
 **P3 evidence:** [Combined study and manuscript extraction](repository-split-p3.md).
 **P4 evidence:** [Independent animation workflow](repository-split-p4.md).
 **P5 evidence:** [Publication archive and bounded execution](repository-split-p5.md).
+**P6 evidence:** [Final cutover verification](repository-split-p6.md).
 **Execution cadence:** Pause after each implemented and verified phase.
 **Ordered phase IDs:** P0, P1, P2, P3, P4, P5, P6.
 
