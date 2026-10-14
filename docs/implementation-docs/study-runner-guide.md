@@ -65,10 +65,13 @@ The runtime override affects scheduling only, not the manifest, result
 identity, seeds, or scientific provenance.
 
 Every checkpoint evaluation also atomically replaces the condition's
-`training-returns.png` figure. It plots the PPO mean rollout return for each
-agent against PPO update number, giving a current learning-curve view without
-accumulating one image per checkpoint. The completed result-bundle entry
-records this figure path in `training_return_figure`. The paired
+`training-returns.png` figure. It plots each agent's realized evaluation
+episode return—the sum of environment rewards over the declared evaluation
+episode—against the PPO update at which that checkpoint was evaluated. This
+gives an interpretable learning curve without accumulating one image per
+checkpoint. The PPO `raw_return_mean` remains a critic-target diagnostic in
+the JSON artifacts; it is not plotted as a realized return. The completed
+result-bundle entry records this figure path in `training_return_figure`. The paired
 `training-entropy.png` and `training-kl.png` plots expose each agent's latent
 policy entropy and approximate KL divergence on the same update axis; their
 paths are recorded in `training_diagnostic_figures`.

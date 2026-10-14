@@ -1167,8 +1167,9 @@ def _write_training_diagnostic_figures(
     """Replace the three complementary learning-curve diagnostics."""
     _write_training_diagnostic_figure(
         history, path / "training-returns.png",
-        metric="returns", title="PPO rollout return during training",
-        y_label="Mean rollout return",
+        metric="realized_episode_return",
+        title="Realized evaluation episode return",
+        y_label="Cumulative episode return",
     )
     _write_training_diagnostic_figure(
         history, path / "training-entropy.png",
@@ -1189,6 +1190,125 @@ def _checkpoint_bytes(metadata: dict[str, Any], runner_state: Any) -> bytes:
         "metadata": metadata,
         "runner_state": serialization.to_state_dict(runner_state),
     })
+
+
+def _recover_existing_condition_entry(
+    manifest: dict[str, Any], output_dir: Path,
+    mode: str, p_level: float, seed: int,
+) -> dict[str, Any] | None:
+    """Rebuild a condition entry from checkpoint artifacts after bundle loss."""
+    condition_dir = output_dir / "conditions" / f"{mode}-p{p_level:g}-seed{seed}"
+    checkpoint_paths = sorted((condition_dir / "checkpoints").glob("checkpoint-*.msgpack"))
+    if not checkpoint_paths:
+        return None
+    checkpoints = []
+    history = []
+    resume_checkpoint_path = checkpoint_paths[-1]
+    trade_only = manifest.get("policy", {}).get("mode") == "trade-only-fixed-allocation"
+    for checkpoint_path in checkpoint_paths:
+        try:
+            payload = serialization.msgpack_restore(checkpoint_path.read_bytes())
+            metadata = payload["metadata"]
+            evaluation_path = condition_dir / "evaluations" / f"{checkpoint_path.stem}.json"
+            if not evaluation_path.exists() and checkpoint_path == resume_checkpoint_path:
+                continue
+            artifact = json.loads(evaluation_path.read_text(encoding="utf-8"))
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ValueError(
+                f"existing checkpoint artifacts are unreadable for {mode} p={p_level} seed={seed}"
+            ) from error
+        if (
+            payload.get("format") != TRAINING_CHECKPOINT_FORMAT
+            or payload.get("format_version") != TRAINING_CHECKPOINT_VERSION
+            or metadata.get("mode") != mode
+            or metadata.get("initial_p_micromolar") != p_level
+            or metadata.get("seed") != seed
+        ):
+            raise ValueError("existing checkpoint condition is incompatible")
+        summary = artifact.get("summary")
+        if summary is None:
+            episodes = artifact.get("episodes", [])
+            if not episodes:
+                raise ValueError("existing checkpoint evaluation has no episodes")
+            agents = ("plant", "fungus") if mode == "mixed" else ("plant",)
+            summary = {
+                "fitness": {
+                    agent: sum(
+                        episode["summary"]["cumulative_reproductive_fitness"][agent]
+                        for episode in episodes
+                    ) / len(episodes) for agent in agents
+                },
+                "actions": {
+                    agent: [
+                        sum(row["actions"][agent][index] for episode in episodes for row in episode["trace"])
+                        / sum(len(episode["trace"]) for episode in episodes)
+                        for index in range(len(episodes[0]["trace"][0]["actions"][agent]))
+                    ][:1 if trade_only else None]
+                    for agent in agents
+                },
+            }
+        transitions = int(metadata["transitions"])
+        checkpoints.append({
+            "transitions": transitions,
+            "checkpoint": str(checkpoint_path.relative_to(output_dir)),
+            "evaluation": str(evaluation_path.relative_to(output_dir)),
+            "metrics": summary,
+            "training_diagnostics": artifact.get("summary", {}).get("training_diagnostics", {}),
+        })
+        diagnostics = checkpoints[-1]["training_diagnostics"]
+        update_size = manifest["training"].get("num_steps", 1) * manifest["training"].get("num_envs", 1)
+        history.append({
+            "update": transitions // update_size,
+            "mean_critic_target": {
+                agent: diagnostics.get(agent, {}).get("raw_return_mean")
+                for agent in ("plant", "fungus") if agent in diagnostics
+            },
+            "latent_entropy": {
+                agent: diagnostics.get(agent, {}).get("latent_entropy")
+                for agent in ("plant", "fungus") if agent in diagnostics
+            },
+            "approx_kl": {
+                agent: diagnostics.get(agent, {}).get("approx_kl")
+                for agent in ("plant", "fungus") if agent in diagnostics
+            },
+            "realized_episode_return": summary["fitness"],
+        })
+    stopping = _stopping_decision(
+        checkpoints, manifest["training"], mode, trade_only=trade_only,
+    )
+    final = checkpoints[-1]
+    resume_transitions = int(
+        serialization.msgpack_restore(resume_checkpoint_path.read_bytes())
+        ["metadata"]["transitions"]
+    )
+    if resume_transitions > final["transitions"]:
+        final = {
+            **final,
+            "transitions": resume_transitions,
+            "checkpoint": str(resume_checkpoint_path.relative_to(output_dir)),
+        }
+    return {
+        "mode": mode,
+        "initial_p_micromolar": p_level,
+        "seed": seed,
+        "execution_kind": "trade-only-ippo",
+        "status": "completed" if stopping["outcome"] == "plateau-complete" else (
+            "unconverged" if stopping["outcome"] == "maximum-budget-unconverged" else "pending"
+        ),
+        "transitions": final["transitions"],
+        "checkpoint": final["checkpoint"],
+        "random_streams": derive_random_streams(seed).to_dict(),
+        "evaluation": {"protocol": manifest["evaluation"]["protocol"], "episodes": manifest["evaluation"]["episodes"]},
+        "evaluation_artifacts": [checkpoint["evaluation"] for checkpoint in checkpoints],
+        "training_return_history": history,
+        "training_return_figure": str((condition_dir / "training-returns.png").relative_to(output_dir)),
+        "training_diagnostic_figures": {
+            "latent_entropy": str((condition_dir / "training-entropy.png").relative_to(output_dir)),
+            "approx_kl": str((condition_dir / "training-kl.png").relative_to(output_dir)),
+        },
+        "stopping_decision": stopping,
+        "stopping_checkpoints": checkpoints,
+    }
 
 
 def _run_historical_trade_only_controls(
@@ -1359,6 +1479,20 @@ def _run_condition_training(
     training_metric_chunks = []
     training_return_history = []
     stopping_decision = None
+    recovered = _recover_existing_condition_entry(
+        manifest, output_dir, mode, p_level, seed,
+    )
+    if recovered is not None:
+        transitions = recovered["transitions"]
+        checkpoints = list(recovered["stopping_checkpoints"])
+        training_return_history = list(recovered["training_return_history"])
+        if recovered["status"] in {"completed", "unconverged"}:
+            return recovered
+        checkpoint_path = output_dir / recovered["checkpoint"]
+        payload = serialization.msgpack_restore(checkpoint_path.read_bytes())
+        config = _training_config(manifest, update_size)
+        template = jax.jit(make_train(env, config, streams))(jax.random.PRNGKey(seed))
+        state = serialization.from_state_dict(template["runner_state"], payload["runner_state"])
     while transitions < training["maximum_transition_budget"]:
         config = _training_config(manifest, update_size)
         trained = jax.jit(make_train(env, config, streams, state))(
@@ -1369,7 +1503,7 @@ def _run_condition_training(
         transitions += update_size
         training_return_history.append({
             "update": transitions // update_size,
-            "returns": {
+            "mean_critic_target": {
                 agent: float(jnp.mean(trained["metrics"][agent].raw_return_mean))
                 for agent in ("plant", "fungus")
             },
@@ -1406,6 +1540,10 @@ def _run_condition_training(
             }
         training_diagnostics = _training_diagnostics(training_metric_chunks)
         evaluation_summary["training_diagnostics"] = training_diagnostics
+        training_return_history[-1]["realized_episode_return"] = {
+            agent: float(value)
+            for agent, value in evaluation_summary["fitness"].items()
+        }
         checkpoints.append({
             "transitions": transitions,
             "checkpoint": str(checkpoint_path.relative_to(output_dir)),
@@ -1476,6 +1614,7 @@ def _run_comparison_block_training(
     """Train every declared condition under one frozen, blind stopping protocol."""
     bundle_path = output_dir / "result-bundle.json"
     summary_path = output_dir / "summary.md"
+    requested_conditions = _condition_matrix(manifest)
     existing_entries: list[dict[str, Any]] = []
     if bundle_path.exists():
         try:
@@ -1492,7 +1631,6 @@ def _run_comparison_block_training(
             raise ValueError("existing comparison-block result provenance is incompatible")
         if existing_bundle.get("qualification_artifacts") != qualification_artifacts:
             raise ValueError("existing comparison-block qualification provenance is incompatible")
-        requested_conditions = _condition_matrix(manifest)
         existing_entries = _validated_existing_entries(
             existing_bundle, requested_conditions,
         )
@@ -1500,9 +1638,16 @@ def _run_comparison_block_training(
             if not summary_path.exists():
                 _write_summary(existing_bundle, summary_path)
             return StudyResult(bundle_path, summary_path)
-    if output_dir.exists() and any(output_dir.iterdir()):
-        if not bundle_path.exists():
-            raise ValueError("existing outputs have no compatible execution identity")
+    if output_dir.exists() and any(output_dir.iterdir()) and not bundle_path.exists():
+        recovered_entries = {}
+        for mode, p_level, seed in requested_conditions:
+            if mode == "mixed":
+                entry = _recover_existing_condition_entry(
+                    manifest, output_dir, mode, p_level, seed,
+                )
+                if entry is not None:
+                    recovered_entries[(mode, p_level, seed)] = entry
+        existing_entries = list(recovered_entries.values())
 
     entries_by_condition = {}
     previous_entries = {
@@ -1636,7 +1781,7 @@ def _run_single_condition_training(
         transitions += update_size
         training_return_history.append({
             "update": transitions // update_size,
-            "returns": {
+            "mean_critic_target": {
                 agent: float(jnp.mean(trained["metrics"][agent].raw_return_mean))
                 for agent in ("plant", "fungus")
             },
@@ -1668,6 +1813,15 @@ def _run_single_condition_training(
             evaluation,
             checkpoint=intermediate_path,
         )
+        training_return_history[-1]["realized_episode_return"] = {
+            agent: float(
+                sum(
+                    episode.summary["cumulative_reproductive_fitness"][agent]
+                    for episode in evaluation.episodes
+                ) / len(evaluation.episodes)
+            )
+            for agent in ("plant", "fungus")
+        }
         _write_training_diagnostic_figures(
             training_return_history, output_dir,
         )

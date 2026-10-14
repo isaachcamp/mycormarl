@@ -325,6 +325,11 @@ def test_historical_trade_only_fixture_emits_a_standard_provenance_bundle(tmp_pa
         "approx_kl": "conditions/mixed-p0.3-seed7/training-kl.png",
         "latent_entropy": "conditions/mixed-p0.3-seed7/training-entropy.png",
     }
+    history = bundle["entries"][0]["training_return_history"]
+    assert "mean_critic_target" in history[0]
+    assert history[0]["realized_episode_return"] == pytest.approx(
+        bundle["entries"][0]["stopping_checkpoints"][0]["metrics"]["fitness"]
+    )
 
 
 def test_comparison_worker_override_is_runtime_only(tmp_path, monkeypatch):
@@ -352,13 +357,15 @@ def test_training_diagnostic_figures_replace_the_previous_checkpoint_view(tmp_pa
     """A condition retains one current learning-curve view for each diagnostic."""
     figure = tmp_path / "condition" / "training-returns.png"
     first_history = [{
-        "update": 1, "returns": {"plant": 0.1, "fungus": 0.2},
+        "update": 1,
+        "realized_episode_return": {"plant": 0.1, "fungus": 0.2},
         "latent_entropy": {"plant": 0.3, "fungus": 0.4},
         "approx_kl": {"plant": 0.01, "fungus": 0.02},
     }]
     second_history = [
         *first_history,
-        {"update": 2, "returns": {"plant": 0.3, "fungus": 0.4},
+        {"update": 2,
+         "realized_episode_return": {"plant": 0.3, "fungus": 0.4},
          "latent_entropy": {"plant": 0.5, "fungus": 0.6},
          "approx_kl": {"plant": 0.03, "fungus": 0.04}},
     ]
@@ -372,6 +379,61 @@ def test_training_diagnostic_figures_replace_the_previous_checkpoint_view(tmp_pa
     assert list(figure.parent.glob("training-returns*")) == [figure]
     assert (figure.parent / "training-entropy.png").is_file()
     assert (figure.parent / "training-kl.png").is_file()
+
+
+def test_orphaned_trade_only_checkpoints_are_recovered_as_a_condition_entry(tmp_path):
+    """A lost comparison bundle can be rebuilt from durable checkpoint evidence."""
+    manifest = _historical_trade_only_manifest(tmp_path)
+    manifest["training"].update({
+        "minimum_transition_budget": 2,
+        "maximum_transition_budget": 2,
+        "checkpoint_interval_timesteps": 1,
+        "num_steps": 1,
+        "num_envs": 1,
+        "stopping": {
+            "evaluation_window_checkpoints": 2,
+            "plateau_tolerances": {
+                "fitness_absolute_floor": 1.0,
+                "fitness_relative": 0.2,
+                "action_absolute": 1.0,
+            },
+        },
+    })
+    output_dir = tmp_path / "outputs"
+    condition_dir = output_dir / "conditions" / "mixed-p0.3-seed7"
+    for transitions in (1, 2):
+        checkpoint = condition_dir / "checkpoints" / f"checkpoint-{transitions:08d}.msgpack"
+        checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint.write_bytes(serialization.msgpack_serialize({
+            "format": study_module.TRAINING_CHECKPOINT_FORMAT,
+            "format_version": study_module.TRAINING_CHECKPOINT_VERSION,
+            "metadata": {
+                "mode": "mixed", "initial_p_micromolar": 0.3,
+                "seed": 7, "transitions": transitions,
+            },
+            "runner_state": {},
+        }))
+        evaluation = condition_dir / "evaluations" / f"checkpoint-{transitions:08d}.json"
+        evaluation.parent.mkdir(parents=True, exist_ok=True)
+        evaluation.write_text(json.dumps({
+            "format": "mycormarl-checkpoint-evaluation-summary",
+            "summary": {
+                "fitness": {"plant": 1.0, "fungus": 0.5},
+                "actions": {"plant": [0.2], "fungus": [0.3]},
+            },
+        }), encoding="utf-8")
+
+    entry = study_module._recover_existing_condition_entry(
+        manifest, output_dir, "mixed", 0.3, 7,
+    )
+
+    assert entry is not None
+    assert entry["status"] == "completed"
+    assert entry["transitions"] == 2
+    assert len(entry["stopping_checkpoints"]) == 2
+    assert entry["training_return_history"][-1]["realized_episode_return"] == {
+        "plant": 1.0, "fungus": 0.5,
+    }
 
 
 @pytest.mark.parametrize("workers", [0, -1, True, 1.5])
