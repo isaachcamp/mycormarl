@@ -1,6 +1,6 @@
 # ADR-0015: Pin core dependencies and retain executable policy evidence
 
-**Status:** Accepted; storage locations, snapshot names, and measured build budget remain unresolved
+**Status:** Accepted; archive hosting and routine build budget resolved in P5; upload and snapshot tags remain cutover work
 
 ## Context
 
@@ -96,3 +96,17 @@ planned.
   sufficiently explored.
 - [uv Git dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/#git).
 - [showyourwork! Zenodo integration](https://show-your.work/en/latest/zenodo/).
+
+## P5 implementation — 14 October 2026
+
+The user selected private GitHub release assets initially, followed by a public
+Zenodo deposit when the paper is ready. The checksum-indexed selected archive
+retains all30 final reported policy networks, their original actor/model/seed
+requirements and learning-curve records. Full exploration checkpoints remain
+intact. Original learned core95d36e1 is an isolated execution runtime, never
+relabelled as the current dependency pin. Ordinary build CPU budget is900s,
+with30 bounded actor-inference conditions, four contract-evaluation steps, no
+training or full historical rollout. Source/tag/descriptor mappings and actual
+release upload are completed at cutover; no release tag or DOI is fabricated.
+Slurm estimates explicitly request CPU/memory/time and retain strict identity
+checks. See REDbyRBD docs/reproducibility for executable requirements.
