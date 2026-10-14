@@ -2,6 +2,24 @@
 
 ## Glossary
 
+### MycorMARL study
+
+A coherent scientific question and the experiments and evidence used to answer
+it. A study can contain several related screens, controls, and learned-policy
+experiments and may form the basis of a scientific publication.
+
+### Study exploration record
+
+The detailed evidence retained from a MycorMARL study run for investigating
+behaviour, diagnosing learning, and answering further scientific questions.
+It can contain substantially more information than a publication requires.
+
+### Publication evidence bundle
+
+The selected results, executable policies, and associated scientific provenance
+needed to reproduce a particular report or paper's reported evidence. It is a
+subset of the study's retained evidence, not the complete exploration record.
+
 ### Operational agent
 
 An agent that is configured as present, biologically alive, and able to
