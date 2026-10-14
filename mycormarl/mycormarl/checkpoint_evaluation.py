@@ -568,3 +568,15 @@ def evaluate_checkpoint_summary(
         seed=seed,
         actor=_actor_from_checkpoint_metadata(metadata),
     )
+
+
+def actor_from_checkpoint_metadata(metadata):
+    """Construct the actor described by current or supported historical metadata."""
+    return _actor_from_checkpoint_metadata(metadata)
+
+
+def policy_actions(actor, parameters, observations, protocol, key):
+    """Execute the declared deterministic or sampled policy action protocol."""
+    if protocol not in {"latent-location", "sampled-policy"}:
+        raise ValueError("unsupported policy evaluation protocol")
+    return _actions(actor, parameters, observations, protocol, key)

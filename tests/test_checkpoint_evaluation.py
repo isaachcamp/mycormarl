@@ -211,3 +211,10 @@ def test_survivor_continues_after_partner_death_until_the_declared_horizon():
     assert second["operational_at_start"][PLANT] is True
     assert second["operational_at_start"][FUNGUS] is False
     assert second["truncated"] is True
+
+
+def test_public_policy_execution_seam_rejects_unknown_protocol():
+    import pytest
+    from mycormarl.checkpoint_evaluation import policy_actions
+    with pytest.raises(ValueError, match="unsupported policy evaluation protocol"):
+        policy_actions(None, {}, {}, "unknown", jax.random.PRNGKey(7))
