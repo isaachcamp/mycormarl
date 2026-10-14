@@ -1,7 +1,4 @@
-"""Temporary legacy manifest adapter; new studies use redbyrbd.static_controls.
-
-Numerical execution is owned by mycormarl.static_rollout. Removed at final cutover.
-"""
+"""Temporary legacy manifest adapter; migrate callers to redbyrbd.static_controls."""
 
 from __future__ import annotations
 
@@ -111,3 +108,30 @@ def run_static_controls(manifest: dict[str, Any]) -> dict[str, Any]:
             "requested": len(entries)
         }
     }
+
+
+def run_batched_static_controls(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Run one homogeneous static policy over all P levels in a single batch.
+
+    This narrow fast path is for controls such as the trade-only mixed baseline:
+    one consumer mode, one seed, no optional traces, and multiple initial-P
+    states.  Initial P is used only by ``reset``; all subsequent dynamics share
+    the same environment executable, so states can safely be vmapped.
+    """
+    required = ("horizon", "model", "modes", "initial_p_micromolar", "seeds", "static_policy")
+    missing = [field for field in required if field not in manifest]
+    if missing:
+        raise ValueError("static-control manifest missing: " + ", ".join(missing))
+    if len(manifest["modes"]) != 1 or len(manifest["seeds"]) != 1:
+        raise ValueError("batched static controls require exactly one mode and one seed")
+    if manifest.get("record_limitation_trace") or manifest.get("record_resource_accounting"):
+        raise ValueError("batched static controls do not support optional traces")
+    mode, seed = manifest["modes"][0], int(manifest["seeds"][0])
+    actions = _actions(manifest["static_policy"])
+    p_levels = [float(value) for value in manifest["initial_p_micromolar"]]
+    environments = [_environment(manifest, mode, p_level) for p_level in p_levels]
+    entries = evaluate_batched_static_policy(environments, actions, seed=seed)
+    rejected = sum(entry["status"] == "rejected" for entry in entries)
+    return {"format": "mycormarl-static-controls", "format_version": 1,
+            "status": "rejected" if rejected else "complete", "entries": entries,
+            "completion": {"completed": len(entries) - rejected, "requested": len(entries)}}
