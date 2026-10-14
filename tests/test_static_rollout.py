@@ -31,3 +31,14 @@ def test_batched_static_rollout_rejects_mixed_dynamics():
     envs = [BaseMycorMarl(EnvConfig(max_steps=1, dt=dt, soil_radius_cm=1., soil_depth_cm=1.), SpeciesParams(PlantTraits(), FungusTraits())) for dt in (.025,.05)]
     with pytest.raises(ValueError, match="homogeneous"):
         evaluate_batched_static_policy(envs, {"plant": [0.,0.,0.,0.], "fungus": [0.,0.,0.,0.]}, seed=7)
+
+
+def test_static_rollout_handles_zero_soil_inventory():
+    from mycormarl.static_rollout import evaluate_static_policy
+    from mycormarl.environments.base_mycor import BaseMycorMarl
+    from mycormarl.params import EnvConfig
+    env = BaseMycorMarl(EnvConfig(max_steps=1, dt=.05, soil_radius_cm=.2, soil_depth_cm=.2, initial_solution_p_um=0.), SpeciesParams(PlantTraits(), FungusTraits()))
+    result = evaluate_static_policy(env, {a:[0.,0.,0.,0.] for a in env.agents}, seed=7)
+    assert result["soil_inventory_initial"] == 0.
+    assert result["uniform_initial_p"]
+    assert abs(result["p_accounting_residual"]) < 1e-5

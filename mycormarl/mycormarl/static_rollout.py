@@ -45,7 +45,7 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
         env.config.b_p,
     )
     positive_values = concentration[active_field]
-    uniform = bool(jnp.all(jnp.isclose(positive_values, positive_values[0])))
+    uniform = not positive_values.size or bool(jnp.all(jnp.isclose(positive_values, positive_values[0])))
     initial_p = float(
         jnp.sum(state.plant_p_pool)
         + jnp.sum(state.fungus_p_pool)
