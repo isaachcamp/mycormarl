@@ -9,7 +9,7 @@ installed-core-to-figure workflow first, then extract the remaining studies
 and animations. Keep detailed exploration records available outside Git and
 publish selected evidence sufficient for reproducible reporting.
 
-**Status:** In progress; P0–P5 verified. Paused before P6.
+**Status:** In progress; P0–P5 verified. P6 in progress.
 **Created:** 13 October 2026.
 **Authoritative decisions:** [ADR-0014](../adr/0014-organize-repositories-around-core-and-scientific-studies.md)
 and [ADR-0015](../adr/0015-pin-core-dependencies-and-retain-executable-policy-evidence.md).
@@ -28,7 +28,7 @@ canonical external diary. No constrained plan or assessment was persisted,
 and no rejected artifact is being reused. Record progress both here and in
 the diary. All original scientific preservation constraints still apply.
 
-**Current phase:** P5 verified; await explicit resumption before P6.
+**Current phase:** P6 in progress; resumed by user 14 October 2026.
 **P0 evidence:** [Preservation phase record](repository-split-p0.md).
 **P1 evidence:** [Installed-core workflow verification](repository-split-p1.md).
 **P2 evidence:** [Research orchestration extraction](repository-split-p2.md).
