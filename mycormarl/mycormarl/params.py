@@ -32,8 +32,8 @@ class EnvConfig:
     consumer_mode: str = "mixed"
     soil_radius_cm: float = 50.0
     soil_depth_cm: float = 100.0
-    radial_interval_cm: float = 0.1
-    depth_interval_cm: float = 0.1
+    radial_interval_cm: float = 0.05
+    depth_interval_cm: float = 0.05
     initial_solution_p_um: float = 1.0
     # ``None`` means uniform solution P throughout the configured domain.
     # Otherwise, knots give a relative concentration factor by depth (cm).

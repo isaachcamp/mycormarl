@@ -7,6 +7,7 @@ from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
 from mycormarl.soil.phosphate_grid import (
+    axisymmetric_edges_from_intervals,
     axisymmetric_profile_p_concentration,
     initial_labile_p_from_micromolar,
     labile_amount_to_solution_concentration,
@@ -130,8 +131,13 @@ def test_buffered_amount_concentration_round_trip():
 
 def test_default_domain_initial_inventory_matches_configured_extents():
     """The default uniform treatment fills the configured cylinder."""
-    r_edges = jnp.linspace(0.0, 50.0, 501)
-    z_edges = jnp.linspace(0.0, 100.0, 1001)
+    config = EnvConfig()
+    r_edges, z_edges = axisymmetric_edges_from_intervals(
+        config.soil_radius_cm,
+        config.soil_depth_cm,
+        config.radial_interval_cm,
+        config.depth_interval_cm,
+    )
 
     amount = initial_labile_p_from_micromolar(
         r_edges,
@@ -142,8 +148,8 @@ def test_default_domain_initial_inventory_matches_configured_extents():
     )
 
     expected = jnp.pi * 50.0**2 * 100.0 * 0.001 * (0.3 + 239.0)
-    assert amount.shape == (500, 1000)
-    # A 500,000-cell float32 reduction incurs about 1 ppm rounding error.
+    assert amount.shape == (1000, 2000)
+    # Preserve the analytical inventory under refinement at float32 precision.
     assert jnp.sum(amount) == pytest.approx(expected, rel=2e-6)
     assert jnp.all(amount > 0.0)
 
@@ -183,8 +189,8 @@ def test_default_config_describes_reference_domain_and_initial_condition():
     assert config.max_steps == 14600
     assert config.soil_radius_cm == pytest.approx(50.0)
     assert config.soil_depth_cm == pytest.approx(100.0)
-    assert config.radial_interval_cm == pytest.approx(0.1)
-    assert config.depth_interval_cm == pytest.approx(0.1)
+    assert config.radial_interval_cm == pytest.approx(0.05)
+    assert config.depth_interval_cm == pytest.approx(0.05)
     assert config.initial_solution_p_depth_profile is None
     assert config.initial_solution_p_um == pytest.approx(1.0)
     assert config.theta_water == pytest.approx(0.3)
