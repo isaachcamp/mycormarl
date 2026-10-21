@@ -29,6 +29,8 @@ class EnvConfig:
 
     max_steps: int = 14600
     dt: float = 0.025
+    allocation_rate_step: float = 0.02  # maximum internal h * outgoing hazard
+    allocation_max_substeps: int = 65536  # exhausted budget invalidates the transition
     consumer_mode: str = "mixed"
     soil_radius_cm: float = 50.0
     soil_depth_cm: float = 100.0

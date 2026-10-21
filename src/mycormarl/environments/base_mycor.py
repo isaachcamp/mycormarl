@@ -14,7 +14,7 @@ import jax.numpy as jnp
 
 from mycormarl import fungus, plant
 from mycormarl.params import EnvConfig, SpeciesParams
-from mycormarl.growth import grow
+from mycormarl.allocation import integrate_allocation
 from mycormarl.soil import (
     axisymmetric_cylindrical_cell_volumes,
     axisymmetric_diffusion_conductances,
@@ -48,7 +48,6 @@ class Actions(IntEnum):
     trade = 0
     growth = 1
     reproduction = 2
-    storage = 3
 
 
 class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
@@ -122,14 +121,14 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
         obs_dim = 5
 
         self.action_set = jnp.array(
-            [Actions.trade, Actions.growth, Actions.reproduction, Actions.storage]
+            [Actions.trade, Actions.growth, Actions.reproduction]
         )
 
         self.observation_spaces = {
             PLANT: Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=jnp.float32),
             FUNGUS: Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=jnp.float32),
         }
-        # Rate action in d^-1: trade, growth, reproduction, storage.
+        # Rate action in d^-1: trade, growth, reproduction.
         self.action_spaces = {
             PLANT: Box(low=0.0, high=jnp.inf, shape=self.action_set.shape, dtype=jnp.float32),
             FUNGUS: Box(low=0.0, high=jnp.inf, shape=self.action_set.shape, dtype=jnp.float32),
@@ -313,6 +312,9 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
 
         # TODO: decrease root/hyphal density with biomass loss.
         """
+        for agent in AGENTS:
+            if actions[agent].shape != (3,):
+                raise ValueError(f"{agent} Rate action must have shape (3,)")
         plant_operational_at_start = jnp.logical_and(
             self.plant_active, jnp.logical_not(state.plant_dead)
         )
@@ -387,17 +389,6 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
             fungus_trade_fraction * fungus_maintenance["p_pool"],
             0.0,
         )
-        plant_c_trade_out = jnp.where(
-            trading_enabled,
-            plant_c_trade_proposed,
-            0.0,
-        )
-        fungus_p_trade_out = jnp.where(
-            trading_enabled,
-            fungus_p_trade_proposed,
-            0.0,
-        )
-
         # Add a flag to indicate whether a trade was proposed but cancelled due
         # to one party dying or being non-operational.
         trade_cancelled = jnp.logical_and(
@@ -418,20 +409,20 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
         allocation_state = state.replace(
             plant_biomass=plant_biomass_after_maintenance,
             fungus_biomass=fungus_biomass_after_maintenance,
-            plant_c_pool=plant_maintenance["c_pool"] - plant_c_trade_out,
+            plant_c_pool=plant_maintenance["c_pool"],
             plant_p_pool=plant_maintenance["p_pool"],
             fungus_c_pool=fungus_maintenance["c_pool"],
-            fungus_p_pool=fungus_maintenance["p_pool"] - fungus_p_trade_out,
+            fungus_p_pool=fungus_maintenance["p_pool"],
             plant_dead=plant_dead,
             fungus_dead=fungus_dead,
         )
-        # Perform allocations.
-        plant_step = self.step_plant(key, allocation_state, actions[PLANT])
-        fungus_step = self.step_fungus(key, allocation_state, actions[FUNGUS])
+        # Transfers and biology share the same evolving pools; incoming trade
+        # participates under the held action during this allocation interval.
+        plant_step, fungus_step, transfers = self._allocate_both(allocation_state, actions)
+        plant_c_trade_out, fungus_p_trade_out = transfers
 
-        # Update biomass and historical max. after growth.
-        # Biomass cap sort of performed twice, since growth is limited in
-        # _apply_allocation.
+        # The allocation integrator already limits the realised growth extent
+        # to the numerical guard; retain the guard on the final biomass too.
         plant_biomass = jnp.minimum(
             plant_biomass_after_maintenance + plant_step["growth"],
             self.species.plant.biomass_cap,
@@ -446,8 +437,8 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
             plant_history_max_biomass=plant_history_max,
             fungus_history_max_biomass=fungus_history_max,
             plant_c_pool=plant_step["c_pool"],
-            plant_p_pool=plant_step["p_pool"] + fungus_p_trade_out,
-            fungus_c_pool=fungus_step["c_pool"] + plant_c_trade_out,
+            plant_p_pool=plant_step["p_pool"],
+            fungus_c_pool=fungus_step["c_pool"],
             fungus_p_pool=fungus_step["p_pool"],
             plant_last_p_received=jnp.where(
                 plant_operational_at_end, fungus_p_trade_out, 0.0
@@ -674,99 +665,53 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
             },
         }
 
-    def _apply_allocation(
-        self,
-        biomass: chex.Array,
-        c_pool: chex.Array,
-        p_pool: chex.Array,
-        action: chex.Array,
-        traits,
-        operational: chex.Array,
-        biomass_cap: float | None = None,
-    ) -> dict:
-        """Apply competing growth/reproduction/storage rates to free C and P."""
-        action = jnp.where(operational, action, jnp.zeros_like(action))
-        biological_rates = action[Actions.growth :]
-        total_rate = jnp.sum(biological_rates)
-        selected_fraction = -jnp.expm1(-total_rate * self.config.dt)
-        rate_shares = jnp.where(
-            total_rate > 0.0,
-            biological_rates / jnp.maximum(total_rate, 1e-12),
-            jnp.zeros_like(biological_rates),
+    def _allocate_both(self, state, actions):
+        operational = jnp.stack((~state.plant_dead, ~state.fungus_dead)).reshape(2)
+        rates = jnp.where(operational[:, None], jnp.stack([actions[a] for a in AGENTS]), 0.)
+        rates = rates.at[:, 0].set(jnp.where(jnp.all(operational), rates[:, 0], 0.))
+        pools = jnp.stack((jnp.concatenate((state.plant_c_pool, state.plant_p_pool)),
+                           jnp.concatenate((state.fungus_c_pool, state.fungus_p_pool))))
+        traits = (self.species.plant, self.species.fungus)
+        costs = jnp.asarray([[t.gamma_c, t.gamma_p] for t in traits])
+        scales = jnp.asarray([t.reproduction_cost_scale for t in traits])
+        room = jnp.array([jnp.maximum(self.species.plant.biomass_cap-state.plant_biomass[0], 0.), jnp.inf])
+        result, converged, substeps = integrate_allocation(
+            pools, rates, costs, scales, room, self.config.dt,
+            self.config.allocation_rate_step, self.config.allocation_max_substeps,
         )
-        growth_alloc = selected_fraction * rate_shares[0]
-        reproduction_alloc = selected_fraction * rate_shares[1]
 
-        growth_c_alloc = growth_alloc * c_pool
-        growth_p_alloc = growth_alloc * p_pool
-        growth = grow(
-            allocated_c=growth_c_alloc,
-            allocated_p=growth_p_alloc,
-            grow_c_cost=traits.gamma_c,
-            grow_p_cost=traits.gamma_p,
-            grow_type="essential",
-        )
-        if biomass_cap is not None:
-            growth = jnp.minimum(
-                growth,
-                jnp.maximum(biomass_cap - biomass, 0.0),
-            )
-        growth_c_used = growth * traits.gamma_c
-        growth_p_used = growth * traits.gamma_p
-        reproduction_c = reproduction_alloc * c_pool
-        reproduction_p = reproduction_alloc * p_pool
-        remaining_c_pool = c_pool - reproduction_c - growth_c_used
-        remaining_p_pool = p_pool - reproduction_p - growth_p_used
-        reproduction_c_scaled = reproduction_c / traits.gamma_c
-        reproduction_p_scaled = reproduction_p / traits.gamma_p
-        reward = self._cobb_douglas(reproduction_c_scaled, reproduction_p_scaled, self.config.alpha)
-        info = {
-            "growth": growth,
-            "growth_c_allocated": growth_c_alloc,
-            "growth_p_allocated": growth_p_alloc,
-            "growth_c_used": growth_c_used,
-            "growth_p_used": growth_p_used,
-            "reproduction_c": reproduction_c,
-            "reproduction_p": reproduction_p,
-            "reproductive_fitness_from_components": reward,
-        }
-        return {
-            "growth": growth,
-            "reproduction_p": reproduction_p,
-            "c_pool": remaining_c_pool,
-            "p_pool": remaining_p_pool,
-            "reward": reward.squeeze(),
-            "info": info,
-        }
+        def outcome(i):
+            t = traits[i]
+            c_pool, p_pool = result[i, 0:1], result[i, 1:2]
+            growth, reproduction = result[i, 2:3], result[i, 3:4]
+            gc, gp = growth*t.gamma_c, growth*t.gamma_p
+            rc = reproduction*t.reproduction_cost_scale*t.gamma_c
+            rp = reproduction*t.reproduction_cost_scale*t.gamma_p
+            return dict(c_pool=c_pool, p_pool=p_pool, growth=growth,
+                        reproduction_p=rp, reward=reproduction.squeeze(), info={
+                            "growth": growth, "growth_c_allocated": gc,
+                            "growth_p_allocated": gp, "growth_c_used": gc,
+                            "growth_p_used": gp, "reproduction_c": rc,
+                            "reproduction_p": rp,
+                            "reproductive_fitness_from_components": reproduction,
+                            "allocation_converged": converged,
+                            "allocation_substeps": substeps,
+                        })
+        return outcome(0), outcome(1), (result[0, 4:5], result[1, 4:5])
 
     def step_plant(self, key: jax.Array, state: State, action: jax.Array) -> dict:
-        """Apply a valid Physical action to the plant's disposable pools."""
-        operational = jnp.logical_and(
-            self.plant_active, jnp.logical_not(state.plant_dead)
-        )
-        return self._apply_allocation(
-            state.plant_biomass,
-            state.plant_c_pool,
-            state.plant_p_pool,
-            action,
-            self.species.plant,
-            operational,
-            biomass_cap=self.species.plant.biomass_cap,
-        )
+        """Apply isolated plant biology; trade is resolved only by step_env."""
+        rates = jnp.asarray(action).at[Actions.trade].set(0.)
+        return self._allocate_both(state, {
+            PLANT: rates, FUNGUS: jnp.zeros(3, dtype=rates.dtype),
+        })[0]
 
     def step_fungus(self, key: jax.Array, state: State, action: jax.Array) -> dict:
-        """Apply a valid Physical action to the fungus's disposable pools."""
-        operational = jnp.logical_and(
-            self.fungus_active, jnp.logical_not(state.fungus_dead)
-        )
-        return self._apply_allocation(
-            state.fungus_biomass,
-            state.fungus_c_pool,
-            state.fungus_p_pool,
-            action,
-            self.species.fungus,
-            operational,
-        )
+        """Apply isolated fungal biology; trade is resolved only by step_env."""
+        rates = jnp.asarray(action).at[Actions.trade].set(0.)
+        return self._allocate_both(state, {
+            PLANT: jnp.zeros(3, dtype=rates.dtype), FUNGUS: rates,
+        })[1]
 
     @staticmethod
     def _validate_soil_config(config: EnvConfig) -> None:
@@ -791,6 +736,12 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
         )
         if not math.isfinite(config.dt) or config.dt <= 0.0:
             raise ValueError("dt must be finite and greater than zero")
+        if not math.isfinite(config.allocation_rate_step) or not 0.0 < config.allocation_rate_step <= 1.0:
+            raise ValueError("allocation_rate_step must be finite and within (0, 1]")
+        if (isinstance(config.allocation_max_substeps, bool)
+                or not isinstance(config.allocation_max_substeps, int)
+                or not 0 < config.allocation_max_substeps < 2**31):
+            raise ValueError("allocation_max_substeps must be a positive 32-bit integer")
         if config.consumer_mode not in {"mixed", "plant-only", "fungus-only"}:
             raise ValueError(
                 "consumer_mode must be 'mixed', 'plant-only', or 'fungus-only'"

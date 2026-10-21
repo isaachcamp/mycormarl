@@ -9,8 +9,11 @@ class PlantTraits:
 
     Biomass is in grams dry mass. ``kfroot`` is represented fine-root mass
     divided by whole-plant mass. ``gamma_c`` is g C per g dry biomass,
-    ``gamma_p`` is mg P per g dry biomass, root radius is in cm, and specific
-    root length is cm root per g fine-root dry mass. ``root_length_density`` is the
+    ``gamma_p`` is mg P per g dry biomass.
+    ``reproduction_cost_scale`` multiplies both growth costs per unit of
+    reproductive output, preserving C:P composition; its default is one.
+    Root radius is in cm, and specific root length is cm root per g fine-root
+    dry mass. ``root_length_density`` is the
     uniform within-disc ``lambda_root`` in cm root per cm³ bulk soil.
     ``amass`` is apparent-gross g C fixed per g leaf dry biomass for one
     reference day, spread uniformly through time by the current model.
@@ -42,6 +45,7 @@ class PlantTraits:
     max_rooting_depth_cm: float = 150.0
     gamma_c: float = 0.402
     gamma_p: float = 1.92
+    reproduction_cost_scale: float = 1.0
     kappa_c: float = 0.007
     kappa_p: float = 0.0
     death_fraction: float = 0.20
@@ -53,6 +57,7 @@ def validate_plant_growth_geometry_traits(traits: PlantTraits) -> None:
     for name in (
         "gamma_c",
         "gamma_p",
+        "reproduction_cost_scale",
         "root_radius",
         "specific_root_length",
         "root_length_density",
