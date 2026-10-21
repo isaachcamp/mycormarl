@@ -21,6 +21,9 @@ configuration and organism traits
 
 ## Runtime modules
 
+The installed `mycormarl` package is sourced from `src/mycormarl/`. Repository
+scripts and tests remain outside the importable package.
+
 | Module | Responsibility | Main consumers |
 |---|---|---|
 | `params.py` | Environment and species configuration containers. | Environment construction and experiment setup. |

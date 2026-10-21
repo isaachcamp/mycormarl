@@ -46,7 +46,7 @@ accountability by the dynamical update steps.
 | Root/hyphal density | `root_length_density`, `hyphae_length_density` | cm cm⁻³; `(n_r, n_z)` | growth → phosphate |
 | Mortality, irreversible free-P loss, reproduction P | cumulative diagnostic fields | mg P | system accounting |
 
-These fields are declared in [`State`](../mycormarl/mycormarl/state.py).
+These fields are declared in [`State`](../src/mycormarl/state.py).
 
 The grid edges are configured directly from a maximum radius, maximum depth,
 and explicit radial/depth intervals. Each cell is an annular cylindrical shell,
@@ -61,8 +61,8 @@ request is rejected with the nearest valid interval and cell count, making the
 actual geometry explicit rather than silently shortening a boundary cell. The
 same edges and volumes are used for P amount, absorber density, diffusion
 faces, and uptake integration. Implemented by
-[`axisymmetric_edges_from_intervals`](../mycormarl/mycormarl/soil/phosphate_grid.py)
-and [`axisymmetric_cylindrical_cell_volumes`](../mycormarl/mycormarl/soil/phosphate_grid.py);
+[`axisymmetric_edges_from_intervals`](../src/mycormarl/soil/phosphate_grid.py)
+and [`axisymmetric_cylindrical_cell_volumes`](../src/mycormarl/soil/phosphate_grid.py);
 geometry and boundary behaviour are tested in
 [`test_axisymmetric_geometry.py`](../tests/test_axisymmetric_geometry.py).
 
@@ -88,7 +88,7 @@ start-of-step organism pools + Rate actions (per day)
 ```
 
 The controlling entry point is
-[`BaseMycorMarl.step_env`](../mycormarl/mycormarl/environments/base_mycor.py).
+[`BaseMycorMarl.step_env`](../src/mycormarl/environments/base_mycor.py).
 It pays maintenance from start pools, resolves outgoing trade, allocates the
 remaining resources, then credits incoming trade and photosynthate. It
 refreshes both density fields after biomass change and invokes the soil model
@@ -112,7 +112,7 @@ and [`test_uptake_credit_cannot_fund_growth_in_the_same_step`](../tests/test_env
 Three clocks must be distinguished. `EnvConfig.dt` is the numerical environment
 step in days; the soil substep is its seconds-based diffusion/uptake subdivision;
 the policy decision interval may contain several complete environment steps.
-[`PolicyIntervalMycorMarl`](../mycormarl/mycormarl/environments/policy_interval.py)
+[`PolicyIntervalMycorMarl`](../src/mycormarl/environments/policy_interval.py)
 holds the same Rate action over an integral number of numerical steps and
 accumulates their rewards and flow diagnostics. Newly acquired resources are
 eligible at the next numerical step, even within one held policy interval.
@@ -132,14 +132,14 @@ default); the wrapper has its own declared number of policy steps.
 
 | Responsibility | Principal symbol | Location |
 |---|---|---|
-| Configuration and timestep/grid controls | `EnvConfig` | [`params.py`](../mycormarl/mycormarl/params.py) |
-| Plant & fungal traits | `SpeciesParams` | [`params.py`](../mycormarl/mycormarl/params.py) |
-| Canonical dynamic state | `State` | [`state.py`](../mycormarl/mycormarl/state.py) |
-| Biological ordering and coupling | `BaseMycorMarl.step_env` | [`base_mycor.py`](../mycormarl/mycormarl/environments/base_mycor.py) |
-| Shared grid construction | `axisymmetric_edges_from_intervals` | [`phosphate_grid.py`](../mycormarl/mycormarl/soil/phosphate_grid.py) |
-| Plant geometry | `plant.density_field_from_biomass` | [`roots.py`](../mycormarl/mycormarl/plant/roots.py) |
-| Fungal geometry | `fungus.density_field_from_biomass` | [`mycelium.py`](../mycormarl/mycormarl/fungus/mycelium.py) |
-| Soil-P update | `evolve_soil_p` | [`soil.py`](../mycormarl/mycormarl/soil/soil.py) |
+| Configuration and timestep/grid controls | `EnvConfig` | [`params.py`](../src/mycormarl/params.py) |
+| Plant & fungal traits | `SpeciesParams` | [`params.py`](../src/mycormarl/params.py) |
+| Canonical dynamic state | `State` | [`state.py`](../src/mycormarl/state.py) |
+| Biological ordering and coupling | `BaseMycorMarl.step_env` | [`base_mycor.py`](../src/mycormarl/environments/base_mycor.py) |
+| Shared grid construction | `axisymmetric_edges_from_intervals` | [`phosphate_grid.py`](../src/mycormarl/soil/phosphate_grid.py) |
+| Plant geometry | `plant.density_field_from_biomass` | [`roots.py`](../src/mycormarl/plant/roots.py) |
+| Fungal geometry | `fungus.density_field_from_biomass` | [`mycelium.py`](../src/mycormarl/fungus/mycelium.py) |
+| Soil-P update | `evolve_soil_p` | [`soil.py`](../src/mycormarl/soil/soil.py) |
 
 The important ownership rule is that geometry modules decide **where absorbing
 length exists**; phosphate uptake decides **how much that length requests**;

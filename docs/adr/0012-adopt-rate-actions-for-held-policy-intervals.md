@@ -43,8 +43,8 @@ be introduced atomically with rate-aware tests and qualification.
 
 ## Implementation evidence and later work
 
-The [action constructor](../../mycormarl/mycormarl/actions.py),
-[policy-interval wrapper](../../mycormarl/mycormarl/environments/policy_interval.py),
+The [action constructor](../../src/mycormarl/actions.py),
+[policy-interval wrapper](../../src/mycormarl/environments/policy_interval.py),
 [rate/interval tests](../../tests/test_decision_intervals.py), and
 [qualification report](../qualification/phosphate-numerical-qualification.md)
 record the implemented four-rate model. The original tracking

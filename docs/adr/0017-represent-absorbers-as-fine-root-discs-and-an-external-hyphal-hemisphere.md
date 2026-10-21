@@ -53,8 +53,8 @@ would require an explicit model extension and new qualification.
 
 The [growth model](../growth-model.md#plant-biomass-to-root-geometry) gives
 conversions, intersection invariants and provenance. The
-[root](../../mycormarl/mycormarl/plant/roots.py) and
-[mycelium](../../mycormarl/mycormarl/fungus/mycelium.py) modules own the pure
+[root](../../src/mycormarl/plant/roots.py) and
+[mycelium](../../src/mycormarl/fungus/mycelium.py) modules own the pure
 geometry functions. [Geometry tests](../../tests/test_growth_geometry.py)
 cover contained length, partial fronts, clipping, zero biomass and
 post-maintenance/growth reconstruction. Numerical qualification follows

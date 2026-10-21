@@ -61,8 +61,8 @@ maintenance/death boundary is a claim of timestep-exact physiology.
 
 The [model overview ledger](../model-overview.md#phosphorus-accounting) and
 [growth model](../growth-model.md) give units and equations. The
-[environment](../../mycormarl/mycormarl/environments/base_mycor.py) and
-[state](../../mycormarl/mycormarl/state.py) implement the transactions and
+[environment](../../src/mycormarl/environments/base_mycor.py) and
+[state](../../src/mycormarl/state.py) implement the transactions and
 counters. [Resource-transaction tests](../../tests/test_base_mycor_refactor.py),
 [reset tests](../../tests/test_labile_phosphate_state.py), and
 [uptake/mortality tests](../../tests/test_environment_phosphate_uptake.py)

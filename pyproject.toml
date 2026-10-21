@@ -17,10 +17,10 @@ dependencies = [
 ]
 
 [tool.setuptools]
-package-dir = {"" = "mycormarl"}
+package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
-where = ["mycormarl"]
+where = ["src"]
 
 [build-system]
 requires = ["setuptools>=77"]

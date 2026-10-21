@@ -81,7 +81,7 @@ this durable decision. See the
 
 ## Implementation evidence
 
-The [profile helper](../../mycormarl/mycormarl/soil/phosphate_grid.py) and
+The [profile helper](../../src/mycormarl/soil/phosphate_grid.py) and
 [reset/profile tests](../../tests/test_labile_phosphate_state.py) define the
 implemented deterministic treatment. The [phosphate guide](../phosphate-model.md#state-units-and-buffering)
 documents its units and initial-inventory meaning. This clarification records

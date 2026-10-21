@@ -48,10 +48,10 @@ delta_biomass = jnp.minimum(
 ```
 
 Implemented by
-[`_grow_biomass_essential_resources`](../mycormarl/mycormarl/growth.py)
+[`_grow_biomass_essential_resources`](../src/mycormarl/growth.py)
 and called for plants and fungi in
-[`step_plant`](../mycormarl/mycormarl/environments/base_mycor.py) and
-[`step_fungus`](../mycormarl/mycormarl/environments/base_mycor.py).
+[`step_plant`](../src/mycormarl/environments/base_mycor.py) and
+[`step_fungus`](../src/mycormarl/environments/base_mycor.py).
 Start-pool timing and the biomass cap are protected by
 [`test_newly_fixed_carbon_is_not_available_for_same_step_growth`](../tests/test_base_mycor_refactor.py)
 and [`test_plant_growth_at_biomass_cap_charges_only_realised_structure`](../tests/test_base_mycor_refactor.py).
@@ -108,7 +108,7 @@ $$
 $$
 
 The shared automatic payment transaction is implemented in
-[`BaseMycorMarl._pay_maintenance`](../mycormarl/mycormarl/environments/base_mycor.py).
+[`BaseMycorMarl._pay_maintenance`](../src/mycormarl/environments/base_mycor.py).
 Allocation leaves retained resources in the free pools, as tested by
 [`test_automatic_maintenance_does_not_spend_reserved_resources`](../tests/test_base_mycor_refactor.py).
 
@@ -134,7 +134,7 @@ $(f_rC/\gamma_C)^\alpha(f_rP/\gamma_P)^{1-\alpha}$; it does not require
 matched C:P construction and creates no parental biomass or offspring state.
 This is the implemented four-rate contract; the proposed three-rate,
 stoichiometric-reproduction redesign is not implemented here. See
-[`step_env`](../mycormarl/mycormarl/environments/base_mycor.py) and
+[`step_env`](../src/mycormarl/environments/base_mycor.py) and
 [`test_incoming_trade_is_not_available_for_same_step_growth`](../tests/test_base_mycor_refactor.py).
 
 Structural P associated with biomass lost to a payment shortfall is added to
@@ -158,7 +158,7 @@ $$
 where $k_{root}$ denotes `PlantTraits.kfroot`, the represented fine-root
 dry-mass fraction (dimensionless), applied exactly once; $SRL$ is
 specific root length (cm g⁻¹ root dry mass), and $L_{root}$ is cm. Implemented
-by [`root_length_from_plant_biomass`](../mycormarl/mycormarl/plant/roots.py).
+by [`root_length_from_plant_biomass`](../src/mycormarl/plant/roots.py).
 
 The cumulative depth distribution is $F(d)=1-\beta^d$. It is normalized over
 the intended maximum rooting depth $D_{root}$, which defaults to 150 cm, rather
@@ -188,8 +188,8 @@ because their assigned length is smaller. Layers below $D_{root}$ are empty.
 Partially crossed annular cells are volume averaged; radii beyond the radial soil
 boundary are clipped, not redistributed.
 Implemented by
-[`root_disc_radii_from_biomass`](../mycormarl/mycormarl/plant/roots.py)
-and [`axisymmetric_stacked_disc_root_density`](../mycormarl/mycormarl/plant/roots.py).
+[`root_disc_radii_from_biomass`](../src/mycormarl/plant/roots.py)
+and [`axisymmetric_stacked_disc_root_density`](../src/mycormarl/plant/roots.py).
 Tests verify depth-dependent radii, uniform density, conservation before domain
 clipping, and clipping behaviour in
 [`test_growth_geometry.py`](../tests/test_growth_geometry.py).
@@ -214,7 +214,7 @@ $$
 where $\gamma_{C,f}$ is g C g⁻¹ dry biomass, $M_C$ is tissue C density
 (g C cm⁻³ tissue), $r_h$ is hyphal radius (cm), and $L_h$ is cm. Spores and
 intraradical structures are excluded. Implemented by
-[`hyphal_length_from_fungal_biomass`](../mycormarl/mycormarl/fungus/mycelium.py).
+[`hyphal_length_from_fungal_biomass`](../src/mycormarl/fungus/mycelium.py).
 
 The length fills a hemisphere at saturation density $\lambda_{sat}$:
 
@@ -224,15 +224,15 @@ $$
 
 The inverse transformations from colony radius to saturated length and from
 length to dry biomass are owned by the same mycelium module. Their composition,
-[`fungal_biomass_for_colony_radius`](../mycormarl/mycormarl/fungus/mycelium.py),
+[`fungal_biomass_for_colony_radius`](../src/mycormarl/fungus/mycelium.py),
 provides the radial-fill biomass. Half of that value is used as the fungal
 actor-observation reference.
 
 Each annular cell receives $\lambda_{sat}$ times its exact occupied-volume
 fraction. Implemented by
-[`colony_radius_from_length_axisymmetric`](../mycormarl/mycormarl/fungus/mycelium.py),
-[`axisymmetric_hemisphere_cell_fractions`](../mycormarl/mycormarl/fungus/mycelium.py),
-and [`axisymmetric_density_from_biomass`](../mycormarl/mycormarl/fungus/mycelium.py).
+[`colony_radius_from_length_axisymmetric`](../src/mycormarl/fungus/mycelium.py),
+[`axisymmetric_hemisphere_cell_fractions`](../src/mycormarl/fungus/mycelium.py),
+and [`axisymmetric_density_from_biomass`](../src/mycormarl/fungus/mycelium.py).
 Partial-front conservation and domain saturation are tested in
 [`test_growth_geometry.py`](../tests/test_growth_geometry.py).
 
@@ -275,8 +275,8 @@ justification.
 | $\lambda_{root}$, $\beta$ | `1 cm cm⁻³`, `0.96` | Provisional inherited geometry choices without empirical calibration. |
 
 Runtime defaults and units are defined in
-[`PlantTraits`](../mycormarl/mycormarl/plant/traits.py) and
-[`FungusTraits`](../mycormarl/mycormarl/fungus/traits.py), with
+[`PlantTraits`](../src/mycormarl/plant/traits.py) and
+[`FungusTraits`](../src/mycormarl/fungus/traits.py), with
 construction-time validation immediately below those definitions.
 
 The early implementation used `gamma_p,fungus=40 mg P g⁻¹` as a reported

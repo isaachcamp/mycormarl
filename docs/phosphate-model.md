@@ -27,7 +27,7 @@ create negative soil P or credit more P than was removed.
 solution concentration enters in µM and is converted by
 $1\,\mu\mathrm{M}=10^{-3}\,\mu\mathrm{mol\,cm^{-3}}$. Organism P pools use mg.
 The unit boundary is explicit in
-[`phosphate_units.py`](../mycormarl/mycormarl/soil/phosphate_units.py).
+[`phosphate_units.py`](../src/mycormarl/soil/phosphate_units.py).
 
 For cell volume $V$ (cm³ bulk soil), solution concentration $C$
 (µmol cm⁻³), volumetric water content $\theta$ (cm³ water cm⁻³ bulk soil), and
@@ -53,9 +53,9 @@ return (
 ```
 
 Implemented by
-[`solution_concentration_to_labile_amount`](../mycormarl/mycormarl/soil/phosphate_grid.py)
+[`solution_concentration_to_labile_amount`](../src/mycormarl/soil/phosphate_grid.py)
 and its inverse
-[`labile_amount_to_solution_concentration`](../mycormarl/mycormarl/soil/phosphate_grid.py).
+[`labile_amount_to_solution_concentration`](../src/mycormarl/soil/phosphate_grid.py).
 Round-trip, initial-field, and canonical-state behaviour are tested in
 [`test_labile_phosphate_state.py`](../tests/test_labile_phosphate_state.py).
 
@@ -108,9 +108,9 @@ D_{app}=\frac{D_l\theta f_l}{\theta+b_p}.
 $$
 
 Implemented by
-[`axisymmetric_diffusion_conductances`](../mycormarl/mycormarl/soil/phosphate_diffusion.py),
-[`diffuse_labile_amount`](../mycormarl/mycormarl/soil/phosphate_diffusion.py),
-and [`apparent_diffusivity_cm2_s`](../mycormarl/mycormarl/soil/phosphate_diffusion.py).
+[`axisymmetric_diffusion_conductances`](../src/mycormarl/soil/phosphate_diffusion.py),
+[`diffuse_labile_amount`](../src/mycormarl/soil/phosphate_diffusion.py),
+and [`apparent_diffusivity_cm2_s`](../src/mycormarl/soil/phosphate_diffusion.py).
 Independent two-cell transfers, closed boundaries, non-negativity, and amount
 conservation are tested in
 [`test_phosphate_diffusion.py`](../tests/test_phosphate_diffusion.py).
@@ -119,7 +119,7 @@ An exact cellwise explicit CFL ceiling is precomputed. If a biological step is
 too large, the entire fixed-geometry diffusion-then-uptake transaction is
 repeated in equal stable substeps. This is numerical subcycling, not biological
 ageing. The number of substeps is cached during environment construction
-([`base_mycor.py:92–118`](../mycormarl/mycormarl/environments/base_mycor.py));
+([`base_mycor.py:92–118`](../src/mycormarl/environments/base_mycor.py));
 the schedule is tested in
 [`test_phosphate_diffusion.py`](../tests/test_phosphate_diffusion.py).
 
@@ -167,14 +167,14 @@ $$
 
 where $J_{max}$ is µmol cm⁻² s⁻¹, $K_m$ and $C_s$ are µmol cm⁻³, and request
 $U$ is µmol P cell⁻¹ per substep. These primitives are implemented in
-[`phosphate_units.py`](../mycormarl/mycormarl/soil/phosphate_units.py).
+[`phosphate_units.py`](../src/mycormarl/soil/phosphate_units.py).
 
 ### Continuous closure
 
 The continuous closure assumes $C_s\approx C_b$, the current cellwise bulk
 solution concentration. It is appropriate when depletion zones are coupled
 at the represented scale. Implemented by
-[`continuous_uptake_request`](../mycormarl/mycormarl/soil/phosphate_uptake.py)
+[`continuous_uptake_request`](../src/mycormarl/soil/phosphate_uptake.py)
 and verified against an independent flux-area-time calculation in
 [`test_continuous_phosphate_uptake.py`](../tests/test_continuous_phosphate_uptake.py).
 
@@ -208,9 +208,9 @@ $$
 Equating diffusive supply to Michaelis–Menten demand produces a quadratic for
 $C_s$; the code evaluates the physical root in a numerically stable form and
 clips it to $0\le C_s\le C_b$. Implemented by
-[`effective_uptake_radius_cm`](../mycormarl/mycormarl/soil/phosphate_uptake.py),
-[`sparse_uptake_resistance`](../mycormarl/mycormarl/soil/phosphate_uptake.py),
-and [`sparse_surface_concentration`](../mycormarl/mycormarl/soil/phosphate_uptake.py).
+[`effective_uptake_radius_cm`](../src/mycormarl/soil/phosphate_uptake.py),
+[`sparse_uptake_resistance`](../src/mycormarl/soil/phosphate_uptake.py),
+and [`sparse_surface_concentration`](../src/mycormarl/soil/phosphate_uptake.py).
 Analytical limits, bounded surface concentration, and JIT compatibility are
 tested in [`test_sparse_phosphate_uptake.py`](../tests/test_sparse_phosphate_uptake.py).
 
@@ -249,9 +249,9 @@ $$
 Only hyphal density determines $t_{diff}$. Consequently, a plant-only cell has
 $w=0$ and remains sparse; roots enter the continuous regime wherever sufficiently
 dense hyphae create a shared coupled depletion field. Implemented by
-[`hyphal_overlap_time_seconds`](../mycormarl/mycormarl/soil/phosphate_uptake.py),
-[`continuous_regime_weight`](../mycormarl/mycormarl/soil/phosphate_uptake.py),
-and [`blend_uptake_requests`](../mycormarl/mycormarl/soil/phosphate_uptake.py).
+[`hyphal_overlap_time_seconds`](../src/mycormarl/soil/phosphate_uptake.py),
+[`continuous_regime_weight`](../src/mycormarl/soil/phosphate_uptake.py),
+and [`blend_uptake_requests`](../src/mycormarl/soil/phosphate_uptake.py).
 
 This is an adaptation of the depletion-zone argument in Schnepf & Roose, not a
 resolved sub-grid simulation. Colony age and front-specific exposure are
@@ -283,9 +283,9 @@ remaining = available - accepted_total
 ```
 
 Implemented by
-[`allocate_competing_uptake`](../mycormarl/mycormarl/soil/phosphate_uptake.py)
+[`allocate_competing_uptake`](../src/mycormarl/soil/phosphate_uptake.py)
 inside the shared production/qualification
-[`blended_uptake_transaction`](../mycormarl/mycormarl/soil/phosphate_uptake.py).
+[`blended_uptake_transaction`](../src/mycormarl/soil/phosphate_uptake.py).
 Competition symmetry, proportionality, and conservation are tested in
 [`test_continuous_phosphate_uptake.py`](../tests/test_continuous_phosphate_uptake.py)
 and end-to-end in
@@ -294,7 +294,7 @@ and end-to-end in
 Accepted root and fungal amounts are summed separately and converted exactly
 once using $1\,\mu mol\,P=0.0309738\,mg\,P$ before being added to organism
 pools. The transaction is implemented in
-[`_apply_blended_uptake_with_diagnostics`](../mycormarl/mycormarl/soil/soil.py)
+[`_apply_blended_uptake_with_diagnostics`](../src/mycormarl/soil/soil.py)
 and its soil-to-pool balance is tested by
 [`test_end_to_end_uptake_conserves_soil_plus_free_pool_p`](../tests/test_environment_phosphate_uptake.py).
 
@@ -320,9 +320,9 @@ explicit biological exports require the wider ledger in the
 | $T_{ref}$, $p$ | `1 day`, `2` | Explicit modelling choices, not empirically inferred lifetimes. |
 
 Configuration defaults are declared in
-[`EnvConfig`](../mycormarl/mycormarl/params.py); organism kinetics and
-radii are in [`PlantTraits`](../mycormarl/mycormarl/plant/traits.py)
-and [`FungusTraits`](../mycormarl/mycormarl/fungus/traits.py).
+[`EnvConfig`](../src/mycormarl/params.py); organism kinetics and
+radii are in [`PlantTraits`](../src/mycormarl/plant/traits.py)
+and [`FungusTraits`](../src/mycormarl/fungus/traits.py).
 
 ## Numerical qualification and limitations
 

@@ -54,7 +54,7 @@ remain subject to calibration and sensitivity analysis.
 
 Equations, units, parameter provenance and limits are in the
 [phosphate model](../phosphate-model.md). The
-[production soil transaction](../../mycormarl/mycormarl/soil/soil.py) shares
+[production soil transaction](../../src/mycormarl/soil/soil.py) shares
 uptake physics with qualification; tests cover
 [buffered state](../../tests/test_labile_phosphate_state.py),
 [diffusion](../../tests/test_phosphate_diffusion.py),

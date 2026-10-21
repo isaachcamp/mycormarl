@@ -66,12 +66,12 @@ described by Oberkampf and Trucano
 | Define scenario matrices and generate results | `run_studies` | [`scripts/phosphate_qualification.py`, lines 441–575](../../scripts/phosphate_qualification.py) |
 | Run isolated, fixed-density soil scenarios | `run_fixed_soil_scenario` | [`scripts/phosphate_qualification.py`, lines 123–233](../../scripts/phosphate_qualification.py) |
 | Run coupled growth–uptake scenarios | `run_coupled_scenario` | [`scripts/phosphate_qualification.py`, lines 249–351](../../scripts/phosphate_qualification.py) |
-| Compare a candidate against a finer reference | `reference_relative_change` | [`phosphate_qualification.py`, lines 8–23](../../mycormarl/mycormarl/soil/phosphate_qualification.py) |
-| Calculate the explicit diffusion limit | `explicit_diffusion_cfl_seconds` | [`phosphate_diffusion.py`, lines 135–155](../../mycormarl/mycormarl/soil/phosphate_diffusion.py) |
-| Convert the biological step into stable substeps | `required_diffusion_substeps` | [`phosphate_diffusion.py`, lines 158–172](../../mycormarl/mycormarl/soil/phosphate_diffusion.py) |
-| Execute the production subcycled solver | `evolve_soil_p` | [`soil.py`, lines 233–295](../../mycormarl/mycormarl/soil/soil.py) |
-| Observe the same solver during qualification | `evolve_soil_p_with_diagnostics` | [`soil.py`, lines 298–348](../../mycormarl/mycormarl/soil/soil.py) |
-| Project annual runtime | `annual_runtime_projection` | [`phosphate_qualification.py`, lines 26–46](../../mycormarl/mycormarl/soil/phosphate_qualification.py) |
+| Compare a candidate against a finer reference | `reference_relative_change` | [`phosphate_qualification.py`, lines 8–23](../../src/mycormarl/soil/phosphate_qualification.py) |
+| Calculate the explicit diffusion limit | `explicit_diffusion_cfl_seconds` | [`phosphate_diffusion.py`, lines 135–155](../../src/mycormarl/soil/phosphate_diffusion.py) |
+| Convert the biological step into stable substeps | `required_diffusion_substeps` | [`phosphate_diffusion.py`, lines 158–172](../../src/mycormarl/soil/phosphate_diffusion.py) |
+| Execute the production subcycled solver | `evolve_soil_p` | [`soil.py`, lines 233–295](../../src/mycormarl/soil/soil.py) |
+| Observe the same solver during qualification | `evolve_soil_p_with_diagnostics` | [`soil.py`, lines 298–348](../../src/mycormarl/soil/soil.py) |
+| Project annual runtime | `annual_runtime_projection` | [`phosphate_qualification.py`, lines 26–46](../../src/mycormarl/soil/phosphate_qualification.py) |
 
 The diagnostic path deliberately calls the production diffusion–uptake
 transaction rather than duplicating the scientific calculation. A test verifies
@@ -104,7 +104,7 @@ influencing that output:
 
 Here \(Q_{\mathrm{floor}}\) prevents meaningless relative errors when both
 values are effectively zero. The implementation is
-[`reference_relative_change`](../../mycormarl/mycormarl/soil/phosphate_qualification.py).
+[`reference_relative_change`](../../src/mycormarl/soil/phosphate_qualification.py).
 
 The study tests intervals of 0.1, 0.05, and 0.025 cm. Each candidate is compared
 with the next finer grid, rather than assuming the finest tested answer is exact
@@ -148,7 +148,7 @@ but the coupled endpoint metrics changed by roughly 98–102%. Consequently, non
 of the larger timestep candidates passed
 ([qualification results, lines 29–36 and 65–70](../qualification/phosphate-numerical-qualification.md)).
 The configuration therefore uses 0.025 day, the finest value tested
-([`params.py`, lines 29–35](../../mycormarl/mycormarl/params.py)).
+([`params.py`, lines 29–35](../../src/mycormarl/params.py)).
 
 This result needs careful interpretation: there is no smaller reference for
 0.025 day, so its selection is a fallback, **not evidence of temporal
@@ -194,7 +194,7 @@ G_{ij}
 where \(D_l\) is the solution diffusion coefficient in cm\(^2\) s\(^{-1}\) and
 \(f_l\) is the dimensionless impedance factor. The code constructs these
 conductances in
-[`axisymmetric_diffusion_conductances`](../../mycormarl/mycormarl/soil/phosphate_diffusion.py).
+[`axisymmetric_diffusion_conductances`](../../src/mycormarl/soil/phosphate_diffusion.py).
 
 The explicit amount update is
 
@@ -224,7 +224,7 @@ The global ceiling is the most restrictive cell:
 \]
 
 This exact cellwise calculation is implemented at
-[`phosphate_diffusion.py`, lines 135–155](../../mycormarl/mycormarl/soil/phosphate_diffusion.py).
+[`phosphate_diffusion.py`, lines 135–155](../../src/mycormarl/soil/phosphate_diffusion.py).
 The environment uses only a safety fraction \(s=0.8\) of the ceiling and chooses
 
 \[
@@ -243,7 +243,7 @@ N_{\mathrm{sub}}
 
 The CFL value and substep count are computed once because grid geometry,
 buffering, and diffusion parameters are static
-([`base_mycor.py`, lines 76–117](../../mycormarl/mycormarl/environments/base_mycor.py)).
+([`base_mycor.py`, lines 76–117](../../src/mycormarl/environments/base_mycor.py)).
 Tests verify the calculated ceiling, the substep schedule, non-negativity, and
 conservation through repeated substeps
 ([`test_phosphate_diffusion.py`, lines 337–347](../../tests/test_phosphate_diffusion.py);
@@ -341,7 +341,7 @@ T_{\mathrm{year}}=N_{\mathrm{year}}T_{\mathrm{step}}.
 \]
 
 It is implemented by
-[`annual_runtime_projection`](../../mycormarl/mycormarl/soil/phosphate_qualification.py),
+[`annual_runtime_projection`](../../src/mycormarl/soil/phosphate_qualification.py),
 while measurement and memory accounting are performed by
 [`benchmark_environment`](../../scripts/phosphate_qualification.py).
 The projection excludes policy inference, learning, logging, data transfer, and

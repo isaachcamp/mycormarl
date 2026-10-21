@@ -53,8 +53,8 @@ malformed input.
 
 ## Evidence
 
-- [Action constructor](../../mycormarl/mycormarl/actions.py) and
+- [Action constructor](../../src/mycormarl/actions.py) and
   [constructor contracts](../../tests/test_actions.py).
-- [PPO rate transform](../../mycormarl/mycormarl/algos/ppo.py) and
+- [PPO rate transform](../../src/mycormarl/algos/ppo.py) and
   [environment action contracts](../../tests/test_base_mycor_refactor.py).
 

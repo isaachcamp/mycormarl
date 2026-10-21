@@ -61,11 +61,11 @@ been removed because it was a scenario convention rather than a calibrated profi
 | **Unsupported** | No literature source or documented quantitative derivation currently backs the value. |
 | **Inconsistent** | Code and active scientific documentation disagree or the declared default is invalid. |
 
-The declarations are in [`PlantTraits`](../mycormarl/mycormarl/plant/traits.py#L7-L44),
-[`FungusTraits`](../mycormarl/mycormarl/fungus/traits.py#L7-L33), and
-[`EnvConfig`](../mycormarl/mycormarl/params.py#L15-L45). Construction-time validation
+The declarations are in [`PlantTraits`](../src/mycormarl/plant/traits.py#L7-L44),
+[`FungusTraits`](../src/mycormarl/fungus/traits.py#L7-L33), and
+[`EnvConfig`](../src/mycormarl/params.py#L15-L45). Construction-time validation
 is immediately below the two trait classes and in
-[`BaseMycorMarl._validate_soil_config`](../mycormarl/mycormarl/environments/base_mycor.py#L731-L796).
+[`BaseMycorMarl._validate_soil_config`](../src/mycormarl/environments/base_mycor.py#L731-L796).
 
 ## Core equations: how parameters affect the model
 
@@ -85,8 +85,8 @@ C_m^*=G\kappa_C\Delta t,\qquad P_{loss}^*=G\kappa_P\Delta t.
 $$
 
 They are deducted before trade and allocation. The implementation is
-[`_pay_maintenance`](../mycormarl/mycormarl/environments/base_mycor.py#L607-L644)
-and [`_apply_allocation`](../mycormarl/mycormarl/environments/base_mycor.py#L646-L700).
+[`_pay_maintenance`](../src/mycormarl/environments/base_mycor.py#L607-L644)
+and [`_apply_allocation`](../src/mycormarl/environments/base_mycor.py#L646-L700).
 
 Plant carbon input is
 
@@ -97,7 +97,7 @@ $$
 Here `amass` is an apparent-gross carbon budget for a 16-hour-light reference day,
 spread uniformly through the current numerical time axis. It is not grams, nor a direct
 area-based gas-exchange rate. This is implemented in
-[`photosynthesise`](../mycormarl/mycormarl/plant/photosynthesis.py#L10-L22).
+[`photosynthesise`](../src/mycormarl/plant/photosynthesis.py#L10-L22).
 
 Biomass-derived absorbing lengths are
 
@@ -109,8 +109,8 @@ $$
 
 Root length is distributed through stacked discs; fungal length fills a hemisphere at
 `saturation_density`. See
-[`root_length_from_plant_biomass`](../mycormarl/mycormarl/plant/roots.py#L9-L21)
-and [`hyphal_length_from_fungal_biomass`](../mycormarl/mycormarl/fungus/mycelium.py#L7-L26).
+[`root_length_from_plant_biomass`](../src/mycormarl/plant/roots.py#L9-L21)
+and [`hyphal_length_from_fungal_biomass`](../src/mycormarl/fungus/mycelium.py#L7-L26).
 
 Soil labile P and solution concentration are linked by
 

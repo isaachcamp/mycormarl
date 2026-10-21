@@ -35,7 +35,7 @@ $$
 
 where $C_s$ is phosphate concentration at the absorbing surface, $J_{\max}$ is maximum influx, and $K_m$ is the half-saturation concentration. The two closures differ principally in how they obtain $C_s$.
 
-The common flux–area–time calculation is visible in [`continuous_uptake_request`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L25-L53) and [`sparse_uptake_request`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L190-L219). The kinetic kernel follows the classical mechanistic root-uptake tradition of Barber and Tinker–Nye; the repository's numerical defaults are attributed via Schnepf & Roose (2006), rather than independently fitted for this model.
+The common flux–area–time calculation is visible in [`continuous_uptake_request`](../../src/mycormarl/soil/phosphate_uptake.py#L25-L53) and [`sparse_uptake_request`](../../src/mycormarl/soil/phosphate_uptake.py#L190-L219). The kinetic kernel follows the classical mechanistic root-uptake tradition of Barber and Tinker–Nye; the repository's numerical defaults are attributed via Schnepf & Roose (2006), rather than independently fitted for this model.
 
 ## Continuous closure
 
@@ -60,7 +60,7 @@ surface_flux = michaelis_menten_surface_flux(concentration, j_max, k_m)
 return surface_flux * absorbing_area * days_to_seconds(dt_days)
 ```
 
-Implemented by [`continuous_uptake_request`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L25-L53). Its arithmetic, zero limits, monotonic response, and JAX compilation are tested in [`test_continuous_phosphate_uptake.py`](../tests/test_continuous_phosphate_uptake.py#L18-L96).
+Implemented by [`continuous_uptake_request`](../../src/mycormarl/soil/phosphate_uptake.py#L25-L53). Its arithmetic, zero limits, monotonic response, and JAX compilation are tested in [`test_continuous_phosphate_uptake.py`](../tests/test_continuous_phosphate_uptake.py#L18-L96).
 
 ## Sparse closure
 
@@ -86,7 +86,7 @@ $$
 D_{\mathrm{app}} = \frac{D_l\theta f_l}{\theta+B},
 $$
 
-with solution diffusion coefficient $D_l$, water content $\theta$, impedance factor $f_l$, and linear buffer power $B$. The code deliberately uses $D_{\mathrm{app}}$ for propagation but $D_{\mathrm{flux}}=D_l\theta f_l$ for amount supply, because buffering is already represented when stored labile amount is converted to solution concentration. This separation is implemented in [`apparent_diffusivity_cm2_s`](../mycormarl/mycormarl/soil/phosphate_diffusion.py#L20-L38) and [`sparse_uptake_resistance`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L93-L121).
+with solution diffusion coefficient $D_l$, water content $\theta$, impedance factor $f_l$, and linear buffer power $B$. The code deliberately uses $D_{\mathrm{app}}$ for propagation but $D_{\mathrm{flux}}=D_l\theta f_l$ for amount supply, because buffering is already represented when stored labile amount is converted to solution concentration. This separation is implemented in [`apparent_diffusivity_cm2_s`](../../src/mycormarl/soil/phosphate_diffusion.py#L20-L38) and [`sparse_uptake_resistance`](../../src/mycormarl/soil/phosphate_uptake.py#L93-L121).
 
 The closure then balances quasi-steady cylindrical diffusive supply with surface uptake:
 
@@ -126,7 +126,7 @@ direct_root = 0.5 * (a + discriminant_root)
 surface = jnp.where(a >= 0.0, direct_root, rationalised_root)
 ```
 
-Implemented by [`territory_radius_cm`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L56-L67), [`effective_uptake_radius_cm`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L70-L90), [`sparse_uptake_resistance`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L93-L121), [`sparse_surface_concentration`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L162-L187), and [`sparse_uptake_request`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L190-L219). Tests check territory geometry, finite propagation, the quadratic residual and bounds, cancellation resistance, flux arithmetic, and zero-supply behaviour in [`test_sparse_phosphate_uptake.py`](../tests/test_sparse_phosphate_uptake.py#L28-L174).
+Implemented by [`territory_radius_cm`](../../src/mycormarl/soil/phosphate_uptake.py#L56-L67), [`effective_uptake_radius_cm`](../../src/mycormarl/soil/phosphate_uptake.py#L70-L90), [`sparse_uptake_resistance`](../../src/mycormarl/soil/phosphate_uptake.py#L93-L121), [`sparse_surface_concentration`](../../src/mycormarl/soil/phosphate_uptake.py#L162-L187), and [`sparse_uptake_request`](../../src/mycormarl/soil/phosphate_uptake.py#L190-L219). Tests check territory geometry, finite propagation, the quadratic residual and bounds, cancellation resistance, flux arithmetic, and zero-supply behaviour in [`test_sparse_phosphate_uptake.py`](../tests/test_sparse_phosphate_uptake.py#L28-L174).
 
 ## How the model moves between closures
 
@@ -164,7 +164,7 @@ $$
 return (1.0 - weight) * sparse + weight * continuous
 ```
 
-The overlap time and stable weight are implemented in [`hyphal_overlap_time_seconds`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L124-L142) and [`continuous_regime_weight`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L145-L159); blending is in [`blend_uptake_requests`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L222-L235). [`uptake_geometry_coefficients`](../mycormarl/mycormarl/soil/soil.py#L45-L78) computes both sparse resistances and this weight from post-growth geometry. The complete transaction computes both alternatives, blends them, and only then caps combined root–fungal demand against cell inventory in [`blended_uptake_transaction`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L258-L354).
+The overlap time and stable weight are implemented in [`hyphal_overlap_time_seconds`](../../src/mycormarl/soil/phosphate_uptake.py#L124-L142) and [`continuous_regime_weight`](../../src/mycormarl/soil/phosphate_uptake.py#L145-L159); blending is in [`blend_uptake_requests`](../../src/mycormarl/soil/phosphate_uptake.py#L222-L235). [`uptake_geometry_coefficients`](../../src/mycormarl/soil/soil.py#L45-L78) computes both sparse resistances and this weight from post-growth geometry. The complete transaction computes both alternatives, blends them, and only then caps combined root–fungal demand against cell inventory in [`blended_uptake_transaction`](../../src/mycormarl/soil/phosphate_uptake.py#L258-L354).
 
 The limits and nominal overlap calculation are tested in [`test_sparse_phosphate_uptake.py`](../tests/test_sparse_phosphate_uptake.py#L39-L67); a mixed-cell integration test independently reconstructs both closures, the shared weight, and the post-blend cap in [`test_p3_environment_uptake.py`](../tests/test_p3_environment_uptake.py#L160-L232).
 
@@ -174,7 +174,7 @@ The condition has three layers of provenance:
 
 1. **Established physical idea:** mechanistic rhizosphere models represent nutrient transport to cylindrical roots and nonlinear surface uptake. Tinker & Nye (2000) synthesize this framework, while Roose, Fowler & Darrah (2001) derive long-time cylindrical-root uptake approximations. Schnepf & Roose (2006) extend mechanistic phosphate modelling to external mycorrhizal hyphae and explicitly discuss overlapping hyphal depletion zones.
 2. **Repository-derived geometry and parameters:** the code converts local hyphal length density to an equivalent cylindrical territory and uses buffered diffusivity. Its nominal saturated density is `2,000 cm cm⁻³`, selected from the lower end of the approximately `2,000–2,500 cm cm⁻³` upper external-hypha profiles observed by Jakobsen et al. (1992), not a universal AMF constant. With $\lambda_h=2{,}000\ \mathrm{cm}^{-2}$, $r_h=5\times10^{-4}\ \mathrm{cm}$, and $D_{\mathrm{app}}\approx3.86\times10^{-9}\ \mathrm{cm^2\,s^{-1}}$, the repository obtains $t_{\mathrm{diff}}\approx0.44$ days. For $T_{ref}=1$ day and $p=2$, this gives $\Omega\approx2.27$ and $w_{cont}\approx0.84$ before other local effects.
-3. **Project-specific closure decision:** the repository compares that estimated overlap time with configurable $T_{\mathrm{ref}}$, then uses a Hill-type smooth weight. The defaults $T_{\mathrm{ref}}=1$ day and $p=2$ are set in [`EnvConfig`](../mycormarl/mycormarl/params.py#L27-L42). They were chosen provisionally as a static proxy for absorber exposure/lifetime because local colonisation age is not stored. The design rationale says this explicitly in [`phosphate-uptake-todos.md`](../implementation-docs/phosphate-uptake-todos.md#L306-L350).
+3. **Project-specific closure decision:** the repository compares that estimated overlap time with configurable $T_{\mathrm{ref}}$, then uses a Hill-type smooth weight. The defaults $T_{\mathrm{ref}}=1$ day and $p=2$ are set in [`EnvConfig`](../../src/mycormarl/params.py#L27-L42). They were chosen provisionally as a static proxy for absorber exposure/lifetime because local colonisation age is not stored. The design rationale says this explicitly in [`phosphate-uptake-todos.md`](../implementation-docs/phosphate-uptake-todos.md#L306-L350).
 
 At the nominal saturated density these defaults give $\Omega\approx2.27$ and $w_{\mathrm{cont}}\approx0.84$, so saturated cells are predominantly in the continuous regime. No hyphae or no apparent diffusion gives $t_{\mathrm{diff}}=\infty$ and exactly $w_{\mathrm{cont}}=0$, so root-only cells always use the sparse closure. Very high hyphal density collapses the gap to zero and gives exactly $w_{\mathrm{cont}}=1$.
 

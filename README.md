@@ -4,6 +4,9 @@ MycorMARL is a JAX/JaxMARL model of plant–mycorrhizal resource exchange. Its
 soil phosphate component stores finite labile P amounts on an axisymmetric
 grid and couples buffered diffusion with root/fungal uptake and competition.
 
+The importable Python package lives in `src/mycormarl/`. Install the project
+with `uv sync`; public imports remain `mycormarl`.
+
 ## Start here
 
 - [Model overview](docs/model-overview.md):
