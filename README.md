@@ -68,3 +68,9 @@ foraging diagnostics, figures and the reproducible report.
 [mycormarl-animations](https://github.com/isaachcamp/mycormarl-animations) owns
 all animation scenes and builders. Both install an immutable core Git revision.
 See [source version conventions](docs/reproducibility/version-control.md).
+
+Historical local outputs and plots were relocated to the sibling data archive
+`../mycormarl-data/exploration/mycormarl-checkout-2026-10-21/`.
+Its `relocation.json` records original paths and file-preservation checks.
+Historical analysis reports are archived in REDbyRBD under
+`docs/archive/core-analysis-2026-08/`.
