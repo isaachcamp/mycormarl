@@ -17,9 +17,18 @@ array statistics do not describe the represented soil volume.
 ## Decision
 
 The baseline reset field is `initial_solution_p_um` applied uniformly to every
-cell of the configured domain. An explicit depth profile or spatial-variability
-treatment replaces that uniform initial field; it must generate the complete
-heterogeneous solution-P field at reset. Such a field must:
+cell of the configured domain. Both a prescribed depth profile and a stochastic
+spatial-variability treatment define the complete initial field at reset, but
+they have distinct inventory contracts.
+
+A prescribed `initial_solution_p_depth_profile` multiplies
+`initial_solution_p_um` by relative factors interpolated at cell-centre depths.
+It is radially uniform and is not normalised to the uniform scenario's mean or
+inventory. Its total labile P follows from the supplied factors and cell
+volumes. Comparing such scenarios is not automatically an equal-inventory
+heterogeneity experiment.
+
+The equal-inventory stochastic variability treatment must:
 
 - be non-negative;
 - be spatially correlated in physical `(r, z)` coordinates;
@@ -29,6 +38,9 @@ heterogeneous solution-P field at reset. Such a field must:
 - use cell-volume weights for realized mean, variance, and coefficient of
   variation;
 - be reproducible from recorded field-generation parameters and a field ID.
+
+These stochastic-field requirements are an accepted study design, not a claim
+that the core depth-profile option implements a random-field generator.
 
 Use a bounded symmetric marginal as the primary variability treatment. Avoid
 creating negative concentrations and repairing them by clipping. A positive
@@ -47,8 +59,9 @@ until the initial-field mechanism has been assessed.
 ## Consequences
 
 - Total P and mode comparisons remain defined independently of organism entry.
-- A finite topsoil-only initial inventory is not a supported configuration;
-  vertical heterogeneity must be expressed as an explicit depth profile.
+- There is no implicit topsoil-only baseline or special topsoil-depth reset
+  switch. Prescribed vertical heterogeneity must be supplied explicitly; its
+  inventory is reported rather than assumed equal to the uniform baseline.
 - Variability is a property of represented soil volume rather than numerical
   array indices.
 - Paired held-out fields provide a fair environmental comparison even if
@@ -61,7 +74,16 @@ until the initial-field mechanism has been assessed.
 
 ## Related study
 
-The provisional correlation scale, variability grid, and qualification rules
-belong to
-[`spatial-p-heterogeneity-pilot-spec.md`](../implementation-docs/spatial-p-heterogeneity-pilot-spec.md),
-not to this durable decision.
+The provisional correlation scale, variability grid, random-field generator,
+and qualification rules belong to the downstream research protocol, not to
+this durable decision. See the
+[association-response programme](https://github.com/isaachcamp/REDbyRBD/blob/main/docs/studies/uniform-p-association-response-programme.md).
+
+## Implementation evidence
+
+The [profile helper](../../mycormarl/mycormarl/soil/phosphate_grid.py) and
+[reset/profile tests](../../tests/test_labile_phosphate_state.py) define the
+implemented deterministic treatment. The [phosphate guide](../phosphate-model.md#state-units-and-buffering)
+documents its units and initial-inventory meaning. This clarification records
+the existing profile behaviour; it does not introduce renormalisation or a
+new variability mechanism.

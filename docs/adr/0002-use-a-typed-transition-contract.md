@@ -9,8 +9,9 @@ pre-reset observation facts from `BaseMycorMarl`. If these essential facts are
 mixed into an informal diagnostic dictionary, spelling or shape drift can
 silently change learning semantics.
 
-The repository currently has a PPO `Trajectory` type but no type named
-`Transition`.
+At the time of this decision the repository had a PPO `Trajectory` type but
+no type named `Transition`. The typed environment contract is now implemented;
+this context records why it was introduced.
 
 ## Decision
 

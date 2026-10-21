@@ -38,7 +38,7 @@ ceiling was about `0.0199 d^-1`. The leaf-level `amass=0.05` remains defensible
 for its named reference light regime; the larger mismatch was the fixed
 `kleaf=0.30`, because the same trajectory's leaf fraction declined from about
 `0.81` to `0.23`. See
-the [growth-scale research note](research/carrot-growth-biomass-cap-and-carbon-fixation.md).
+the [growth-scale research note](https://github.com/isaachcamp/REDbyRBD/blob/main/docs/research/carrot-growth-biomass-cap-and-carbon-fixation.md).
 The corrected static-allocation qualification selects `kleaf=0.68`: its
 high-P, all-growth control reaches `31.38 g DM` at day 120, inside the
 `25--35 g` favourable trajectory envelope and below the `50 g` numerical
@@ -178,12 +178,12 @@ continuous closures are blended using `uptake_reference_time_days` and
 | Runtime field | Default and units | Description and model effect | Evidence, derivation, and status |
 |---|---:|---|---|
 | `max_steps` | `14,600 steps` | Administrative episode limit. At the default timestep it represents `14,600×0.025=365 d`; truncation is not biological death. | Arithmetic one-year scenario, not literature-derived. **Numerical/model choice.** |
-| `dt` | `0.025 d` (`0.6 h`) | Biological/action step and basis for maintenance, photosynthesis, uptake, and termination timing. Diffusion is internally subcycled if required. | Operational default retained pending issue #24, which will separate the policy decision interval from numerical integration. The standard fixed-geometry soil qualification supports `0.05 d`, but coupled fixed-action timestep comparisons change action frequency and are diagnostic only. **Numerical/model choice, not a biological parameter estimate.** |
+| `dt` | `0.025 d` (`0.6 h`) | Numerical environment step and basis for maintenance, photosynthesis, uptake, and termination timing. Diffusion is internally subcycled if required; a policy interval may hold a rate command across several numerical steps. | Largest tested eligible timestep passing the retained fixed-soil and coupled fixed-policy qualification against both next-finer and finest references. See the [qualification tables](qualification/phosphate-numerical-qualification.md). **Numerical/model choice, not a biological parameter estimate.** |
 | `consumer_mode` | `"mixed"` | Activates plant and fungus together; alternatives are `plant-only` and `fungus-only`. It changes which organisms are operational and which uptake/trade processes occur. | Experimental scenario selection. **Model choice.** |
 | `soil_radius_cm` | `50 cm` | Outer radius of the axisymmetric cylinder; controls cell count, soil volume, radial boundary, available P, and clipping of organism geometry. | No literature or experimental-vessel source is recorded for the default. **Unsupported scenario geometry.** |
 | `soil_depth_cm` | `100 cm` | Cylinder depth; controls soil volume, vertical boundary, and the represented fraction of the analytical root profile. | No literature or experimental-vessel source is recorded for the default. **Unsupported scenario geometry.** |
-| `radial_interval_cm` | `0.1 cm` | Exact uniform radial cell spacing. Smaller values increase resolution and cost; extent must be evenly divisible. | Existing spatial qualification retained `0.1 cm` against finer candidates for the reduced test problem. **Numerical choice; not universal convergence evidence.** |
-| `depth_interval_cm` | `0.1 cm` | Exact uniform depth spacing with the same cost and divisibility implications. | Same qualification basis and limitation as radial spacing. **Numerical choice.** |
+| `radial_interval_cm` | `0.05 cm` | Exact uniform radial cell spacing. Smaller values increase resolution and cost; extent must be evenly divisible. | Retained spatial qualification selects `0.05 cm` against next-finer and finest references; `0.1 cm` fails the finest-reference coupled comparison. **Numerical choice for the tested fixture; not universal convergence evidence.** |
+| `depth_interval_cm` | `0.05 cm` | Exact uniform depth spacing with the same cost and divisibility implications. The default cylinder now has `1000 × 2000` cells. | Same qualification basis and limitation as radial spacing. **Numerical choice.** |
 | `initial_solution_p_um` | `1 µM` | Initial soil-solution inorganic phosphate. With no depth profile it applies uniformly through the represented domain; a supplied profile scales it by depth. Through buffering it sets total initial labile inventory. It is not extractable or total soil P. | Order-of-magnitude low-P condition associated with [Vance et al. (2003)](https://doi.org/10.1046/j.1469-8137.2003.00695.x), not a universal mean. **Transferred/provisional.** |
 | `initial_solution_p_depth_profile` | `None` (uniform) | Optional `(depth cm, relative factor)` knots, linearly interpolated by cell-centre depth. | The selected grassland-derived shape is a structural scenario, not a calibrated pore-water profile. |
 | `phosphate_diffusion_coefficient_cm2_s` | `1e-5 cm² s⁻¹` | Solution diffusion coefficient in finite-volume transport; with water, impedance, and buffering it determines amount conductance and apparent propagation. | Provisional parameterisation from [Schnepf & Roose (2006)](https://doi.org/10.1111/j.1469-8137.2006.01771.x). **Transferred.** |
@@ -255,7 +255,7 @@ focused tests listed in the [phosphate model](phosphate-model.md#numerical-quali
 
 This register is a consolidation of the runtime declarations and the existing
 [growth model](growth-model.md), [phosphate model](phosphate-model.md), and
-[parameter research review](research/default-biomass-stoichiometry-and-photosynthesis-parameters.md).
+[parameter research review](https://github.com/isaachcamp/REDbyRBD/blob/main/docs/research/default-biomass-stoichiometry-and-photosynthesis-parameters.md).
 It does not turn a repository assumption into literature evidence merely because that
 assumption has already been documented.
 

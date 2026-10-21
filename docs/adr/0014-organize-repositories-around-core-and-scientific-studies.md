@@ -1,6 +1,8 @@
 # ADR-0014: Organize repositories around the core and scientific studies
 
-**Status:** Accepted; detailed migration mechanics remain unresolved
+**Status:** Accepted; initial repository extraction and cutover completed.
+Implementation status clarified 21 October 2026; the original decision and
+source identities are retained.
 
 ## Context
 
@@ -30,8 +32,8 @@ research repositories.
 Name the combined research repository `REDbyRBD`, expanded as "Resource exchange
 dynamics by resource budgetary demands". This name identifies the shared
 scientific story rather than tying the repository to the core package's name
-or a single experimental method. The animation repository's proposed name
-remains `mycormarl-animations`.
+or a single experimental method. The animation repository's selected name
+is `mycormarl-animations`.
 
 Use the following opening in the research README:
 
@@ -82,17 +84,19 @@ training rerun in the ordinary article build is not required.
 
 ## Consequences
 
-Study-specific orchestration currently inside the Python package must be
-considered alongside standalone scripts during extraction. The scientific
-protocols must be disentangled from reusable facilities before extraction.
-Detailed core public APIs, Slurm resource specifications,
-animation workflow outputs, and migration mechanics remain open decisions.
+Study-specific orchestration and standalone scientific scripts belong
+downstream; reusable facilities remain in core. Initial extraction and
+independent-package verification are recorded in the
+[cutover provenance](../reproducibility/repository-cutover.json).
+Future study/API extensions still follow this ownership boundary rather than
+reintroducing named scientific protocols into core.
 
 ADR-0015 records the accepted dependency-pinning, result-retention, and
 cross-repository documentation conventions, fixed report tags, and the
 distinction between exploration records and publication evidence bundles.
-Routine policy evaluation is permitted in figure builds, with a measured
-compute budget still to be specified.
+Routine bounded policy evaluation was permitted in the initial report build;
+the historical budget and archive requirements are recorded in ADR-0015.
+Current downstream build behaviour is governed by its own versioned protocol.
 
 ## Sources
 

@@ -6,9 +6,11 @@
 
 In `mixed`, the model begins with a living established fungus, fungal reserves,
 hyphal uptake geometry, and an active bilateral association. The plant and
-fungus independently choose continuous transfer fractions. Finite trade
-latents pass through a sigmoid, so a living actor can request arbitrarily small
-but not exactly zero trade.
+fungus independently choose continuous transfer rates. Trade latents pass
+through softplus in the implemented rate policy, which has no explicit
+exact-zero or association-off outcome in its mathematical support. Numerical
+underflow is not an association decision; non-policy callers can supply zero
+rates explicitly.
 
 Disabling transfers while retaining the fungus would not represent absence of
 association. The fungus would still consume soil phosphorus through its
@@ -60,5 +62,6 @@ continuous plant and fungal trade policies operate unchanged.
 
 ## Related studies
 
-- [`uniform-p-association-response-pilot-spec.md`](https://github.com/isaachcamp/REDbyRBD/blob/main/docs/implementation-docs/uniform-p-association-response-pilot-spec.md)
-- [`spatial-p-heterogeneity-pilot-spec.md`](../implementation-docs/spatial-p-heterogeneity-pilot-spec.md)
+- [Historical uniform-P pilot](https://github.com/isaachcamp/REDbyRBD/blob/main/docs/archive/study-designs/uniform-p-association-response-pilot.md).
+- [Association-response research programme](https://github.com/isaachcamp/REDbyRBD/blob/main/docs/studies/uniform-p-association-response-programme.md).
+- [Initial-inventory variability decision](0010-represent-spatial-p-variability-in-the-initial-soil-inventory.md).

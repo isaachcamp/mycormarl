@@ -18,12 +18,14 @@ construction.
 Every caller must provide a valid physical action before invoking
 `BaseMycorMarl`.
 
-- PPO uses the agreed sigmoid and centred-simplex transforms.
+- PPO constructs the implemented per-day Rate action using softplus transforms
+  and scores its sampled Gaussian latents. The former sigmoid/simplex mapping
+  was replaced by the rate migration in ADR-0012.
 - Heuristics, tests, examples, and qualification scripts use one shared public
   action-construction helper.
 - `BaseMycorMarl` consumes the physical action unchanged.
 - The compiled environment does not clip, replace non-finite values, project
-  to the simplex, renormalise, or provide a fallback allocation.
+  an action, renormalise, or provide a fallback allocation.
 - Optional validation may be provided as an explicit debug/test helper outside
   the compiled training path. Invalid input is a contract violation, not a
   recoverable environment event.
@@ -31,11 +33,28 @@ Every caller must provide a valid physical action before invoking
 Because the environment never repairs an action, `Transition` does not need an
 `action_was_projected` field.
 
+The public non-policy `rate_action` constructor has a separate, permissive
+input contract: negative and non-finite input values become zero rates before
+the environment is called. This construction-time sanitisation is not an
+environment repair and is not part of PPO's latent transform. Scientific
+callers requiring invalid-input rejection must check their raw inputs before
+using that constructor. The unchanged-command guarantee begins at the
+environment boundary; it does not promise that the constructor rejects
+malformed input.
+
 ## Consequences
 
 - The PPO likelihood always describes the action the environment executes.
-- Invalid-action bugs fail focused contract tests instead of being hidden.
+- Invalid environment inputs are contract violations; a caller must not rely
+  on compiled execution to diagnose them.
 - All repository action call sites must migrate to the shared constructor.
 - Direct external callers are responsible for satisfying the documented
-  bounds and simplex invariant.
+  finite, non-negative per-day rate contract. No sum-to-one constraint applies.
+
+## Evidence
+
+- [Action constructor](../../mycormarl/mycormarl/actions.py) and
+  [constructor contracts](../../tests/test_actions.py).
+- [PPO rate transform](../../mycormarl/mycormarl/algos/ppo.py) and
+  [environment action contracts](../../tests/test_base_mycor_refactor.py).
 
