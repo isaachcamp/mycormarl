@@ -72,6 +72,18 @@ configuration and organism traits
 
 Named studies, parameter screens, foraging experiments, empirical qualifications
 and their figures live in [REDbyRBD](https://github.com/isaachcamp/REDbyRBD).
+Study-specific soil-domain selection also lives there, including candidate
+depths, stress policies, horizons and acceptance criteria. Invoke
+`redbyrbd.domain_qualification`; there is no core duplicate or forwarder.
+
+Core retains solver qualification: phosphate convergence/conservation helpers,
+deep-soil geometry and P-accounting regression checks, and
+`scripts/phosphate_qualification.py`. Its `docs/qualification/` records are
+core numerical evidence. REDbyRBD's qualification records apply to named
+study protocols and their pinned core revisions. The directories have
+different responsibilities; sharing the name does not make their evidence
+interchangeable.
+
 Core owns generic `static_rollout`, checkpoint/policy execution, action conversion
 and RNG contracts. Legacy study/static manifest forwarders were removed at
 cutover; invoke the research package directly. The animation repository owns

@@ -13,5 +13,5 @@ def test_core_has_no_downstream_runtime_imports():
 
 
 def test_named_research_modules_are_absent_from_installed_core():
-    for name in ["study", "trade_only_study", "static_controls", "resource_pressure_screen", "resource_pressure_analysis", "plant_growth_qualification", "soil.absorber_diagnostic", "soil.depletion_gradient_diagnostic", "soil.hyphal_density_sweep"]:
+    for name in ["study", "trade_only_study", "static_controls", "resource_pressure_screen", "resource_pressure_analysis", "plant_growth_qualification", "domain_qualification", "soil.absorber_diagnostic", "soil.depletion_gradient_diagnostic", "soil.hyphal_density_sweep"]:
         assert importlib.util.find_spec("mycormarl." + name) is None, name

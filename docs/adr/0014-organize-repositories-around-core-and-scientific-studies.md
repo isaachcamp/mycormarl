@@ -59,6 +59,16 @@ protocols, treatment matrices, stopping criteria, acceptance checks, and
 scientific interpretation. Extract the experimental portions of `study.py`
 rather than retaining that mixed module wholesale as a core framework.
 
+Apply the same boundary to qualification. Core owns numerical solver
+verification, convergence and invariant regression checks. Research owns
+empirical plant-growth comparisons and selection of study domains under
+declared horizons, policies, candidate matrices and acceptance criteria.
+`redbyrbd.domain_qualification` is the study-domain implementation; do not
+retain a duplicate or compatibility forwarder in core. Both repositories may
+retain qualification evidence for their own responsibilities, with explicit
+source/configuration identities. A study passing a domain-selection rule is
+not a substitute for core solver qualification, or vice versa.
+
 The animation repository owns scenes, animation-specific data preparation,
 rendering configuration, and visual validators. Reusable biological
 calculations remain in core, and scientific figure preparation belongs with
