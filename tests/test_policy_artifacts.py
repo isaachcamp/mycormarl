@@ -22,6 +22,18 @@ from mycormarl.policy_artifacts import (
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_loader_rejects_the_pre_migration_four_rate_actor_contract(tmp_path):
+    legacy = tmp_path / 'four-rate.msgpack'
+    legacy.write_bytes(serialization.msgpack_serialize({
+        'format': 'mycormarl-ippo-policy', 'format_version': 1,
+        'actor_interface_version': 'two-head-latent-v1',
+        'environment_state_schema_version': 'state-v2',
+        'consumer_mode': 'mixed', 'parameters': {'plant': {}, 'fungus': {}},
+    }))
+    with pytest.raises(ValueError, match='incompatible actor interface'):
+        load_policy_artifact(legacy)
+
+
 def test_policy_artifact_round_trip_identifies_current_interfaces(tmp_path):
     """Saved policies state which actor and environment-state contracts they use."""
     output = tmp_path / "policies.msgpack"
