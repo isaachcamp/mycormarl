@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from typing import Any
+import math
 
 import jax
 import jax.numpy as jnp
 
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
+from mycormarl.actions import rate_action
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
@@ -17,6 +19,7 @@ from mycormarl.soil.phosphate_grid import labile_amount_to_solution_concentratio
 
 _AGENTS = (PLANT, FUNGUS)
 _POOL_TOLERANCE = 1e-6
+_RATE_RTOL, _RATE_ATOL = 1e-7, 1e-10
 
 def _validated_actions(actions):
     if set(actions) != set(_AGENTS):
@@ -24,9 +27,63 @@ def _validated_actions(actions):
     result = {}
     for agent in _AGENTS:
         value = jnp.asarray(actions[agent], dtype=jnp.float32)
-        if value.shape != (4,) or not bool(jnp.all(jnp.isfinite(value))) or bool(jnp.any(value < 0)):
+        if value.shape != (3,) or not bool(jnp.all(jnp.isfinite(value))) or bool(jnp.any(value < 0)):
             raise ValueError(f"invalid Rate action for {agent}")
         result[agent] = value
+    return result
+
+
+def evaluate_static_allocation(env, *, interval_days, trade_shares,
+                               reproductive_shares, seed,
+                               target_residual_fraction=.001, total_rate_per_day=None):
+    """Run a declared per-interval static strategy, distinct from raw rates.
+
+    The total intensity is an isolated matched-pool turnover reference. Actual
+    elemental depletion depends on stoichiometry, trade and other processes.
+    Internal numerical substeps hold the resulting physical rates unchanged.
+    """
+    policy_interval = getattr(env, 'decision_interval_days', env.config.dt)
+    if (not math.isfinite(interval_days) or interval_days <= 0.
+            or not math.isclose(interval_days, env.config.dt, rel_tol=1e-10)
+            or not math.isclose(interval_days, policy_interval, rel_tol=1e-10)):
+        raise ValueError('static interval must be positive, finite and match policy/environment intervals')
+    if not math.isfinite(target_residual_fraction) or not 0. < target_residual_fraction < 1.:
+        raise ValueError('target_residual_fraction must be finite and strictly between zero and one')
+    total_rate = -math.log(target_residual_fraction) / interval_days
+    if not math.isfinite(total_rate) or total_rate > float(jnp.finfo(jnp.float32).max):
+        raise ValueError('total allocation rate must be finite and representable in float32')
+    if total_rate_per_day is not None and (
+            not math.isfinite(total_rate_per_day) or total_rate_per_day <= 0.
+            or not math.isclose(total_rate_per_day, total_rate, rel_tol=_RATE_RTOL, abs_tol=_RATE_ATOL)):
+        raise ValueError(f'total_rate_per_day must match the declared interval and residual: {total_rate}')
+    for name, shares in (('trade_shares',trade_shares), ('reproductive_shares',reproductive_shares)):
+        if set(shares) != set(_AGENTS):
+            raise ValueError(f'{name} must specify plant and fungus')
+        if any(not math.isfinite(float(v)) or not 0. <= float(v) <= 1. for v in shares.values()):
+            raise ValueError(f'{name} must be finite and within [0, 1]')
+    actions, strategies = {}, {}
+    for agent in _AGENTS:
+        p, a = float(trade_shares[agent]), float(reproductive_shares[agent])
+        biology = (1-p)*total_rate
+        actions[agent] = rate_action(p*total_rate, (1-a)*biology, a*biology)
+        strategies[agent] = dict(trade_share=p, reproductive_share=a,
+                                reproduction_cost_scale=float(getattr(env.species, agent).reproduction_cost_scale))
+    required_substeps = math.ceil(max(float(jnp.sum(action)) for action in actions.values())
+                                 * env.config.dt / env.config.allocation_rate_step)
+    if required_substeps > env.config.allocation_max_substeps:
+        raise ValueError('static allocation requires more substeps than the allocation budget')
+    result = evaluate_static_policy(env, actions, seed=seed, record_resource_accounting=True)
+    result['static_allocation'] = dict(
+        protocol='rate-static-allocation-v1', interval_days=float(interval_days),
+        environment_interval_days=float(env.config.dt),
+        policy_interval_days=float(policy_interval),
+        target_residual_fraction=float(target_residual_fraction),
+        total_rate_per_day=total_rate, strategies=strategies,
+        supplied_total_rate_per_day=total_rate_per_day,
+        total_rate_validation_tolerance=dict(relative=_RATE_RTOL, absolute_per_day=_RATE_ATOL),
+        allocation_solver=dict(rate_step=env.config.allocation_rate_step,
+                               max_substeps=env.config.allocation_max_substeps),
+    )
     return result
 
 
@@ -84,10 +141,10 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
             ])
             fitness = fitness + jnp.array([rewards[PLANT], rewards[FUNGUS]])
             carbon_fixed = carbon_fixed + plant_info["carbon_fixed"][0]
-            step_accounting = jnp.zeros((2, 2, 5))
+            step_accounting = jnp.zeros((2, 2, 6))
             if record_resource_accounting:
                 # Resource axis: C=0, P=1. Destination axis is acquired,
-                # maintenance, growth, trade_in, trade_out.
+                # maintenance, growth, trade_in, trade_out, reproduction.
                 step_accounting = step_accounting.at[:, :, 0].set(jnp.array([
                     [plant_info["carbon_fixed"][0], plant_info["direct_p_uptake_mg"][0] + plant_info["trade_in"][0]],
                     [fungus_info["trade_in"][0], fungus_info["direct_p_uptake_mg"][0]],
@@ -107,6 +164,10 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
                 step_accounting = step_accounting.at[:, :, 4].set(jnp.array([
                     [plant_info["trade_out"][0], 0.0],
                     [0.0, fungus_info["trade_out"][0]],
+                ]))
+                step_accounting = step_accounting.at[:, :, 5].set(jnp.array([
+                    [plant_info["reproduction_c"][0], plant_info["reproduction_p"][0]],
+                    [fungus_info["reproduction_c"][0], fungus_info["reproduction_p"][0]],
                 ]))
                 accounting = accounting + step_accounting
             acquired = jnp.zeros((2, 2))
@@ -171,7 +232,7 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
             (initial_state, jnp.array(0), jnp.zeros(2), jnp.zeros(2),
              jnp.zeros(2, dtype=jnp.int32), jnp.zeros(2), jnp.zeros(2), jnp.array(0.0),
              jnp.zeros((env.max_episode_steps, 2, 18)), jnp.zeros((2, 2)),
-             jnp.zeros((2, 2, 5))),
+             jnp.zeros((2, 2, 6))),
         )
 
     state, steps, uptake_values, transfer_values, death_values, growth_values, fitness_values, carbon_fixed, trace_values, _, accounting_values = jax.jit(rollout)(state)
@@ -248,7 +309,7 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
         "terminated": bool(state.terminal),
     }
     if record_resource_accounting:
-        destinations = ("acquired", "maintenance", "growth", "trade_in", "trade_out")
+        destinations = ("acquired", "maintenance", "growth", "trade_in", "trade_out", "reproduction")
         resources = ("c", "p")
         result["resource_accounting"] = {
             agent: {
@@ -265,6 +326,7 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
             "destinations": "cumulative flows observed during each timestep; final pools are reported separately",
             "acquired": "photosynthetic fixation or direct uptake plus incoming trade",
             "growth": "resource consumed for realized structural biomass growth",
+            "reproduction": "cost-scaled resource exports, distinct from reproductive output",
             "trade_in_out": "resource transferred between agents",
         }
     if record_limitation_trace:
