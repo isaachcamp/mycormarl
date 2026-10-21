@@ -14,7 +14,7 @@ grid and couples buffered diffusion with root/fungal uptake and competition.
   buffering, diffusion, uptake regimes, competition, and verification.
 - [Module map](docs/module-map.md):
   code ownership, pipeline boundaries, executables, and test locations.
-- [Independent PPO walking skeleton](docs/ippo-walking-skeleton.md):
+- [Independent PPO walking skeleton](docs/implementation-docs/ippo-walking-skeleton.md):
   actor observations, Physical actions, lifecycle semantics, training, and
   saved-policy compatibility.
 - [Model Parameter Register](docs/model-parameter-register.md): register
