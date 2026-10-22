@@ -277,7 +277,7 @@ def run_deep_soil_qualification(
                 actions,
             )
             if not all(bool(jnp.all(info[agent]['allocation_converged'])) for agent in (PLANT,FUNGUS)):
-                raise ValueError('allocation solver budget exhausted')
+                raise ValueError('allocation integration failed: exhausted budget or non-finite result')
             if bool(jnp.any(info[PLANT]['biomass_guard_contact'])):
                 raise ValueError('plant numerical biomass guard contacted')
             plant_p_cost_mg = float(

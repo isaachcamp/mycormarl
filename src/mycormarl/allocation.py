@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 def integrate_allocation(pools, rates, costs, reproduction_scales, growth_room,
                          dt, rate_step, max_substeps):
-    """Return stocks, growth, reproduction, donor trade and elemental growth offers.
+    """Return C, P, growth, reproductive expenditure, trade, C/P offers, output.
 
     SSPRK3 substeps obey h * maximum outgoing hazard <= rate_step <= 1.
     Each Euler stage is therefore nonnegative. Paired transfer and biological
@@ -23,14 +23,14 @@ def integrate_allocation(pools, rates, costs, reproduction_scales, growth_room,
         available = jnp.min(y[:, :2] / costs, axis=1)
         growth = jnp.minimum(rates[:, 1] * available,
                              jnp.maximum(growth_room-y[:, 2], 0.) / h)
-        reproduction = rates[:, 2] * available / reproduction_scales
-        used = growth + reproduction_scales * reproduction
+        reproductive_expenditure = rates[:, 2] * available
+        used = growth + reproductive_expenditure
         trade = rates[:, 0] * jnp.stack((y[0, 0], y[1, 1]))
         c = -costs[:, 0]*used + jnp.stack((-trade[0], trade[0]))
         p = -costs[:, 1]*used + jnp.stack((trade[1], -trade[1]))
         # Offers retain limitation information without spending the surplus.
         offers = rates[:, 1, None] * y[:, :2]
-        return jnp.concatenate((jnp.stack((c, p, growth, reproduction, trade), axis=1), offers), axis=1)
+        return jnp.concatenate((jnp.stack((c, p, growth, reproductive_expenditure, trade), axis=1), offers), axis=1)
 
     def advance(_, carry):
         y, correction = carry
@@ -43,6 +43,9 @@ def integrate_allocation(pools, rates, costs, reproduction_scales, growth_room,
         return updated, (updated-y)-increment
 
     result, _ = jax.lax.fori_loop(0, n, advance, (initial, jnp.zeros_like(initial)))
+    output = jnp.where(result[:, 3] == 0., 0., result[:, 3] / reproduction_scales)
+    result = jnp.concatenate((result, output[:, None]), axis=1)
+    converged = converged & jnp.all(jnp.isfinite(result))
     # An exhausted budget is an explicit failed numerical transition, never
     # a silently capped action or an accepted under-resolved approximation.
     return jnp.where(converged, result, jnp.nan), converged, n

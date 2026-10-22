@@ -240,7 +240,7 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
 
     state, steps, uptake_values, transfer_values, death_values, growth_values, fitness_values, carbon_fixed, trace_values, _, accounting_values, guard_contact, allocation_ok = jax.jit(rollout)(state)
     if not bool(allocation_ok):
-        reasons.append('allocation solver budget exhausted')
+        reasons.append('allocation integration failed: exhausted budget or non-finite result')
     if bool(guard_contact):
         reasons.append('plant numerical biomass guard contacted')
     uptake = {PLANT: float(uptake_values[0]), FUNGUS: float(uptake_values[1])}
@@ -491,7 +491,7 @@ def evaluate_batched_static_policy(environments: list[BaseMycorMarl], actions: d
         residual = initial_total - final_soil - final_pools - losses
         reasons = []
         if not bool(allocation_ok[index]):
-            reasons.append('allocation solver budget exhausted')
+            reasons.append('allocation integration failed: exhausted budget or non-finite result')
         if bool(guard_contact[index]):
             reasons.append('plant numerical biomass guard contacted')
         if float(jnp.min(state.soil_labile_p[index])) < -_POOL_TOLERANCE:

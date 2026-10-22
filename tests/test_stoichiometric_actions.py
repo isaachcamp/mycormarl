@@ -63,6 +63,35 @@ def test_reproductive_cost_scale_changes_output_without_changing_elemental_expen
     assert jnp.array_equal(getattr(final, agent+'_biomass'), getattr(initial, agent+'_biomass'))
 
 
+@pytest.mark.parametrize('agent',[PLANT,FUNGUS])
+@pytest.mark.parametrize('scale',[1e37,1e38])
+def test_large_finite_reproductive_cost_preserves_expenditure_when_output_underflows(agent,scale):
+    env = pool_environment(**{agent:dict(initial_c_pool=4.,initial_p_pool=3.,
+        gamma_c=2.,gamma_p=3.,reproduction_cost_scale=scale)})
+    actions = {PLANT:(0.,0.,0.),FUNGUS:(0.,0.,0.)}
+    actions[agent] = (0.,0.,1.)
+    initial,(_,final,rewards,_,info) = advance(env,actions[PLANT],actions[FUNGUS])
+    assert float(info[agent]['reproduction_c'][0]) == pytest.approx(1.2642411176,abs=3e-6)
+    assert float(info[agent]['reproduction_p'][0]) == pytest.approx(1.8963616764,abs=3e-6)
+    assert float(getattr(final,agent+'_c_pool')[0]) == pytest.approx(2.7357588824,abs=3e-6)
+    assert float(getattr(final,agent+'_p_pool')[0]) == pytest.approx(1.1036383236,abs=3e-6)
+    if scale == 1e37:
+        assert float(rewards[agent]) == pytest.approx(6.321205588e-38,rel=2e-6,abs=0.)
+    else:
+        # The exact output is below float32's normal range; spending remains resolved.
+        assert 0. <= float(rewards[agent]) <= float(jnp.finfo(jnp.float32).tiny)
+    assert jnp.array_equal(getattr(final,agent+'_biomass'),getattr(initial,agent+'_biomass'))
+
+
+def test_unrepresentable_reproductive_output_is_an_explicit_failed_transition():
+    env = pool_environment(plant=dict(initial_c_pool=100.,initial_p_pool=100.,
+                                      reproduction_cost_scale=2e-38))
+    _,(_,final,rewards,_,info) = advance(env,(0.,0.,1.))
+    assert not bool(info[PLANT]['allocation_converged'])
+    assert not bool(jnp.isfinite(rewards[PLANT]))
+    assert not bool(jnp.isfinite(final.plant_c_pool[0]))
+
+
 @pytest.mark.parametrize('agent', [PLANT, FUNGUS])
 @pytest.mark.parametrize('scale', [0., -1., float('nan'), float('inf')])
 def test_environment_rejects_invalid_reproductive_costs(agent, scale):

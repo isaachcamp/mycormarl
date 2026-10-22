@@ -347,7 +347,7 @@ def evaluate_policy_parameters(
             rewards = jax.tree_util.tree_map(lambda value: value[index], rewards_history)
             infos = jax.tree_util.tree_map(lambda value: value[index], infos_history)
             if not all(bool(jnp.all(infos[agent]['allocation_converged'])) for agent in (PLANT,FUNGUS)):
-                raise ValueError('allocation solver budget exhausted')
+                raise ValueError('allocation integration failed: exhausted budget or non-finite result')
             if bool(jnp.any(infos[PLANT]['biomass_guard_contact'])):
                 raise ValueError('plant numerical biomass guard contacted')
             state = jax.tree_util.tree_map(lambda value: value[index], states_history)
@@ -457,7 +457,7 @@ def evaluate_policy_summary(
         )
         active = jnp.arange(done_flags.shape[0]) < episode_length
         if not bool(jnp.all(jnp.where(active,allocation_ok,True))):
-            raise ValueError('allocation solver budget exhausted')
+            raise ValueError('allocation integration failed: exhausted budget or non-finite result')
         if bool(jnp.any(active & guard_contact)):
             raise ValueError('plant numerical biomass guard contacted')
         episode_metrics.append({

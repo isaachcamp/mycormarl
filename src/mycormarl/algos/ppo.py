@@ -20,7 +20,7 @@ from mycormarl.transition import Transition
 def _require_numerical_qualification(allocation_ok, guard_contact):
     """Reject a failed compiled chunk before callers can checkpoint its output."""
     if not bool(allocation_ok):
-        raise ValueError('allocation solver budget exhausted')
+        raise ValueError('allocation integration failed: exhausted budget or non-finite result')
     if bool(guard_contact):
         raise ValueError('plant numerical biomass guard contacted')
 

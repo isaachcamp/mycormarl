@@ -685,10 +685,11 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
         def outcome(i):
             t = traits[i]
             c_pool, p_pool = result[i, 0:1], result[i, 1:2]
-            growth, reproduction = result[i, 2:3], result[i, 3:4]
+            growth, reproductive_expenditure = result[i, 2:3], result[i, 3:4]
+            reproduction = result[i, 7:8]
             gc, gp = growth*t.gamma_c, growth*t.gamma_p
-            rc = reproduction*t.reproduction_cost_scale*t.gamma_c
-            rp = reproduction*t.reproduction_cost_scale*t.gamma_p
+            rc = reproductive_expenditure*t.gamma_c
+            rp = reproductive_expenditure*t.gamma_p
             return dict(c_pool=c_pool, p_pool=p_pool, growth=growth,
                         reproduction_p=rp, reward=reproduction.squeeze(), info={
                             "growth": growth, "growth_c_allocated": result[i, 5:6],

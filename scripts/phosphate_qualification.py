@@ -640,7 +640,7 @@ def benchmark_environment(config: EnvConfig, repeats: int = 20) -> dict:
     jax.block_until_ready(full_carry)
     warmed_full_seconds = (time.perf_counter() - started) / repeats
     if not bool(full_carry[1]):
-        raise ValueError('allocation solver budget exhausted')
+        raise ValueError('allocation integration failed: exhausted budget or non-finite result')
     if bool(full_carry[2]):
         raise ValueError('plant numerical biomass guard contacted')
     full_projection = annual_runtime_projection(config.dt, warmed_full_seconds)
