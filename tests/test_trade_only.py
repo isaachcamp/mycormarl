@@ -12,7 +12,7 @@ from mycormarl.algos.ppo import (
     initialize_runner_state,
     make_train,
 )
-from mycormarl.checkpoint_evaluation import evaluate_policy_parameters
+from mycormarl.checkpoint_evaluation import evaluate_policy_parameters,evaluate_policy_summary
 from mycormarl.environments.base_mycor import BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
@@ -26,13 +26,24 @@ from mycormarl.trade_only import (
 from mycormarl.random_streams import derive_random_streams
 
 
+def test_summary_evaluation_can_switch_between_full_and_reduced_control_actors_on_one_environment():
+    from test_stoichiometric_actions import pool_environment
+    env = pool_environment(dt=.05,max_steps=1)
+    observations,_ = env.reset(jax.random.PRNGKey(0))
+    for reduced in (False,True):
+        actor = ActorCritic(trade_only=reduced)
+        parameters = {a:actor.init(jax.random.PRNGKey(i+1),observations[a]) for i,a in enumerate(env.agents)}
+        result = evaluate_policy_summary(env,parameters,episodes=1,actor=actor)
+        if reduced:
+            assert result['actions']['plant'][1:] == pytest.approx([6.2169795,.6907755])
+
+
 def test_fixed_allocation_action_preserves_learned_trade_and_declared_90_10_rates():
-    """The constrained seam emits the ordinary four-component Rate action."""
+    """The constrained seam retains its declared rates in the three-rate schema."""
     action = fixed_allocation_rate_action(jnp.asarray(1.25))
 
     assert action.tolist() == pytest.approx(
-        [1.25, 0.9 * TOTAL_BIOLOGICAL_RATE_PER_DAY,
-         0.1 * TOTAL_BIOLOGICAL_RATE_PER_DAY, 0.0]
+        [1.25, 6.2169795, .6907755]
     )
 
 
@@ -49,10 +60,9 @@ def test_plant_only_actions_hold_static_plant_allocation_and_zero_trade():
     actions = plant_only_actions()
 
     assert actions["plant"].tolist() == pytest.approx(
-        [0.0, 0.9 * TOTAL_BIOLOGICAL_RATE_PER_DAY,
-         0.1 * TOTAL_BIOLOGICAL_RATE_PER_DAY, 0.0]
+        [0.0, 6.2169795, .6907755]
     )
-    assert actions["fungus"].tolist() == pytest.approx([0.0, 0.0, 0.0, 0.0])
+    assert actions["fungus"].tolist() == pytest.approx([0.0, 0.0, 0.0])
 
 
 def test_trade_only_ppo_updates_scalar_trade_policy_and_executes_fixed_allocation():
@@ -73,11 +83,11 @@ def test_trade_only_ppo_updates_scalar_trade_policy_and_executes_fixed_allocatio
     for agent, trajectory in zip(
         ("plant", "fungus"), output["trajectories"], strict=True
     ):
-        assert trajectory.rate_action.shape[-1] == 4
+        assert trajectory.rate_action.shape[-1] == 3
         assert jnp.allclose(
             trajectory.rate_action[..., 1:],
             jnp.asarray([0.9 * TOTAL_BIOLOGICAL_RATE_PER_DAY,
-                         0.1 * TOTAL_BIOLOGICAL_RATE_PER_DAY, 0.0]),
+                         0.1 * TOTAL_BIOLOGICAL_RATE_PER_DAY]),
         )
         assert not jnp.any(trajectory.biological_rate_actor_valid)
         assert jnp.any(trajectory.trade_actor_valid)
@@ -106,7 +116,7 @@ def test_trade_only_latent_location_evaluation_records_commanded_and_realised_ex
 
     assert row["actions"]["plant"][1:] == pytest.approx(
         [0.9 * TOTAL_BIOLOGICAL_RATE_PER_DAY,
-         0.1 * TOTAL_BIOLOGICAL_RATE_PER_DAY, 0.0]
+         0.1 * TOTAL_BIOLOGICAL_RATE_PER_DAY]
     )
     assert set(row["transfers"]["plant"]) == {"proposed_out", "out", "in"}
     assert row["transfers"]["plant"]["out"] <= row["transfers"]["plant"]["proposed_out"]

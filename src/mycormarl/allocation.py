@@ -13,7 +13,7 @@ def integrate_allocation(pools, rates, costs, reproduction_scales, growth_room,
     extents use the same stage weights, preserving both elemental balances.
     Rates are held constant while pools and the limiting resource are updated.
     """
-    required = jnp.maximum(1, jnp.ceil(jnp.max(jnp.sum(rates, axis=1))*dt/rate_step))
+    required = jnp.maximum(1, jnp.ceil(jnp.max(jnp.sum(rates, axis=1))*(dt/rate_step)))
     converged = required <= max_substeps
     n = jnp.where(converged, required, 0).astype(jnp.int32)
     h = dt / jnp.maximum(n, 1)
@@ -32,14 +32,17 @@ def integrate_allocation(pools, rates, costs, reproduction_scales, growth_room,
         offers = rates[:, 1, None] * y[:, :2]
         return jnp.concatenate((jnp.stack((c, p, growth, reproduction, trade), axis=1), offers), axis=1)
 
-    def advance(_, y):
+    def advance(_, carry):
+        y, correction = carry
         first = h * flux(y)
         second = h * flux(y + first)
         third = h * flux(y + .25*(first+second))
-        # Increment form also leaves a dormant organism's stocks unchanged.
-        return y + (first + second + 4.*third) / 6.
+        # Compensate long float32 ledgers without clipping stocks or rates.
+        increment = (first + second + 4.*third) / 6. - correction
+        updated = y + increment
+        return updated, (updated-y)-increment
 
-    result = jax.lax.fori_loop(0, n, advance, initial)
+    result, _ = jax.lax.fori_loop(0, n, advance, (initial, jnp.zeros_like(initial)))
     # An exhausted budget is an explicit failed numerical transition, never
     # a silently capped action or an accepted under-resolved approximation.
     return jnp.where(converged, result, jnp.nan), converged, n

@@ -122,6 +122,8 @@ class PolicyIntervalMycorMarl(AutoResetMixin, MultiAgentEnv):
             ):
                 infos[agent][field] = jnp.sum(infos_history[agent][field], axis=0)
             if agent == PLANT:
+                infos[agent]['biomass_guard_contact'] = jnp.any(
+                    infos_history[agent]['biomass_guard_contact'],axis=0)
                 infos[agent]["carbon_fixed"] = jnp.sum(
                     infos_history[agent]["carbon_fixed"], axis=0
                 )

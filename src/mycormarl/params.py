@@ -47,4 +47,3 @@ class EnvConfig:
     uptake_reference_time_days: float = 1.0
     uptake_transition_exponent: float = 2.0
     theta_water: float = 0.3
-    alpha: float = 0.5

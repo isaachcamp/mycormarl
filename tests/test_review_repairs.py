@@ -74,8 +74,8 @@ def test_independent_consumer_mode_keeps_absent_partner_dormant(mode, inactive, 
     env = BaseMycorMarl(_small_config(mode), _species())
     _, state = env.reset(jax.random.PRNGKey(0))
     aggressive = {
-        PLANT: physical_action(1.0, 1.0, 1.0, 1.0),
-        FUNGUS: physical_action(1.0, 1.0, 1.0, 1.0),
+        PLANT: physical_action(1.0, 1.0, 1.0),
+        FUNGUS: physical_action(1.0, 1.0, 1.0),
     }
 
     for step in range(2):
@@ -101,8 +101,8 @@ def test_absorbing_death_removes_real_root_geometry_and_uptake():
     c_before = state.plant_c_pool.copy()
     p_before = state.plant_p_pool.copy()
     actions = {
-        PLANT: physical_action(1.0, 1.0, 1.0, 1.0),
-        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
+        PLANT: physical_action(1.0, 1.0, 1.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, rewards, dones, infos = env.step_env(

@@ -315,6 +315,7 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
         for agent in AGENTS:
             if actions[agent].shape != (3,):
                 raise ValueError(f"{agent} Rate action must have shape (3,)")
+        plant_guard_at_start = state.plant_biomass >= self.species.plant.biomass_cap
         plant_operational_at_start = jnp.logical_and(
             self.plant_active, jnp.logical_not(state.plant_dead)
         )
@@ -561,6 +562,7 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
                 **plant_step["info"],
                 **plant_maintenance["info"],
                 "biomass": state.plant_biomass,
+                "biomass_guard_contact": plant_guard_at_start | (state.plant_biomass >= self.species.plant.biomass_cap),
                 "c_pool": state.plant_c_pool,
                 "p_pool": state.plant_p_pool,
                 "proposed_trade_out": plant_c_trade_proposed,
@@ -746,8 +748,6 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
             raise ValueError(
                 "consumer_mode must be 'mixed', 'plant-only', or 'fungus-only'"
             )
-        if not math.isfinite(config.alpha) or not 0.0 <= config.alpha <= 1.0:
-            raise ValueError("alpha must be finite and within [0, 1]")
         if (
             isinstance(config.max_steps, bool)
             or not isinstance(config.max_steps, int)
@@ -789,10 +789,6 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
                 for depth, factor in knots
             ) or any(right[0] <= left[0] for left, right in zip(knots, knots[1:])):
                 raise ValueError("initial_solution_p_depth_profile requires increasing finite depths and non-negative factors")
-
-    def _cobb_douglas(self, c: chex.Array, p: chex.Array, alpha: float) -> chex.Array:
-        """Compute Cobb-Douglas rewarding for reproduction based on phosphorus and carbon."""
-        return (c ** alpha) * (p ** (1 - alpha))
 
     def is_terminal(self, state: State) -> chex.Array:
         return state.terminal | \

@@ -244,8 +244,8 @@ def test_uptake_credit_cannot_fund_growth_in_the_same_step():
     env = BaseMycorMarl(_p3_config(), species)
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: physical_action(0.0, 1.0, 0.0, 0.0),
-        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
+        PLANT: physical_action(0.0, 1.0, 0.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(
@@ -295,8 +295,8 @@ def test_compiled_step_confines_post_growth_fungal_geometry_and_uptake():
     env = BaseMycorMarl(config, species)
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
-        FUNGUS: physical_action(0.0, 1.0, 0.0, 0.0),
+        PLANT: physical_action(0.0, 0.0, 0.0),
+        FUNGUS: physical_action(0.0, 1.0, 0.0),
     }
     outside_colony = jnp.array([
         [False, True],
@@ -326,8 +326,8 @@ def test_end_to_end_uptake_conserves_soil_plus_free_pool_p():
         + state.fungus_p_pool[0]
     )
     actions = {
-        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
-        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
+        PLANT: physical_action(0.0, 0.0, 0.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, _, _, _ = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -384,8 +384,8 @@ def test_structural_p_removed_with_biomass_is_recorded_as_mortality_loss():
     env = BaseMycorMarl(_p3_config(initial_solution_p_um=0.0), species)
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: physical_action(0.0, 0.0, 0.0, 1.0),
-        FUNGUS: physical_action(0.0, 0.0, 0.0, 1.0),
+        PLANT: physical_action(0.0, 0.0, 0.0),
+        FUNGUS: physical_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, _, _, _ = env.step_env(jax.random.PRNGKey(1), state, actions)

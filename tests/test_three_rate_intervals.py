@@ -100,6 +100,15 @@ def test_short_interval_preserves_a_failed_allocation_qualification_flag():
     assert not info[PLANT]['allocation_converged']
 
 
+def test_interval_reports_guard_contact_even_after_later_maintenance_reduces_biomass():
+    numerical = pool_environment(dt=1.,max_steps=2,
+        plant=dict(initial_biomass=.99,biomass_cap=1.,initial_c_pool=.04,kappa_c=.02))
+    held = PolicyIntervalMycorMarl(numerical,decision_interval_days=2.,max_episode_steps=1)
+    _, final, _, _, info = step(held,{PLANT:jnp.array([0.,10.,0.]),FUNGUS:jnp.zeros(3)})
+    assert float(final.plant_biomass[0]) < 1.
+    assert bool(info[PLANT]['biomass_guard_contact'][0])
+
+
 def test_interval_preserves_a_trade_cancellation_event_before_a_dormant_substep():
     numerical = pool_environment(dt=.05,plant=dict(initial_c_pool=.6,kappa_c=10.,death_fraction=.9),
                                  fungus=dict(initial_p_pool=1.))

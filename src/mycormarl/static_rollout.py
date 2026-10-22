@@ -113,16 +113,18 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
 
     def rollout(initial_state):
         def condition(carry):
-            current_state, steps, *_ = carry
-            return (steps < env.max_episode_steps) & ~current_state.terminal
+            current_state, steps, *_, guard_contact, allocation_ok = carry
+            return (steps < env.max_episode_steps) & ~current_state.terminal & allocation_ok & ~guard_contact
 
         def advance(carry):
-            previous, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed, trace, prior_acquired, accounting = carry
+            previous, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed, trace, prior_acquired, accounting, guard_contact, allocation_ok = carry
             _, current, rewards, _, info = env.step_env(
                 jax.random.PRNGKey(seed + steps + 1), previous, actions
             )
             plant_info = info[PLANT]
             fungus_info = info[FUNGUS]
+            allocation_ok = allocation_ok & plant_info['allocation_converged'] & fungus_info['allocation_converged']
+            guard_contact = guard_contact | jnp.any(plant_info['biomass_guard_contact'])
             uptake = uptake + jnp.array([
                 plant_info["direct_p_uptake_mg"][0],
                 fungus_info["direct_p_uptake_mg"][0],
@@ -195,7 +197,8 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
                     plant_info["maint_c_used"][0], plant_info["maint_p_used"][0],
                     fungus_info["maint_c_used"][0], fungus_info["maint_p_used"][0],
                 ]).reshape(2, 2)
-                maintenance_fraction = maintenance_used / jnp.maximum(prior_acquired, 1e-12)
+                maintenance_fraction = jnp.where(steps > 0,
+                    maintenance_used / jnp.maximum(prior_acquired, 1e-12), 0.)
                 trade_out = jnp.array([plant_info["trade_out"][0], fungus_info["trade_out"][0]])
                 trade_in = jnp.array([plant_info["trade_in"][0], fungus_info["trade_in"][0]])
                 trade_out_normalized = jnp.array([
@@ -224,7 +227,7 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
                 ], axis=1)
                 trace_row = jnp.concatenate([trace_row, limiting_code[:, None]], axis=1)
                 trace = trace.at[steps].set(trace_row)
-            return current, steps + 1, uptake, transfers, deaths, growth, fitness, carbon_fixed, trace, acquired, accounting
+            return current, steps + 1, uptake, transfers, deaths, growth, fitness, carbon_fixed, trace, acquired, accounting, guard_contact, allocation_ok
 
         return jax.lax.while_loop(
             condition,
@@ -232,10 +235,14 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
             (initial_state, jnp.array(0), jnp.zeros(2), jnp.zeros(2),
              jnp.zeros(2, dtype=jnp.int32), jnp.zeros(2), jnp.zeros(2), jnp.array(0.0),
              jnp.zeros((env.max_episode_steps, 2, 18)), jnp.zeros((2, 2)),
-             jnp.zeros((2, 2, 6))),
+             jnp.zeros((2, 2, 6)), jnp.any(initial_state.plant_biomass >= env.species.plant.biomass_cap), jnp.asarray(True)),
         )
 
-    state, steps, uptake_values, transfer_values, death_values, growth_values, fitness_values, carbon_fixed, trace_values, _, accounting_values = jax.jit(rollout)(state)
+    state, steps, uptake_values, transfer_values, death_values, growth_values, fitness_values, carbon_fixed, trace_values, _, accounting_values, guard_contact, allocation_ok = jax.jit(rollout)(state)
+    if not bool(allocation_ok):
+        reasons.append('allocation solver budget exhausted')
+    if bool(guard_contact):
+        reasons.append('plant numerical biomass guard contacted')
     uptake = {PLANT: float(uptake_values[0]), FUNGUS: float(uptake_values[1])}
     transfers = {
         "plant_c_out": float(transfer_values[0]),
@@ -247,9 +254,9 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
     final_pools = float(
         jnp.sum(state.plant_p_pool)
         + jnp.sum(state.fungus_p_pool)
-        + jnp.sum(jnp.where(state.plant_dead, 0.0, state.plant_biomass))
+        + jnp.sum(state.plant_biomass)
         * env.species.plant.gamma_p
-        + jnp.sum(jnp.where(state.fungus_dead, 0.0, state.fungus_biomass))
+        + jnp.sum(state.fungus_biomass)
         * env.species.fungus.gamma_p
     )
     losses = float(sum(float(jnp.sum(getattr(state, field))) for field in (
@@ -263,7 +270,7 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
     if float(jnp.min(state.soil_labile_p)) < -_POOL_TOLERANCE:
         reasons.append("negative soil P pool")
     for agent, dead in ((PLANT, state.plant_dead), (FUNGUS, state.fungus_dead)):
-        if bool(jnp.any(dead)) and (mode == "mixed" or agent == PLANT):
+        if bool(jnp.any(dead)) and (mode == "mixed" or mode == agent+'-only'):
             reasons.append(f"biological failure: {agent} died")
     if any(
         bool(jnp.any(getattr(state, field) < 0.0))
@@ -346,8 +353,8 @@ def evaluate_static_policy(env: BaseMycorMarl, actions: dict[str, jax.Array], *,
                         "allocated_to_used_c_ratio": float(row[agent_index, 4]),
                         "allocated_to_used_p_ratio": float(row[agent_index, 5]),
                         "limiting_resource": labels[int(row[agent_index, 17])],
-                        "acquired_c": float(row[agent_index, 7]),
-                        "acquired_p": float(row[agent_index, 8]),
+                        "acquired_c": float(row[agent_index, 6]),
+                        "acquired_p": float(row[agent_index, 7]),
                         "maintenance_c_used": float(row[agent_index, 8]),
                         "maintenance_p_used": float(row[agent_index, 9]),
                         "maintenance_fraction_of_prior_acquired_c": float(row[agent_index, 10]),
@@ -419,10 +426,13 @@ def evaluate_batched_static_policy(environments: list[BaseMycorMarl], actions: d
 
     def rollout(initial_state):
         def advance(_, carry):
-            current, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed = carry
-            active = ~current.terminal
+            current, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed, guard_contact, allocation_ok = carry
+            active = ~current.terminal & allocation_ok & ~guard_contact
             keys = jnp.broadcast_to(jax.random.PRNGKey(seed + 1), (batch_size, 2))
             _, updated, rewards, _, info = batched_step(keys, current, actions)
+            allocation_ok = allocation_ok & jnp.where(active,
+                info[PLANT]['allocation_converged'] & info[FUNGUS]['allocation_converged'], True)
+            guard_contact = guard_contact | (active & info[PLANT]['biomass_guard_contact'][:,0])
             next_state = jax.tree.map(
                 lambda previous, next_value: retain_active(previous, next_value, active),
                 current, updated,
@@ -440,23 +450,25 @@ def evaluate_batched_static_policy(environments: list[BaseMycorMarl], actions: d
                 & ~info["transitions"][PLANT].operational_at_end,
                 info["transitions"][FUNGUS].operational_at_start
                 & ~info["transitions"][FUNGUS].operational_at_end,
-            ), axis=1).astype(jnp.int32)
+            ), axis=1).astype(jnp.int32) * active[:,None]
             growth = growth + jnp.stack((
                 info[PLANT]["growth"][:, 0], info[FUNGUS]["growth"][:, 0],
             ), axis=1) * active_float[:, None]
             fitness = fitness + jnp.stack((rewards[PLANT], rewards[FUNGUS]), axis=1) * active_float[:, None]
             carbon_fixed = carbon_fixed + info[PLANT]["carbon_fixed"][:, 0] * active_float
-            return next_state, steps + active.astype(jnp.int32), uptake, transfers, deaths, growth, fitness, carbon_fixed
+            return next_state, steps + active.astype(jnp.int32), uptake, transfers, deaths, growth, fitness, carbon_fixed, guard_contact, allocation_ok
 
         return jax.lax.fori_loop(
             0, environment.max_episode_steps, advance,
             (initial_state, jnp.zeros(batch_size, dtype=jnp.int32),
              jnp.zeros((batch_size, 2)), jnp.zeros((batch_size, 2)),
              jnp.zeros((batch_size, 2), dtype=jnp.int32), jnp.zeros((batch_size, 2)),
-             jnp.zeros((batch_size, 2)), jnp.zeros(batch_size)),
+             jnp.zeros((batch_size, 2)), jnp.zeros(batch_size),
+             initial_state.plant_biomass[:,0] >= environment.species.plant.biomass_cap,
+             jnp.ones(batch_size,dtype=bool)),
         )
 
-    state, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed = jax.jit(rollout)(batch_state)
+    state, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed, guard_contact, allocation_ok = jax.jit(rollout)(batch_state)
     entries = []
     for index, (p_level, initial_soil, initial_total) in enumerate(
         zip(p_levels, initial_soils, initial_totals, strict=True)
@@ -464,8 +476,8 @@ def evaluate_batched_static_policy(environments: list[BaseMycorMarl], actions: d
         final_soil = float(jnp.sum(state.soil_labile_p[index]) * MICROMOL_P_TO_MG_P)
         final_pools = float(
             jnp.sum(state.plant_p_pool[index]) + jnp.sum(state.fungus_p_pool[index])
-            + jnp.sum(jnp.where(state.plant_dead[index], 0.0, state.plant_biomass[index])) * environment.species.plant.gamma_p
-            + jnp.sum(jnp.where(state.fungus_dead[index], 0.0, state.fungus_biomass[index])) * environment.species.fungus.gamma_p
+            + jnp.sum(state.plant_biomass[index]) * environment.species.plant.gamma_p
+            + jnp.sum(state.fungus_biomass[index]) * environment.species.fungus.gamma_p
         )
         counters = {
             "plant_mortality": float(jnp.sum(state.cumulative_plant_p_mortality_loss_mg[index])),
@@ -478,10 +490,14 @@ def evaluate_batched_static_policy(environments: list[BaseMycorMarl], actions: d
         losses = sum(counters.values())
         residual = initial_total - final_soil - final_pools - losses
         reasons = []
+        if not bool(allocation_ok[index]):
+            reasons.append('allocation solver budget exhausted')
+        if bool(guard_contact[index]):
+            reasons.append('plant numerical biomass guard contacted')
         if float(jnp.min(state.soil_labile_p[index])) < -_POOL_TOLERANCE:
             reasons.append("negative soil P pool")
         for agent, dead in ((PLANT, state.plant_dead[index]), (FUNGUS, state.fungus_dead[index])):
-            if bool(jnp.any(dead)):
+            if bool(jnp.any(dead)) and (mode == "mixed" or mode == agent+'-only'):
                 reasons.append(f"biological failure: {agent} died")
         if any(bool(jnp.any(getattr(state, field)[index] < 0.0))
                for field in ("plant_c_pool", "plant_p_pool", "fungus_c_pool", "fungus_p_pool")):

@@ -20,6 +20,11 @@ from mycormarl.soil.deep_soil_qualification import (
 )
 
 
+def test_qualification_policy_rejects_the_obsolete_storage_component():
+    with pytest.raises(TypeError,match='storage'):
+        StaticPolicy(trade=0.,growth=0.,reproduction=0.,storage=1.)
+
+
 def test_qualification_confines_fungal_density_and_request_to_current_colony():
     """Every sampled production transition keeps fungal uptake in its colony."""
     fungus = FungusTraits(
@@ -51,8 +56,8 @@ def test_qualification_confines_fungal_density_and_request_to_current_colony():
             b_p=0.0,
         ),
         species=SpeciesParams(plant=PlantTraits(), fungus=fungus),
-        plant_policy=StaticPolicy(0.0, 0.0, 0.0, 1.0),
-        fungus_policy=StaticPolicy(0.0, 0.0, 0.0, 1.0),
+        plant_policy=StaticPolicy(0.0, 0.0, 0.0),
+        fungus_policy=StaticPolicy(0.0, 0.0, 0.0),
         duration_days=1,
         seed=0,
         software_revision="test-revision",
@@ -93,8 +98,8 @@ def test_qualification_reports_inventory_loss_for_required_depth_bands():
             phosphate_diffusion_coefficient_cm2_s=1e-30,
         ),
         species=species,
-        plant_policy=StaticPolicy(0.0, 0.0, 0.0, 1.0),
-        fungus_policy=StaticPolicy(0.0, 0.0, 0.0, 1.0),
+        plant_policy=StaticPolicy(0.0, 0.0, 0.0),
+        fungus_policy=StaticPolicy(0.0, 0.0, 0.0),
         duration_days=1,
         seed=0,
         software_revision="test-revision",
@@ -133,7 +138,7 @@ def test_qualification_records_fixed_horizon_integrated_p_uptake_and_balance():
             death_fraction=0.0,
         ),
     )
-    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+    policy = StaticPolicy(0.0, 0.0, 0.0)
 
     result = run_deep_soil_qualification(
         config=EnvConfig(
@@ -194,8 +199,8 @@ def test_writer_emits_separate_soil_snapshots_and_complete_provenance(tmp_path):
             phosphate_diffusion_coefficient_cm2_s=1e-30,
         ),
         species=species,
-        plant_policy=StaticPolicy(0.0, 0.0, 0.0, 1.0),
-        fungus_policy=StaticPolicy(0.0, 0.0, 0.0, 1.0),
+        plant_policy=StaticPolicy(0.0, 0.0, 0.0),
+        fungus_policy=StaticPolicy(0.0, 0.0, 0.0),
         duration_days=1,
         seed=7,
         software_revision="test-revision",
@@ -208,13 +213,14 @@ def test_writer_emits_separate_soil_snapshots_and_complete_provenance(tmp_path):
         "manifest.json",
     }
     manifest = json.loads(paths["manifest_json"].read_text())
+    assert manifest['schema_version'] == '3'
     assert manifest["software_revision"] == "test-revision"
     assert manifest["seed"] == 7
     assert manifest["duration_days"] == 1
     assert manifest["environment"]["dt"] == pytest.approx(1.0)
     assert manifest["traits"]["fungus"]["saturation_density"] == pytest.approx(2000.0)
     assert manifest["policies"]["fungus"]["rate_action_per_day"] == pytest.approx(
-        [0.0, 0.0, 0.0, 1.0]
+        [0.0, 0.0, 0.0]
     )
     with np.load(paths["daily_soil_p_npz"]) as snapshots:
         assert snapshots["scenario_id"].item() == manifest["scenario_id"]
@@ -237,7 +243,7 @@ def test_writer_refuses_to_overwrite_incompatible_artifacts(tmp_path):
         plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
         fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
     )
-    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+    policy = StaticPolicy(0.0, 0.0, 0.0)
     original = run_deep_soil_qualification(
         config=config,
         species=species,
@@ -282,7 +288,7 @@ def test_comparison_checks_equivalence_and_recomputes_original_loss(tmp_path):
         plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
         fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
     )
-    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+    policy = StaticPolicy(0.0, 0.0, 0.0)
     original = run_deep_soil_qualification(
         config=config,
         species=species,
@@ -342,7 +348,7 @@ def test_temporal_gate_accepts_matching_endpoint_metrics():
         plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
         fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
     )
-    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+    policy = StaticPolicy(0.0, 0.0, 0.0)
 
     def run(dt):
         return run_deep_soil_qualification(
@@ -377,7 +383,7 @@ def test_temporal_gate_rejects_different_fixed_horizons():
         plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
         fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
     )
-    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+    policy = StaticPolicy(0.0, 0.0, 0.0)
 
     def run(dt, duration_days):
         return run_deep_soil_qualification(
@@ -411,7 +417,7 @@ def test_temporal_gate_reports_timestep_scaled_pools_without_failing():
         plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
         fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
     )
-    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+    policy = StaticPolicy(0.0, 0.0, 0.0)
 
     def run(dt):
         return run_deep_soil_qualification(
@@ -490,7 +496,7 @@ def test_temporal_gate_fails_when_integrated_p_uptake_does_not_converge():
         plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
         fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
     )
-    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+    policy = StaticPolicy(0.0, 0.0, 0.0)
 
     def run(dt):
         return run_deep_soil_qualification(
@@ -548,7 +554,7 @@ def test_temporal_gate_requires_each_run_to_close_extended_p_balance():
         plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
         fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
     )
-    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+    policy = StaticPolicy(0.0, 0.0, 0.0)
 
     def run(dt):
         return run_deep_soil_qualification(
@@ -596,7 +602,7 @@ def test_temporal_gate_requires_each_run_to_preserve_fungal_confinement():
         plant=PlantTraits(initial_biomass=0.0, jmax=0.0),
         fungus=FungusTraits(initial_biomass=0.0, jmax=0.0),
     )
-    policy = StaticPolicy(0.0, 0.0, 0.0, 1.0)
+    policy = StaticPolicy(0.0, 0.0, 0.0)
 
     def run(dt):
         return run_deep_soil_qualification(

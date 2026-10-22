@@ -17,6 +17,14 @@ from mycormarl.trade_only import fixed_allocation_rate_action
 from mycormarl.transition import Transition
 
 
+def _require_numerical_qualification(allocation_ok, guard_contact):
+    """Reject a failed compiled chunk before callers can checkpoint its output."""
+    if not bool(allocation_ok):
+        raise ValueError('allocation solver budget exhausted')
+    if bool(guard_contact):
+        raise ValueError('plant numerical biomass guard contacted')
+
+
 class PolicyParameters(NamedTuple):
     """Gaussian trade latent and two biological latents (intensity, share)."""
 
@@ -1058,6 +1066,10 @@ def make_train(
         ) = jax.lax.scan(
             _update_step, runner_state, None, NUM_UPDATES
         )
+        jax.debug.callback(_require_numerical_qualification,
+            jnp.all(plant_traj.info['allocation_converged'])
+            & jnp.all(fungus_traj.info['allocation_converged']),
+            jnp.any(plant_traj.info['biomass_guard_contact']))
 
         return {
             "runner_state": runner_state,

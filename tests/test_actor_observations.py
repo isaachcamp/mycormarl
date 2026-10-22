@@ -161,8 +161,8 @@ def test_step_stores_realised_received_trade_before_reconstructing_observations(
     env = _environment()
     _, state = env.reset(jax.random.PRNGKey(0))
     trade_everything = {
-        PLANT: rate_action(1_000.0, 0.0, 0.0, 0.0),
-        FUNGUS: rate_action(1_000.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(1_000.0, 0.0, 0.0),
+        FUNGUS: rate_action(1_000.0, 0.0, 0.0),
     }
 
     observations, next_state, _, _, _ = env.step_env(
@@ -250,8 +250,8 @@ def test_no_trade_transition_clears_previous_received_trade_memory():
         fungus_last_c_received=jnp.array([4.0]),
     )
     no_trade = {
-        PLANT: rate_action(0.0, 1.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.0, 1.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, 1.0, 0.0),
+        FUNGUS: rate_action(0.0, 1.0, 0.0),
     }
 
     observations, next_state, _, _, _ = env.step_env(

@@ -136,11 +136,9 @@ def _relative_growth_rate(initial: float, final: float, days: float) -> float | 
     return math.log(final / initial) / days
 
 
-def _episode_summary(
-    initial: dict[str, Any], trace: list[dict[str, Any]], dt_days: float
-) -> dict[str, Any]:
+def _episode_summary(initial: dict[str, Any], trace: list[dict[str, Any]]) -> dict[str, Any]:
     final = trace[-1]["state"]
-    duration_days = len(trace) * dt_days
+    duration_days = trace[-1]['time_days']
     cumulative_fitness = {
         agent: sum(row["reproductive_fitness"][agent] for row in trace)
         for agent in (PLANT, FUNGUS)
@@ -273,7 +271,7 @@ def _scan_episode(
     return initial_state, trajectory, final_carry[0]
 
 
-_SUMMARY_RUNNERS: dict[tuple[BaseMycorMarl, EvaluationProtocol, str], Any] = {}
+_SUMMARY_RUNNERS: dict[tuple[BaseMycorMarl, EvaluationProtocol, str, bool], Any] = {}
 
 
 def _compiled_summary_runner(
@@ -282,7 +280,7 @@ def _compiled_summary_runner(
     actor: ActorCritic,
 ) -> Any:
     """Cache the compiled summary rollout for repeated checkpoints."""
-    cache_key = (environment, protocol, actor.activation)
+    cache_key = (environment, protocol, actor.activation, actor.trade_only)
     runner = _SUMMARY_RUNNERS.get(cache_key)
     if runner is not None:
         return runner
@@ -294,10 +292,13 @@ def _compiled_summary_runner(
             key, observations, state = carry
             actions, key = _actions(actor, parameters, observations, protocol, key)
             key, step_key = jax.random.split(key)
-            observations, state, rewards, dones, _ = environment.step_env(
+            observations, state, rewards, dones, infos = environment.step_env(
                 step_key, state, actions
             )
-            return (key, observations, state), (actions, rewards, dones["__all__"])
+            allocation_ok = jnp.all(jnp.stack([
+                infos[agent]['allocation_converged'] for agent in (PLANT,FUNGUS)]))
+            guard_contact = jnp.any(infos[PLANT]['biomass_guard_contact'])
+            return (key, observations, state), (actions, rewards, dones["__all__"], allocation_ok, guard_contact)
 
         final_carry, trajectory = jax.lax.scan(
             step, (key, observations, state), None, length=environment.max_episode_steps
@@ -345,11 +346,17 @@ def evaluate_policy_parameters(
             actions = jax.tree_util.tree_map(lambda value: value[index], actions_history)
             rewards = jax.tree_util.tree_map(lambda value: value[index], rewards_history)
             infos = jax.tree_util.tree_map(lambda value: value[index], infos_history)
+            if not all(bool(jnp.all(infos[agent]['allocation_converged'])) for agent in (PLANT,FUNGUS)):
+                raise ValueError('allocation solver budget exhausted')
+            if bool(jnp.any(infos[PLANT]['biomass_guard_contact'])):
+                raise ValueError('plant numerical biomass guard contacted')
             state = jax.tree_util.tree_map(lambda value: value[index], states_history)
             transitions = infos["transitions"]
             state_snapshot = _state_snapshot(state)
+            time_days = _scalar(state.step) * environment.config.dt
+            interval_days = time_days - (trace[-1]['time_days'] if trace else 0.)
             trace.append({
-                "time_days": _scalar(state.step) * environment.config.dt,
+                "time_days": time_days,
                 "actions": _plain(actions),
                 "realised_actions": {
                     agent: _plain(transitions[agent].realised_action)
@@ -364,9 +371,8 @@ def evaluate_policy_parameters(
                     for agent in (PLANT, FUNGUS)
                 },
                 "reproductive_fitness": _plain(rewards),
-                # Store the resource terms in the same biomass-equivalent
-                # units used by the Cobb--Douglas reward.  This makes the
-                # reported fitness independently decomposable.
+                # Growth-cost-equivalent exports. Divide by the organism's
+                # reproductive cost scale to recover realised output.
                 "reproductive_resources": {
                     agent: {
                         "carbon": _scalar(infos[agent]["reproduction_c"])
@@ -387,7 +393,7 @@ def evaluate_policy_parameters(
                     agent: _relative_growth_rate(
                         previous_state["living_biomass"][agent],
                         state_snapshot["living_biomass"][agent],
-                        environment.config.dt,
+                        interval_days,
                     )
                     for agent in (PLANT, FUNGUS)
                 },
@@ -411,7 +417,7 @@ def evaluate_policy_parameters(
         result_episodes.append(EvaluationEpisode(
             initial_state,
             tuple(trace),
-            _episode_summary(initial_state, trace, environment.config.dt),
+            _episode_summary(initial_state, trace),
         ))
 
     if protocol == "latent-location":
@@ -442,7 +448,7 @@ def evaluate_policy_summary(
     for _ in range(episodes):
         runner = _compiled_summary_runner(environment, protocol, actor)
         key, trajectory, final_state = runner(parameters, key)
-        actions, rewards, done_flags = trajectory
+        actions, rewards, done_flags, allocation_ok, guard_contact = trajectory
         done_flags = jnp.asarray(done_flags, dtype=bool)
         has_termination = jnp.any(done_flags)
         termination_index = jnp.argmax(done_flags)
@@ -450,6 +456,10 @@ def evaluate_policy_summary(
             has_termination, termination_index + 1, done_flags.shape[0]
         )
         active = jnp.arange(done_flags.shape[0]) < episode_length
+        if not bool(jnp.all(jnp.where(active,allocation_ok,True))):
+            raise ValueError('allocation solver budget exhausted')
+        if bool(jnp.any(active & guard_contact)):
+            raise ValueError('plant numerical biomass guard contacted')
         episode_metrics.append({
             "fitness": {
                 agent: jnp.sum(jnp.where(active, rewards[agent], 0.0))

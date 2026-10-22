@@ -23,6 +23,26 @@ from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
 
 
+def test_held_evaluation_reports_physical_duration_and_short_final_interval_growth_rates():
+    import math
+    from mycormarl.environments.policy_interval import PolicyIntervalMycorMarl
+    from test_stoichiometric_actions import pool_environment
+    env = PolicyIntervalMycorMarl(pool_environment(dt=.05,max_steps=3),
+        decision_interval_days=.1,max_episode_steps=2)
+    actor = ActorCritic()
+    observations,_ = env.reset(jax.random.PRNGKey(0))
+    parameters = {a:actor.init(jax.random.PRNGKey(i+1),observations[a]) for i,a in enumerate(env.agents)}
+    episode = evaluate_policy_parameters(env,parameters,episodes=1,actor=actor).episodes[0]
+    assert episode.summary['duration_days'] == pytest.approx(.15)
+    assert [row['time_days'] for row in episode.trace] == pytest.approx([.1,.15])
+    initial = episode.initial_state['living_biomass'][PLANT]
+    first = episode.trace[0]['state']['living_biomass'][PLANT]
+    final = episode.trace[1]['state']['living_biomass'][PLANT]
+    assert episode.trace[0]['interval_rgr_per_day'][PLANT] == pytest.approx(math.log(first/initial)/.1)
+    assert episode.trace[1]['interval_rgr_per_day'][PLANT] == pytest.approx(math.log(final/first)/.05)
+    assert episode.summary['episode_rgr_per_day'][PLANT] == pytest.approx(math.log(final/initial)/.15)
+
+
 def _environment():
     return BaseMycorMarl(
         EnvConfig(
