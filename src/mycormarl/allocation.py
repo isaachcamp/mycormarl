@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 def integrate_allocation(pools, rates, costs, reproduction_scales, growth_room,
                          dt, rate_step, max_substeps):
-    """Return C, P, cumulative growth, reproduction and donor trade per agent.
+    """Return stocks, growth, reproduction, donor trade and elemental growth offers.
 
     SSPRK3 substeps obey h * maximum outgoing hazard <= rate_step <= 1.
     Each Euler stage is therefore nonnegative. Paired transfer and biological
@@ -17,7 +17,7 @@ def integrate_allocation(pools, rates, costs, reproduction_scales, growth_room,
     converged = required <= max_substeps
     n = jnp.where(converged, required, 0).astype(jnp.int32)
     h = dt / jnp.maximum(n, 1)
-    initial = jnp.concatenate((pools, jnp.zeros((2, 3), dtype=pools.dtype)), axis=1)
+    initial = jnp.concatenate((pools, jnp.zeros((2, 5), dtype=pools.dtype)), axis=1)
 
     def flux(y):
         available = jnp.min(y[:, :2] / costs, axis=1)
@@ -28,7 +28,9 @@ def integrate_allocation(pools, rates, costs, reproduction_scales, growth_room,
         trade = rates[:, 0] * jnp.stack((y[0, 0], y[1, 1]))
         c = -costs[:, 0]*used + jnp.stack((-trade[0], trade[0]))
         p = -costs[:, 1]*used + jnp.stack((trade[1], -trade[1]))
-        return jnp.stack((c, p, growth, reproduction, trade), axis=1)
+        # Offers retain limitation information without spending the surplus.
+        offers = rates[:, 1, None] * y[:, :2]
+        return jnp.concatenate((jnp.stack((c, p, growth, reproduction, trade), axis=1), offers), axis=1)
 
     def advance(_, y):
         first = h * flux(y)

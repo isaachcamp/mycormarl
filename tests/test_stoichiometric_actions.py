@@ -11,7 +11,7 @@ from mycormarl.plant.traits import PlantTraits
 from mycormarl.fungus.traits import FungusTraits
 
 
-def pool_environment(*, dt=1.0, plant=None, fungus=None, **config):
+def pool_environment(*, dt=1.0, max_steps=10, plant=None, fungus=None, **config):
     plant_traits = dict(initial_biomass=1., initial_c_pool=2., initial_p_pool=1.,
                         gamma_c=1., gamma_p=1., kappa_c=0., kappa_p=0.,
                         kleaf=0., jmax=0.)
@@ -20,7 +20,7 @@ def pool_environment(*, dt=1.0, plant=None, fungus=None, **config):
     plant_traits.update(plant or {})
     fungus_traits.update(fungus or {})
     return BaseMycorMarl(
-        EnvConfig(dt=dt, max_steps=10, soil_radius_cm=.2, soil_depth_cm=.2,
+        EnvConfig(dt=dt, max_steps=max_steps, soil_radius_cm=.2, soil_depth_cm=.2,
                   radial_interval_cm=.1, depth_interval_cm=.1,
                   initial_solution_p_um=0., **config),
         SpeciesParams(PlantTraits(**plant_traits), FungusTraits(**fungus_traits)),
@@ -88,6 +88,20 @@ def test_equal_trade_and_growth_hazards_compete_without_trade_priority():
     assert float(final.plant_c_pool[0]) == pytest.approx(.1353352832, rel=3e-6)
     assert float(final.plant_p_pool[0]) == pytest.approx(.5676676416, rel=3e-6)
     assert float(final.fungus_c_pool[0]) == pytest.approx(.4323323584, rel=3e-6)
+
+
+@pytest.mark.parametrize('c,p,offered_c,offered_p,used', [
+    (2.,.5,.8490904191,.2370452096,.2370452096),
+    (1.,1.,.3242492688,.5371246344,.3242492688),
+])
+def test_growth_offers_preserve_elemental_limitation_information(c,p,offered_c,offered_p,used):
+    env = pool_environment(plant=dict(initial_c_pool=c,initial_p_pool=p))
+    _, (_, _, _, _, info) = advance(env,(1.,.75,.25))
+    plant = info[PLANT]
+    assert float(plant['growth_c_allocated'][0]) == pytest.approx(offered_c, abs=3e-6)
+    assert float(plant['growth_p_allocated'][0]) == pytest.approx(offered_p, abs=3e-6)
+    assert float(plant['growth_c_used'][0]) == pytest.approx(used, abs=3e-6)
+    assert float(plant['growth_p_used'][0]) == pytest.approx(used, abs=3e-6)
 
 
 @pytest.mark.parametrize('case,c,p,share,scale,trade,expected', [

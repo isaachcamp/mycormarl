@@ -689,8 +689,8 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
             rp = reproduction*t.reproduction_cost_scale*t.gamma_p
             return dict(c_pool=c_pool, p_pool=p_pool, growth=growth,
                         reproduction_p=rp, reward=reproduction.squeeze(), info={
-                            "growth": growth, "growth_c_allocated": gc,
-                            "growth_p_allocated": gp, "growth_c_used": gc,
+                            "growth": growth, "growth_c_allocated": result[i, 5:6],
+                            "growth_p_allocated": result[i, 6:7], "growth_c_used": gc,
                             "growth_p_used": gp, "reproduction_c": rc,
                             "reproduction_p": rp,
                             "reproductive_fitness_from_components": reproduction,
