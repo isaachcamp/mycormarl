@@ -3,6 +3,12 @@
 **Status:** Accepted; records implemented numerical contracts and the
 21 October 2026 selection of the qualified `0.05 cm` default.
 
+The historical separate outgoing/incoming allocation ordering below is
+superseded by [ADR-0020](0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md).
+Maintenance/death and post-allocation source, geometry and soil boundaries
+remain. The retained older coupled qualification keeps its original model
+identity; new allocation evidence is reported separately.
+
 ## Context and decision
 
 Changing resolution must approximate the same declared physical experiment,
@@ -25,10 +31,9 @@ trajectory. Distinguish three clocks:
   concentration-dependent requests are refreshed in every soil substep.
 
 This records the existing outer splitting. It does not endorse every ordering
-as timestep-independent physiology, select a future allocation solver, or
-authorise a continuous maintenance/source/soil reordering. The separate
-three-rate migration remains on hold and will receive its own ADR when
-implemented.
+as timestep-independent physiology or authorise a continuous
+maintenance/source/soil reordering. ADR-0020 subsequently selected a coupled
+three-rate allocation solver and admitted incoming trade during allocation.
 
 Use an exactly uniform production grid whose requested intervals divide the
 physical extents. Reject invalid intervals with a valid alternative rather

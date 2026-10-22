@@ -2,10 +2,10 @@
 
 ## Status
 
-Accepted; the four-component Rate action is implemented. The historical
-fraction/simplex context below describes the model it replaced. This record
-does not declare the later three-rate proposal implemented or supersede the
-current storage contract.
+Partially superseded by
+[ADR-0020](0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md)
+on 22 October 2026. Its three-rate model replaces the four-component/storage
+contract below. The held-rate physical-time principle remains accepted.
 
 ## Context
 
@@ -16,7 +16,7 @@ updated free pool makes biological change depend on numerical resolution.
 The one-day fixed-policy numerical qualification exposed this coupling through
 uptake, biomass-derived geometry, and subsequent uptake feedback.
 
-## Decision
+## Original decision (four-component/storage portions superseded)
 
 Replace the Physical action with a **Rate action** whose four components are
 non-negative first-order rates in `d^-1` for trade, growth, reproduction, and
@@ -43,16 +43,14 @@ be introduced atomically with rate-aware tests and qualification.
 
 ## Implementation evidence and later work
 
-The [action constructor](../../src/mycormarl/actions.py),
-[policy-interval wrapper](../../src/mycormarl/environments/policy_interval.py),
-[rate/interval tests](../../tests/test_decision_intervals.py), and
-[qualification report](../qualification/phosphate-numerical-qualification.md)
-record the implemented four-rate model. The original tracking
+The original four-rate source baseline was `1ec2804`; its
+[qualification archive](../qualification/rate-action-49/phosphate-numerical/phosphate-numerical-qualification.md)
+retains that model's provenance. The original tracking
 [issue #49](https://github.com/isaachcamp/mycormarl/issues/49) remains open;
 its tracker state is separate from this source-level implementation status.
 
-The approved [three-rate specification #79](https://github.com/isaachcamp/mycormarl/issues/79)
-is on execution hold. Per the 21 October 2026 instruction, its successor ADR
-will be written when that migration is implemented, through
-[final integration ticket #85](https://github.com/isaachcamp/mycormarl/issues/85).
-Until then, this remains the record of the implemented four-rate contract.
+The [three-rate specification #79](https://github.com/isaachcamp/mycormarl/issues/79)
+was subsequently implemented. ADR-0020 records simultaneous trade/biology,
+stoichiometric reproductive output, implicit retention and the separate static
+experiment contract. Current constructor and interval tests exercise that
+successor model; historical four-rate outcomes are not equivalent evidence.

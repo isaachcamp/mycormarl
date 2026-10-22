@@ -16,11 +16,12 @@ transition is a biological termination event.
 ### Rate action
 
 The action command passed to `BaseMycorMarl`. It commands non-negative
-first-order **per-day** rates for trade, growth, reproduction, and storage.
-Growth, reproduction, and storage compete as pool outflow hazards rather than
-as a simplex; storage initially means retention in the existing free pool, not
-a new compartment. Newly acquired soil P, photosynthate, and received trade
-are eligible for the held rate during subsequent numerical substeps.
+first-order **per-day** rates for trade, growth and reproduction. Trade and
+stoichiometric biology compete simultaneously for evolving free C/P pools;
+received trade is eligible during allocation. Retention is the free resource
+stock left after realised spending, including essential-resource surplus and
+finite-rate residue. It has no separate controlled hazard or compartment.
+New soil P and photosynthate become eligible in the next numerical step.
 
 The policy wrapper holds the Rate action unchanged across numerical substeps.
 PPO records sampled latents, the executed Rate action, and likelihoods in
@@ -155,8 +156,10 @@ losses, maintenance, host transfer, and whole-fungus budgets.
 
 ### Cumulative reproductive fitness
 
-The time-sum of an organism's per-transition Cobb–Douglas reproduction reward
-over an evaluation episode. Plant cumulative reproductive fitness is the
+The time-sum of an organism's realised stoichiometric reproductive output
+over an evaluation episode. Both essential resources constrain output; their
+costs equal growth costs times the organism's reproductive cost scale. The
+output is exported and adds no parental biomass. Plant cumulative reproductive fitness is the
 primary plant-performance endpoint for phosphorus-response policy studies
 because it is the quantity optimized by the plant PPO objective.
 
@@ -164,6 +167,27 @@ Final living plant biomass and cumulative gross plant growth are secondary
 plant-performance endpoints. They make the simulated response comparable with
 greenhouse growth measurements, but they are not interchangeable with
 cumulative reproductive fitness and are not themselves the PPO objective.
+
+### Reproductive cost scale
+
+A finite, positive multiplier of both growth C/P costs per unit reproductive
+output, specified independently for plant and fungus and defaulting to one.
+At fixed commands, changing it scales output efficiency while preserving
+reproductive resource expenditure and composition.
+
+### Biological intensity and reproductive expenditure share
+
+Biological intensity is the sum of growth and reproduction rates. The
+reproductive expenditure share divides that intensity between the two paired
+resource sinks. It is an expenditure preference; output also depends on
+reproductive cost scale and essential-resource availability.
+
+### Declared static allocation experiment
+
+A fixed-share experiment that declares equal policy and outer environment
+intervals, a nominal residual target, and the corresponding total processing
+intensity. This contract is distinct from unrestricted fixed-rate references
+and learned policies. Numerical refinement holds the physical commands fixed.
 
 ### Plant biomass numerical guard
 
@@ -207,7 +231,7 @@ latent-to-physical-action mapping. It is the primary evaluation protocol for
 P-response studies.
 
 This protocol does not compute the expected physical action, because the
-nonlinear sigmoid and centred-simplex transforms generally make the transform
+nonlinear softplus intensity and sigmoid share transforms generally make the transform
 of a latent mean differ from the mean transformed action. Repeated sampled
 policy rollouts are a separate diagnostic of residual policy-distribution
 variability, not the primary estimate of learned strategy and not by itself

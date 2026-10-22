@@ -15,13 +15,14 @@ record existing model decisions retrospectively, with their recording date.
 | [0009](0009-represent-am-engagement-using-complete-consumer-modes.md) | Reset-level AM association through complete consumer modes |
 | [0010](0010-represent-spatial-p-variability-in-the-initial-soil-inventory.md) | Complete initial P fields; prescribed profiles versus equal-inventory variability |
 | [0011](0011-separate-the-plant-biomass-guard-from-policy-observation-scaling.md) | Separate numerical biomass guard and observation scale |
-| [0012](0012-adopt-rate-actions-for-held-policy-intervals.md) | Implemented four-rate action and held policy intervals |
+| [0012](0012-adopt-rate-actions-for-held-policy-intervals.md) | Held-rate principle; four-component/storage portions superseded by 0020 |
 | [0014](0014-organize-repositories-around-core-and-scientific-studies.md) | Core, research and animation ownership |
 | [0015](0015-pin-core-dependencies-and-retain-executable-policy-evidence.md) | Exact core pins, evidence identity and separate exploration retention |
 | [0016](0016-use-finite-inventory-buffered-phosphate-transport-and-uptake.md) | Finite buffered soil inventory, diffusion, uptake and competition |
 | [0017](0017-represent-absorbers-as-fine-root-discs-and-an-external-hyphal-hemisphere.md) | Fine-root discs, external-hyphal hemisphere and domain clipping |
 | [0018](0018-account-for-structural-phosphorus-and-explicit-biological-exports.md) | Structural P, biological exports, death and reset resource accounts |
 | [0019](0019-separate-policy-numerical-and-soil-clocks-and-qualify-resolution.md) | Separate clocks, explicit numerical splitting and qualified resolution |
+| [0020](0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md) | Three-rate coupled allocation, stoichiometric reproductive output and declared static intensity |
 
 The assumption catalogue, equations, units and parameter provenance belong in
 the [model overview](../model-overview.md), [growth model](../growth-model.md),
@@ -30,11 +31,11 @@ the [model overview](../model-overview.md), [growth model](../growth-model.md),
 consequential choices, alternatives and limitations, rather than duplicating
 every parameter or treating all current assumptions as calibrated facts.
 
-The three-rate allocation/reproduction design has no successor ADR yet.
-Its [implementation specification](https://github.com/isaachcamp/mycormarl/issues/79)
-remains on execution hold; [ticket #85](https://github.com/isaachcamp/mycormarl/issues/85)
-must add that ADR when the migration is implemented. The current record is
-ADR-0012; this documentation work does not supersede it or start the migration.
+ADR-0020 is the implemented action/reproduction baseline for
+[specification #79](https://github.com/isaachcamp/mycormarl/issues/79).
+It explicitly supersedes the relevant older action, allocation-order and reward
+portions while preserving environment/PPO separation and biomass-derived
+geometry. Earlier scientific artifacts retain their original provenance.
 
 Research diagnostic/endpoint decisions ADR-0005–0008 and ADR-0013 live in
 [REDbyRBD](https://github.com/isaachcamp/REDbyRBD/tree/main/docs/adr).

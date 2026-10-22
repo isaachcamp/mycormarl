@@ -1,6 +1,66 @@
 # Action-application bugs for later follow-up
 
-Recorded 15 October 2026 at the user's request. No fixes are implemented by this note. These findings come from code inspection; the storage defect additionally has a reproducible analytical calculation. Dedicated environment regression tests remain to be added when fixes are undertaken. This is an investigation record, not a replacement for the repository's GitHub issue tracker.
+Originally recorded 15 October 2026 at the user's request. The historical
+findings below are preserved; their original paths refer to the earlier package
+layout. Current code is under `src/mycormarl/`. This investigation record
+supplements the GitHub tracker.
+
+## Resolution status — 22 October 2026
+
+The [three-rate implementation](../adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md)
+resolves items 1–5. The [qualification report](../qualification/three-rate-allocation.md)
+and retained 487-test result provide public behavioral evidence.
+
+| Original item | Current status |
+|---|---|
+| 1. Timestep-dependent storage hazard | Removed in #80; retention is implicit free stock. |
+| 2. Execution before later interval death discarded | Fixed in #83; any-step allocation execution reaches PPO validity. |
+| 3. Disabled trade reported as realised | Fixed in #83; component availability and requested commands remain distinct. |
+| 4. Held horizon overrun | Fixed in #83; shortened final intervals and terminal padding freeze state, flows and reward. |
+| 5. Mixed final-step/cumulative diagnostics | Fixed in #83; flows sum, events use any-step aggregation, qualification requires all executed steps. |
+| 6. Reset inventory depends on dt | Deliberately deferred by #79. Numerical comparisons explicitly pin physical initial pools. |
+
+Additional confirmed defects found and fixed during the migration:
+
+- PPO's scalar trade entropy was summed over the batch dimension; #81 retains
+  per-sample scalar entropy and sums only the biological latent vector.
+- Growth C/P offers aliased realised use, hiding essential-resource limitation.
+  #83 integrates non-consuming `kg*C`/`kg*P` offers separately.
+- The wrapper's old fitness recomputation was wrong at nonunit reproductive
+  costs. #83 sums realised output directly.
+- Static resource ledgers omitted reproductive exports; #82 adds them.
+- Raw/batched static and evaluation/learning/qualification paths could accept
+  exhausted allocation budgets and non-finite results. #84 rejects these paths.
+- Final static P inventory excluded retained dead structure, creating a false
+  `0.5 mg` residual in a public death fixture. #84 includes it alongside actual
+  mortality exports.
+- Static single-consumer summaries treated absent counterparts as deaths. #84
+  restricts biological-failure classification to configured consumers.
+- Static limitation traces read acquired C/P from the wrong columns and
+  reported first-row maintenance/prior-acquisition ratios near `5e9` instead
+  of the documented zero. Both serializer calculations are corrected in #84.
+- Guard contact could be missed after later maintenance reduced biomass. #84
+  retains an any-step contact event and rejects unqualified workflows. Batched
+  stops also mask death counters from discarded later dynamics.
+- Existing `1000/day` analytical cases exposed float32 cumulative roundoff
+  (`9.9999857` growth versus `10`). Compensated updates fix this without wider
+  tolerances. Eager/JIT reassociation also selected different substep counts
+  at an integer boundary; factoring the time scale fixes the discrepancy.
+- Held evaluation used numerical dt for duration and growth-rate denominators;
+  #84 uses elapsed physical time, including shortened final intervals.
+- Summary evaluation reused a full-control compiled actor for reduced-control
+  parameters on the same environment. #84 includes actor family in its cache key.
+- Final #85 audit found large finite reproductive costs could round output to
+  zero and then erase spending reconstructed as `scale * output`. Integrating
+  expenditure directly fixes both stock and export ledgers, with both-species
+  regressions at `1e37`/`1e38`. Output overflowing float32 now explicitly fails
+  allocation qualification rather than reporting successful infinite fitness.
+
+The final-substep received-trade observation window remains the explicit
+existing interface, as does reset-stock dependence on dt. Wider continuous
+maintenance/source/soil reordering remains outside this migration. The
+investigation findings and proposals below should be read in their original
+15 October context rather than as unresolved claims about the current engine.
 
 ## 1. Storage has a numerical-timestep-dependent effect
 

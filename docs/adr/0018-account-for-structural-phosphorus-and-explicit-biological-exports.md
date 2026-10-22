@@ -3,6 +3,11 @@
 **Status:** Accepted; retrospective record of implemented accounting and reset
 contracts, recorded 21 October 2026.
 
+The reproductive objective subsequently selected by
+[ADR-0020](0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md)
+is realised stoichiometric output with cost-scaled paired exports. The
+structural, mortality, loss and reset accounting boundaries here remain accepted.
+
 ## Context and decision
 
 Soil-only conservation cannot establish whole-system P accounting: growth
@@ -24,7 +29,8 @@ than silently discarding those terms or inventing a recycling compartment.
   structural P removed with actual biomass loss in mortality-loss counters.
 - Treat reproductive P as an explicit export. Keep all three export counters
   separate; none creates soil P, litter, offspring or a receiving pool.
-  This accounting boundary does not select a new reproductive objective.
+  At adoption this accounting boundary did not select a reproductive objective;
+  ADR-0020 subsequently superseded the earlier Cobb–Douglas reward.
 - Make biological death absorbing after the post-maintenance historical-
   maximum biomass threshold. Suppress later activity while retaining residual
   stored biomass and free pools for accounting. Do not discard or recycle

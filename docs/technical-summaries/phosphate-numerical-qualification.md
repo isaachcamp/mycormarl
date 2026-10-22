@@ -1,5 +1,10 @@
 # Why the phosphate model needs numerical qualification
 
+> The coupled action engine has since changed under
+> [ADR-0020](../adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md).
+> Its [allocation qualification](../qualification/three-rate-allocation.md) is
+> separate; the older numerical study below retains its original model identity.
+
 > **Historical results:** The selection and timings discussed below predate
 > the next-finer-and-finest reference gate. Current defaults are `0.05 cm`
 > spatial intervals and `0.025 day` numerical steps; use the

@@ -22,9 +22,11 @@ and fungal uptake requests from those density fields, and credits accepted P
 to organism pools.
 
 The coupling is deliberately delayed across a numerical environment step. Resources
-visible at its start can fund growth; post-growth geometry then controls uptake;
-newly acquired P becomes available for allocation at the next timestep. This
-makes credit assignment explicit and prevents same-step resource recycling.
+visible after maintenance and incoming partner trade can fund growth;
+post-growth geometry then controls uptake. New soil P and photosynthate become
+available for allocation at the next numerical step. Incoming trade participates
+inside coupled allocation, as recorded by
+[ADR-0020](adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md).
 
 ## Shared state and geometry
 
@@ -77,8 +79,8 @@ reduced domains remain appropriate for tests and development runs.
 ```text
 start-of-step organism pools + Rate actions (per day)
   -> automatic maintenance and maintenance-deficit mortality
-  -> bilateral trade, or cancellation after maintenance death
-  -> stoichiometric growth, independent C/P reproduction exports, free-pool retention
+  -> coupled bilateral trade and stoichiometric growth/reproductive output
+     (unavailable trade disabled; surplus and finite-rate residue retained)
   -> surviving biomass and mortality/export accounting
   -> photosynthetic C fixation
   -> biomass-derived root and hyphal density on the shared grid
@@ -89,8 +91,8 @@ start-of-step organism pools + Rate actions (per day)
 
 The controlling entry point is
 [`BaseMycorMarl.step_env`](../src/mycormarl/environments/base_mycor.py).
-It pays maintenance from start pools, resolves outgoing trade, allocates the
-remaining resources, then credits incoming trade and photosynthate. It
+It pays maintenance from start pools, integrates trade and biological spending
+together, then credits photosynthate. It
 refreshes both density fields after biomass change and invokes the soil model
 through `step_phosphorus_field`.
 
@@ -114,8 +116,11 @@ step in days; the soil substep is its seconds-based diffusion/uptake subdivision
 the policy decision interval may contain several complete environment steps.
 [`PolicyIntervalMycorMarl`](../src/mycormarl/environments/policy_interval.py)
 holds the same Rate action over an integral number of numerical steps and
-accumulates their rewards and flow diagnostics. Newly acquired resources are
-eligible at the next numerical step, even within one held policy interval.
+accumulates their rewards and flow diagnostics, freezing after a terminal
+boundary. New soil P and photosynthate are eligible at the next numerical
+step, even within one held policy interval. Allocation also has its own
+outgoing-hazard subdivision: it holds commands fixed and admits incoming trade
+without repeating outer maintenance, acquisition or soil transactions.
 Soil subcycling holds geometry fixed and does not repeat maintenance, growth,
 trade, or photosynthesis. Increasing soil substeps therefore cannot by itself
 remove errors in those biological processes.
@@ -320,22 +325,23 @@ its own source revision, configuration and runtime, not today's defaults.
 
 ### Growth, storage, and mortality
 
-- **Assumption:** C and P are essential growth resources with fixed
+- **Assumption:** C and P are essential growth and reproductive resources with fixed
   stoichiometric requirements. Uptake can accumulate P in a free pool, but no
   separate regulated luxury-storage compartment, resource substitution,
   remobilisation, or internal recycling is represented.
-- **Assumption:** Maintenance is paid before trade, growth, reproduction, and
-  storage; a maintenance deficit is converted immediately into biomass loss
+- **Assumption:** Maintenance is paid before coupled trade, growth and reproduction;
+  a maintenance deficit is converted immediately into biomass loss
   according to the more severe resource deficit.
 - **Limitation:** Structural P lost through mortality is exported or discarded
   rather than returned to soil.
 - **Assumption:** Reproduction is an instantaneous resource export and reward,
   not offspring production with establishment, survival, or demographic
   feedback.
-- **Assumption:** Storage means retention in a free resource pool, not a
-  distinct reserve tissue or compartment.
-- **Assumption:** Newly acquired resources cannot finance growth in the same
-  numerical step, while newly realised biomass changes uptake geometry immediately.
+- **Assumption:** Retention is the remaining free pool, with no controlled
+  storage hazard or distinct reserve tissue.
+- **Assumption:** New soil P and photosynthate cannot finance allocation in the
+  same numerical step. Incoming trade can; newly realised biomass changes
+  uptake geometry immediately.
 - **Limitation:** Age structure, lifespan, dormancy, developmental stage, and
   seasonal phenology are not represented.
 - **Limitation:** Plant and fungal `kappa_p` are irreversible free-P losses

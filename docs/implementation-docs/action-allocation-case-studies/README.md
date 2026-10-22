@@ -2,6 +2,12 @@
 
 21 October 2026. Illustrations of the accepted three-variable sampling and simultaneous-flux design. These are isolated continuous-time calculations, not rollouts of the existing environment or trained policies. No production code changes are made.
 
+**Implementation update, 22 October 2026:** the illustrations retain their
+independent-calculation provenance. The production model now implements the
+selected design; its six-case comparison is recorded separately in the
+[qualification report](../../qualification/three-rate-allocation.md) and
+[ADR-0020](../../adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md).
+
 ## Model and units
 
 Define normalised pools `x=C/gamma_C`, `y=P/gamma_P`. These quantities have growth-output-equivalent units: one unit of either element supports one unit of growth when its complement is present. Both illustrative organisms use the same cost coefficients so that normalised transfers can be shared directly. Real plant/fungus costs can differ and require debit/credit conversion in physical C/P units.

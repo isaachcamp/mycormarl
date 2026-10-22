@@ -10,13 +10,12 @@
 
 Plant and fungus pay unavoidable carbon maintenance and irreversible free-P
 loss from their start-of-step pools, then execute a Rate action
-`[trade, growth, reproduction, storage]` in non-negative per-day rates.
-Trade is removed first; competing growth, reproduction, and storage rates
-select allocations from the remaining C and P. Growth treats C and P as
-essential resources: the scarcer resource after conversion by
-organism-specific stoichiometric costs limits new
-dry biomass. Payment shortfalls remove biomass, reproduction exports
-resources and generates reward, and death does not replenish C or P resources.
+`[trade, growth, reproduction]` in non-negative per-day rates. Trade and
+biology compete simultaneously in the evolving free pools, including incoming
+trade. Both growth and reproduction require paired C/P at organism-specific
+stoichiometric costs; reproduction scales those costs by a positive multiplier
+defaulting to one. Payment shortfalls remove biomass, realised reproductive
+output generates reward, and death does not replenish C or P resources.
 
 Surviving plant biomass is mapped to a stack of depth-dependent root discs with
 uniform within-disc length density. Surviving fungal biomass is mapped to an
@@ -25,33 +24,38 @@ the sole geometry inputs to phosphate uptake.
 
 ## Resource-limited biomass change
 
-For organism $o\in\{p,f\}$, the realised growth increment is
+For organism $o\in\{p,f\}$, instantaneous essential-resource availability and
+the unconstrained biological rates are
 
 $$
-\Delta G_o=\min\left(\frac{C_{o,g}}{\gamma_{C,o}},
-                         \frac{P_{o,g}}{\gamma_{P,o}}\right),
+Q_o=\min\left(\frac{C_o}{\gamma_{C,o}},\frac{P_o}{\gamma_{P,o}}\right),
+\qquad \dot G_o=k_{g,o}Q_o,\qquad \dot R_o=\frac{k_{r,o}Q_o}{s_o}.
 $$
 
-where $C_{o,g}$ is allocated C (g C), $P_{o,g}$ is allocated P (mg P),
+Here $C_o$ is free C (g C), $P_o$ is free P (mg P),
 $\gamma_{C,o}$ is structural C cost (g C g⁻¹ dry biomass), and
-$\gamma_{P,o}$ is structural P cost (mg P g⁻¹ dry biomass). The realised costs
-are $\Delta G_o\gamma_{C,o}$ and $\Delta G_o\gamma_{P,o}$; all unspent offered
-resources, including surplus complementary resource, remain in the free pools.
+$\gamma_{P,o}$ is structural P cost (mg P g⁻¹ dry biomass), and
+$s_o=\texttt{reproduction_cost_scale}>0$. Integrating these rates gives
+structural growth $\Delta G_o$ and exported reproductive output $\Delta R_o$.
+Growth spends $\gamma\Delta G_o$ and reproduction spends
+$s_o\gamma\Delta R_o$ for each element. Surplus complementary resource and
+finite-rate residue remain in the free pools.
+The commanded intensities are per-pool rates, independent of biomass units.
+Larger available pools automatically produce larger absolute fluxes under the
+same command; uptake, maintenance and the biomass guard can still change the
+physical trajectory as biomass changes.
 Plant growth is limited to remaining biomass-guard capacity **before** charging
 these costs, so blocked growth consumes neither C nor P.
 
 ```python
-delta_biomass = jnp.minimum(
-    (allocated_c) / grow_c_cost,
-    (allocated_p) / grow_p_cost
-)
+q = jnp.minimum(c_pool / gamma_c, p_pool / gamma_p)
+growth_rate = kg * q
+reproductive_output_rate = kr * q / reproduction_cost_scale
 ```
 
 Implemented by
-[`_grow_biomass_essential_resources`](../src/mycormarl/growth.py)
-and called for plants and fungi in
-[`step_plant`](../src/mycormarl/environments/base_mycor.py) and
-[`step_fungus`](../src/mycormarl/environments/base_mycor.py).
+the [coupled allocation integrator](../src/mycormarl/allocation.py), called by
+[`BaseMycorMarl.step_env`](../src/mycormarl/environments/base_mycor.py).
 Start-pool timing and the biomass cap are protected by
 [`test_newly_fixed_carbon_is_not_available_for_same_step_growth`](../tests/test_base_mycor_refactor.py)
 and [`test_plant_growth_at_biomass_cap_charges_only_realised_structure`](../tests/test_base_mycor_refactor.py).
@@ -112,30 +116,48 @@ The shared automatic payment transaction is implemented in
 Allocation leaves retained resources in the free pools, as tested by
 [`test_automatic_maintenance_does_not_spend_reserved_resources`](../tests/test_base_mycor_refactor.py).
 
-For trade rate $k_t$, the outgoing fraction is $1-\exp(-k_tdt)$, applied to
-post-maintenance donor C for the plant and P for the fungus. Bilateral transfer
-is cancelled if either partner is non-operational after maintenance. Incoming
-trade is credited after allocation and cannot fund growth in that numerical
-step. Both outgoing commands are resolved before either recipient uses them.
-
-For biological rates $k_g,k_r,k_s$, define $K=k_g+k_r+k_s$. The offered
-growth/reproduction fractions are
+Let $T_C=k_{t,p}C_p$, $T_P=k_{t,f}P_f$, and
+$U_o=\dot G_o+s_o\dot R_o$. During allocation the coupled balances are
 
 $$
-f_g=(1-e^{-Kdt})k_g/K,\qquad f_r=(1-e^{-Kdt})k_r/K,
+\dot C_p=-\gamma_{C,p}U_p-T_C,\qquad
+\dot P_p=-\gamma_{P,p}U_p+T_P,
+$$
+$$
+\dot C_f=-\gamma_{C,f}U_f+T_C,\qquad
+\dot P_f=-\gamma_{P,f}U_f-T_P.
 $$
 
-with both zero when $K=0$. Each fraction is applied separately to the remaining
-C and P pools. Storage has no separate receiving compartment: only realised
-growth costs and reproductive exports are subtracted. Its inclusion in $K$
-does affect finite-step allocation, so refinement still needs verification.
-Reproduction exports $f_rC$ and $f_rP$ independently and scores
-$(f_rC/\gamma_C)^\alpha(f_rP/\gamma_P)^{1-\alpha}$; it does not require
-matched C:P construction and creates no parental biomass or offspring state.
-This is the implemented four-rate contract; the proposed three-rate,
-stoichiometric-reproduction redesign is not implemented here. See
-[`step_env`](../src/mycormarl/environments/base_mycor.py) and
-[`test_incoming_trade_is_not_available_for_same_step_growth`](../tests/test_base_mycor_refactor.py).
+Bilateral trade is disabled if either participant is non-operational after
+maintenance. Each transfer is paired in physical units; no stoichiometric
+conversion applies to the transfer itself. Incoming resources can fund biology
+during this allocation interval. With competing biology, realised trade is not
+generally the isolated fraction $1-\exp(-k_tdt)$ of the starting donor pool.
+
+Reward is $\int\dot R_o\,dt$, with no Cobb–Douglas exponent. Output is not
+added to parental biomass or an offspring state. At fixed commands and stocks,
+changing $s_o$ divides output by that factor and leaves expenditure unchanged.
+There is no separate storage hazard or end-step surplus liquidation.
+See [ADR-0020](adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md)
+and the [incoming-trade analytical test](../tests/test_base_mycor_refactor.py).
+
+Allocation uses SSPRK3 substeps bounded by outgoing intensity, default
+`allocation_rate_step=.02`, with compensated float32 sums. Internal refinement
+holds the three rates fixed. The solver accumulates reproductive expenditure
+$E_o=\int k_{r,o}Q_o\,dt$, derives output $E_o/s_o$ once, and records native
+exports $\gamma E_o$ directly. This preserves material accounts when very small
+output increments would underflow; use the export ledger for resource budgets.
+Output below float32's normal range can round to zero without changing spending.
+Exhausting `allocation_max_substeps=65536`, or producing non-finite integrated
+stocks/output, marks a failed transition; public experiment, learning and
+evaluation workflows reject it. Growth-guard contact also invalidates qualification, even if later biomass
+falls below the guard. The [qualification report](qualification/three-rate-allocation.md)
+records tested accuracy and timings. The [static allocation guide](static-allocation.md)
+defines the separate interval-dependent total-intensity experiment contract.
+
+The legacy `growth_c_allocated`/`growth_p_allocated` diagnostics integrate
+$k_gC$ and $k_gP$ as non-consuming elemental offers. These diagnose limitation;
+actual paired spending is recorded in `growth_c_used`/`growth_p_used`.
 
 Structural P associated with biomass lost to a payment shortfall is added to
 cumulative mortality-loss diagnostics. It is not recycled to soil. Free P

@@ -1,5 +1,10 @@
 # Biologically Plausible IPPO Actor Interface Implementation Plan
 
+> **Implementation update, 22 October 2026:** This is the historical actor implementation plan.
+> The current action/reproduction baseline is [ADR-0020](../adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md),
+> verified in the [allocation report](../qualification/three-rate-allocation.md).
+> Original analysis is retained below with its original provenance.
+
 **Status:** Reviewed proposal; implementation has not started.
 
 ## Summary

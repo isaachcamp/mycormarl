@@ -332,6 +332,12 @@ diffusion, sparse/continuous limits, competition, JIT compilation, independent
 consumers, and end-to-end balance. The canonical convergence and performance
 results are in the [numerical qualification report](qualification/phosphate-numerical-qualification.md).
 
+Those retained coupled trajectories predate the three-rate allocation engine
+and keep their original provenance. Soil transaction choices remain in force;
+the new action, reproduction, grouping and workflow evidence is in the
+[three-rate qualification](qualification/three-rate-allocation.md). It does not
+relabel the older spatial/calibration study as a rerun of the new model.
+
 - **Code-backed:** Diffusion is conservative on a closed domain and uptake is
   capped by cell inventory.
 - **Code-backed:** Linear buffering is instantaneous, homogeneous, and
