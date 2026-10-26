@@ -697,20 +697,6 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
                         })
         return outcome(0), outcome(1), (result[0, 4:5], result[1, 4:5])
 
-    def step_plant(self, key: jax.Array, state: State, action: jax.Array) -> dict:
-        """Apply isolated plant biology; trade is resolved only by step_env."""
-        rates = jnp.asarray(action).at[Actions.trade].set(0.)
-        return self._allocate_both(state, {
-            PLANT: rates, FUNGUS: jnp.zeros(3, dtype=rates.dtype),
-        })[0]
-
-    def step_fungus(self, key: jax.Array, state: State, action: jax.Array) -> dict:
-        """Apply isolated fungal biology; trade is resolved only by step_env."""
-        rates = jnp.asarray(action).at[Actions.trade].set(0.)
-        return self._allocate_both(state, {
-            PLANT: jnp.zeros(3, dtype=rates.dtype), FUNGUS: rates,
-        })[1]
-
     @staticmethod
     def _validate_soil_config(config: EnvConfig) -> None:
         """Validate all reset-critical soil scalars before allocating arrays.
