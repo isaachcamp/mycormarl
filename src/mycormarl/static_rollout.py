@@ -46,6 +46,72 @@ def _p_exports(state):
     }
 
 
+def _static_summary(env, state, actions, seed, initial_soil, initial_total,
+                    steps, uptake_values, transfer_values, death_values,
+                    growth_values, fitness_values, carbon_fixed,
+                    guard_contact, allocation_ok, *, uniform=True):
+    """Report one completed rollout with shared qualification and P accounting."""
+    mode, p_level = env.config.consumer_mode, env.config.initial_solution_p_um
+    reasons = []
+    if not bool(allocation_ok):
+        reasons.append('allocation integration failed: exhausted budget or non-finite result')
+    if bool(guard_contact):
+        reasons.append('plant numerical biomass guard contacted')
+    uptake = {PLANT: float(uptake_values[0]), FUNGUS: float(uptake_values[1])}
+    transfers = {
+        "plant_c_out": float(transfer_values[0]),
+        "fungus_p_out": float(transfer_values[1]),
+    }
+    biological_deaths = {PLANT: int(death_values[0]), FUNGUS: int(death_values[1])}
+
+    final_soil, final_pools = _p_inventory(state, env.species)
+    p_loss_or_export_counters = _p_exports(state)
+    losses = sum(p_loss_or_export_counters.values())
+    residual = initial_total - final_soil - final_pools - losses
+    if not uniform and env.config.initial_solution_p_depth_profile is None:
+        reasons.append("uniform initial P verification failed")
+    if float(jnp.min(state.soil_labile_p)) < -_POOL_TOLERANCE:
+        reasons.append("negative soil P pool")
+    for agent, dead in ((PLANT, state.plant_dead), (FUNGUS, state.fungus_dead)):
+        if bool(jnp.any(dead)) and (mode == "mixed" or mode == agent+'-only'):
+            reasons.append(f"biological failure: {agent} died")
+    if any(
+        bool(jnp.any(getattr(state, field) < 0.0))
+        for field in ("plant_c_pool", "plant_p_pool", "fungus_c_pool", "fungus_p_pool")
+    ):
+        reasons.append("negative organism resource pool")
+    if abs(residual) > 1e-5 * max(1.0, initial_total):
+        reasons.append("resource-accounting failure: P residual is nonzero")
+    if initial_soil > 0.0 and final_soil <= 1e-12:
+        reasons.append("pathological depletion: soil inventory exhausted")
+
+    return {
+        "mode": mode, "initial_p_micromolar": p_level, "seed": seed,
+        "status": "rejected" if reasons else "completed",
+        "rejection_reasons": reasons,
+        "steps": int(steps), "uniform_initial_p": uniform,
+        "initial_solution_p_profiled": env.config.initial_solution_p_depth_profile is not None,
+        "biomass": {PLANT: float(state.plant_biomass[0]), FUNGUS: float(state.fungus_biomass[0])},
+        "final_living_biomass": {
+            PLANT: 0.0 if bool(state.plant_dead[0]) else float(state.plant_biomass[0]),
+            FUNGUS: 0.0 if bool(state.fungus_dead[0]) else float(state.fungus_biomass[0]),
+        },
+        "c_pools": {PLANT: float(state.plant_c_pool[0]), FUNGUS: float(state.fungus_c_pool[0])},
+        "p_pools": {PLANT: float(state.plant_p_pool[0]), FUNGUS: float(state.fungus_p_pool[0])},
+        "uptake": uptake, "transfers": transfers, "biological_deaths": biological_deaths,
+        "commanded_rate_actions": {agent: [float(value) for value in actions[agent]] for agent in _AGENTS},
+        "cumulative_growth": {PLANT: float(growth_values[0]), FUNGUS: float(growth_values[1])},
+        "cumulative_reproductive_fitness": {PLANT: float(fitness_values[0]), FUNGUS: float(fitness_values[1])},
+        "cumulative_direct_p_uptake_mg": uptake,
+        "cumulative_carbon_fixed": float(carbon_fixed),
+        "soil_inventory_initial": initial_soil, "soil_inventory_final": final_soil,
+        "p_loss_or_export": losses,
+        "p_loss_or_export_counters": p_loss_or_export_counters,
+        "p_accounting_residual": residual,
+        "terminated": bool(state.terminal),
+    }
+
+
 def _validated_actions(actions):
     if set(actions) != set(_AGENTS):
         raise ValueError("static actions must specify plant and fungus")
@@ -153,8 +219,6 @@ def evaluate_static_policy(
             for step in checkpoint_steps)
             or tuple(sorted(set(checkpoint_steps))) != tuple(checkpoint_steps)):
         raise ValueError("checkpoint_steps must be increasing unique integers within the horizon")
-    mode, p_level = env.config.consumer_mode, env.config.initial_solution_p_um
-    reasons: list[str] = []
     initial_obs, state = env.reset(jax.random.PRNGKey(seed))
     snapshots = {}
     if checkpoint_steps:
@@ -337,63 +401,10 @@ def evaluate_static_policy(
     (state, steps, uptake_values, transfer_values, death_values, growth_values,
      fitness_values, carbon_fixed, trace_values, _, accounting_values,
      guard_contact, allocation_ok, captured, count) = values
-    if not bool(allocation_ok):
-        reasons.append('allocation integration failed: exhausted budget or non-finite result')
-    if bool(guard_contact):
-        reasons.append('plant numerical biomass guard contacted')
-    uptake = {PLANT: float(uptake_values[0]), FUNGUS: float(uptake_values[1])}
-    transfers = {
-        "plant_c_out": float(transfer_values[0]),
-        "fungus_p_out": float(transfer_values[1]),
-    }
-    biological_deaths = {PLANT: int(death_values[0]), FUNGUS: int(death_values[1])}
-
-    final_soil, final_pools = _p_inventory(state, env.species)
-    p_loss_or_export_counters = _p_exports(state)
-    losses = sum(p_loss_or_export_counters.values())
-    residual = initial_total - final_soil - final_pools - losses
-    if not uniform and env.config.initial_solution_p_depth_profile is None:
-        reasons.append("uniform initial P verification failed")
-    if float(jnp.min(state.soil_labile_p)) < -_POOL_TOLERANCE:
-        reasons.append("negative soil P pool")
-    for agent, dead in ((PLANT, state.plant_dead), (FUNGUS, state.fungus_dead)):
-        if bool(jnp.any(dead)) and (mode == "mixed" or mode == agent+'-only'):
-            reasons.append(f"biological failure: {agent} died")
-    if any(
-        bool(jnp.any(getattr(state, field) < 0.0))
-        for field in ("plant_c_pool", "plant_p_pool", "fungus_c_pool", "fungus_p_pool")
-    ):
-        reasons.append("negative organism resource pool")
-    if abs(residual) > 1e-5 * max(1.0, initial_total):
-        reasons.append("resource-accounting failure: P residual is nonzero")
-    if initial_soil > 0.0 and final_soil <= 1e-12:
-        reasons.append("pathological depletion: soil inventory exhausted")
-
-    result = {
-        "mode": mode, "initial_p_micromolar": p_level, "seed": seed,
-        "status": "rejected" if reasons else "completed",
-        "rejection_reasons": reasons,
-        "steps": int(steps), "uniform_initial_p": uniform,
-        "initial_solution_p_profiled": env.config.initial_solution_p_depth_profile is not None,
-        "biomass": {PLANT: float(state.plant_biomass[0]), FUNGUS: float(state.fungus_biomass[0])},
-        "final_living_biomass": {
-            PLANT: 0.0 if bool(state.plant_dead[0]) else float(state.plant_biomass[0]),
-            FUNGUS: 0.0 if bool(state.fungus_dead[0]) else float(state.fungus_biomass[0]),
-        },
-        "c_pools": {PLANT: float(state.plant_c_pool[0]), FUNGUS: float(state.fungus_c_pool[0])},
-        "p_pools": {PLANT: float(state.plant_p_pool[0]), FUNGUS: float(state.fungus_p_pool[0])},
-        "uptake": uptake, "transfers": transfers, "biological_deaths": biological_deaths,
-        "commanded_rate_actions": {agent: [float(value) for value in actions[agent]] for agent in _AGENTS},
-        "cumulative_growth": {PLANT: float(growth_values[0]), FUNGUS: float(growth_values[1])},
-        "cumulative_reproductive_fitness": {PLANT: float(fitness_values[0]), FUNGUS: float(fitness_values[1])},
-        "cumulative_direct_p_uptake_mg": uptake,
-        "cumulative_carbon_fixed": float(carbon_fixed),
-        "soil_inventory_initial": initial_soil, "soil_inventory_final": final_soil,
-        "p_loss_or_export": losses,
-        "p_loss_or_export_counters": p_loss_or_export_counters,
-        "p_accounting_residual": residual,
-        "terminated": bool(state.terminal),
-    }
+    result = _static_summary(
+        env, state, actions, seed, initial_soil, initial_total, steps,
+        uptake_values, transfer_values, death_values, growth_values,
+        fitness_values, carbon_fixed, guard_contact, allocation_ok, uniform=uniform)
     if record_resource_accounting:
         destinations = ("acquired", "maintenance", "growth", "trade_in", "trade_out", "reproduction")
         resources = ("c", "p")
@@ -485,8 +496,6 @@ def evaluate_batched_static_policy(environments: list[BaseMycorMarl], actions: d
     comparable = replace(reference.config, initial_solution_p_um=0.0)
     if any(replace(env.config, initial_solution_p_um=0.0) != comparable or env.species != reference.species for env in environments):
         raise ValueError("batched static rollout requires homogeneous dynamics and species")
-    mode = reference.config.consumer_mode
-    p_levels = [env.config.initial_solution_p_um for env in environments]
     if any(env.config.initial_solution_p_depth_profile is not None for env in environments):
         raise ValueError("batched static controls do not support P depth profiles")
     states = []
@@ -553,53 +562,12 @@ def evaluate_batched_static_policy(environments: list[BaseMycorMarl], actions: d
 
     state, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed, guard_contact, allocation_ok = jax.jit(rollout)(batch_state)
     entries = []
-    for index, (p_level, initial_soil, initial_total) in enumerate(
-        zip(p_levels, initial_soils, initial_totals, strict=True)
+    for index, (env, initial_soil, initial_total) in enumerate(
+        zip(environments, initial_soils, initial_totals, strict=True)
     ):
         current = jax.tree.map(lambda value: value[index], state)
-        final_soil, final_pools = _p_inventory(current, environment.species)
-        counters = _p_exports(current)
-        losses = sum(counters.values())
-        residual = initial_total - final_soil - final_pools - losses
-        reasons = []
-        if not bool(allocation_ok[index]):
-            reasons.append('allocation integration failed: exhausted budget or non-finite result')
-        if bool(guard_contact[index]):
-            reasons.append('plant numerical biomass guard contacted')
-        if float(jnp.min(state.soil_labile_p[index])) < -_POOL_TOLERANCE:
-            reasons.append("negative soil P pool")
-        for agent, dead in ((PLANT, state.plant_dead[index]), (FUNGUS, state.fungus_dead[index])):
-            if bool(jnp.any(dead)) and (mode == "mixed" or mode == agent+'-only'):
-                reasons.append(f"biological failure: {agent} died")
-        if any(bool(jnp.any(getattr(state, field)[index] < 0.0))
-               for field in ("plant_c_pool", "plant_p_pool", "fungus_c_pool", "fungus_p_pool")):
-            reasons.append("negative organism resource pool")
-        if abs(residual) > 1e-5 * max(1.0, initial_total):
-            reasons.append("resource-accounting failure: P residual is nonzero")
-        if initial_soil > 0.0 and final_soil <= 1e-12:
-            reasons.append("pathological depletion: soil inventory exhausted")
-        entries.append({
-            "mode": mode, "initial_p_micromolar": p_level, "seed": seed,
-            "status": "rejected" if reasons else "completed", "rejection_reasons": reasons,
-            "steps": int(steps[index]), "uniform_initial_p": True,
-            "initial_solution_p_profiled": False,
-            "biomass": {PLANT: float(state.plant_biomass[index, 0]), FUNGUS: float(state.fungus_biomass[index, 0])},
-            "final_living_biomass": {
-                PLANT: 0.0 if bool(state.plant_dead[index, 0]) else float(state.plant_biomass[index, 0]),
-                FUNGUS: 0.0 if bool(state.fungus_dead[index, 0]) else float(state.fungus_biomass[index, 0]),
-            },
-            "c_pools": {PLANT: float(state.plant_c_pool[index, 0]), FUNGUS: float(state.fungus_c_pool[index, 0])},
-            "p_pools": {PLANT: float(state.plant_p_pool[index, 0]), FUNGUS: float(state.fungus_p_pool[index, 0])},
-            "uptake": {PLANT: float(uptake[index, 0]), FUNGUS: float(uptake[index, 1])},
-            "transfers": {"plant_c_out": float(transfers[index, 0]), "fungus_p_out": float(transfers[index, 1])},
-            "biological_deaths": {PLANT: int(deaths[index, 0]), FUNGUS: int(deaths[index, 1])},
-            "commanded_rate_actions": {agent: [float(value) for value in actions[agent]] for agent in _AGENTS},
-            "cumulative_growth": {PLANT: float(growth[index, 0]), FUNGUS: float(growth[index, 1])},
-            "cumulative_reproductive_fitness": {PLANT: float(fitness[index, 0]), FUNGUS: float(fitness[index, 1])},
-            "cumulative_direct_p_uptake_mg": {PLANT: float(uptake[index, 0]), FUNGUS: float(uptake[index, 1])},
-            "cumulative_carbon_fixed": float(carbon_fixed[index]),
-            "soil_inventory_initial": initial_soil, "soil_inventory_final": final_soil,
-            "p_loss_or_export": losses, "p_loss_or_export_counters": counters,
-            "p_accounting_residual": residual, "terminated": bool(state.terminal[index]),
-        })
+        entries.append(_static_summary(
+            env, current, actions, seed, initial_soil, initial_total, steps[index],
+            uptake[index], transfers[index], deaths[index], growth[index],
+            fitness[index], carbon_fixed[index], guard_contact[index], allocation_ok[index]))
     return entries
