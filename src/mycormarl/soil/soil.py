@@ -78,49 +78,6 @@ def uptake_geometry_coefficients(
     return root_resistance, fungus_resistance, continuous_weight
 
 
-def _apply_blended_uptake_with_diagnostics(
-    state: State,
-    dt_days: float,
-    species: SpeciesParams,
-    cell_volumes_cm3: chex.Array,
-    theta_water: float,
-    b_p: float,
-    root_sparse_resistance: chex.Array,
-    fungus_sparse_resistance: chex.Array,
-    continuous_weight: chex.Array,
-) -> tuple[State, PhosphateUptakeDiagnostics]:
-    """Apply blended uptake and return exact cellwise qualification observables."""
-    concentration = labile_amount_to_solution_concentration(
-        state.soil_labile_p,
-        cell_volumes_cm3,
-        theta_water,
-        b_p,
-    )
-    remaining, accepted_root, accepted_fungus, diagnostics = blended_uptake_transaction(
-        state.soil_labile_p,
-        concentration,
-        state.root_length_density,
-        state.hyphae_length_density,
-        cell_volumes_cm3,
-        species,
-        dt_days,
-        root_sparse_resistance,
-        fungus_sparse_resistance,
-        continuous_weight,
-    )
-    plant_gain_mg = micromol_p_to_mg_p(jnp.sum(accepted_root))
-    fungus_gain_mg = micromol_p_to_mg_p(jnp.sum(accepted_fungus))
-    return state.replace(
-        soil_labile_p=remaining,
-        plant_p_pool=state.plant_p_pool + plant_gain_mg,
-        fungus_p_pool=state.fungus_p_pool + fungus_gain_mg,
-        cumulative_direct_plant_p_uptake_micromol=(
-            state.cumulative_direct_plant_p_uptake_micromol
-            + jnp.sum(accepted_root)
-        ),
-    ), diagnostics
-
-
 def soil_diffusion_uptake_substep(
     state: State,
     dt_days: float,
@@ -186,18 +143,36 @@ def soil_diffusion_uptake_substep_with_diagnostics(
         vertical_conductance,
         days_to_seconds(dt_days),
     )
-    diffused_state = state.replace(soil_labile_p=diffused_amount)
-    return _apply_blended_uptake_with_diagnostics(
-        diffused_state,
-        dt_days,
-        species,
+    state = state.replace(soil_labile_p=diffused_amount)
+    concentration = labile_amount_to_solution_concentration(
+        state.soil_labile_p,
         cell_volumes_cm3,
         theta_water,
         b_p,
+    )
+    remaining, accepted_root, accepted_fungus, diagnostics = blended_uptake_transaction(
+        state.soil_labile_p,
+        concentration,
+        state.root_length_density,
+        state.hyphae_length_density,
+        cell_volumes_cm3,
+        species,
+        dt_days,
         root_sparse_resistance,
         fungus_sparse_resistance,
         continuous_weight,
     )
+    plant_gain_mg = micromol_p_to_mg_p(jnp.sum(accepted_root))
+    fungus_gain_mg = micromol_p_to_mg_p(jnp.sum(accepted_fungus))
+    return state.replace(
+        soil_labile_p=remaining,
+        plant_p_pool=state.plant_p_pool + plant_gain_mg,
+        fungus_p_pool=state.fungus_p_pool + fungus_gain_mg,
+        cumulative_direct_plant_p_uptake_micromol=(
+            state.cumulative_direct_plant_p_uptake_micromol
+            + jnp.sum(accepted_root)
+        ),
+    ), diagnostics
 
 
 def evolve_soil_p(

@@ -333,10 +333,9 @@ problems.
   redistributes that amount by conservative diffusion, derives a fresh solution
   concentration, removes accepted root/fungal uptake, and stores the remaining
   amount. See
-  [`soil_diffusion_uptake_substep_with_diagnostics`](../../src/mycormarl/soil/soil.py#L190-L230),
+  [`soil_diffusion_uptake_substep_with_diagnostics`](../../src/mycormarl/soil/soil.py),
   [`labile_amount_to_solution_concentration`](../../src/mycormarl/soil/phosphate_grid.py#L221-L235),
-  and the inventory update in
-  [`_apply_blended_uptake_with_diagnostics`](../../src/mycormarl/soil/soil.py#L115-L151).
+  and the inventory update in that same soil substep.
   Therefore the bulk concentration **does evolve**.
 - The sparse surface concentration also changes whenever current $C_b$ changes,
   because it is recalculated each substep. Its resistance, however, is held

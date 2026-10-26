@@ -294,7 +294,7 @@ and end-to-end in
 Accepted root and fungal amounts are summed separately and converted exactly
 once using $1\,\mu mol\,P=0.0309738\,mg\,P$ before being added to organism
 pools. The transaction is implemented in
-[`_apply_blended_uptake_with_diagnostics`](../src/mycormarl/soil/soil.py)
+[`soil_diffusion_uptake_substep_with_diagnostics`](../src/mycormarl/soil/soil.py)
 and its soil-to-pool balance is tested by
 [`test_end_to_end_uptake_conserves_soil_plus_free_pool_p`](../tests/test_environment_phosphate_uptake.py).
 
