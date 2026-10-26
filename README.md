@@ -46,8 +46,17 @@ uv run python scripts/phosphate_examples.py --mode all
 Run the tests:
 
 ```bash
-uv run pytest -q
+uv run python -m pytest -q
 ```
+
+Check the four fixed-action biological reference runs:
+
+```bash
+uv run python scripts/biological_reference.py check
+```
+
+See [reference-check guidance](docs/biological-reference-checks.md) for the
+baseline, sparse snapshots, tolerances and explicit regeneration workflow.
 
 Run a small reproducible PPO development job and save a versioned bundle with
 both policy parameter trees:

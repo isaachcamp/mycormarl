@@ -78,40 +78,6 @@ def uptake_geometry_coefficients(
     return root_resistance, fungus_resistance, continuous_weight
 
 
-def _apply_blended_uptake(
-    state: State,
-    dt_days: float,
-    species: SpeciesParams,
-    cell_volumes_cm3: chex.Array,
-    theta_water: float,
-    b_p: float,
-    root_sparse_resistance: chex.Array,
-    fungus_sparse_resistance: chex.Array,
-    continuous_weight: chex.Array,
-) -> State:
-    """Apply the complete concentration-dependent uptake transaction.
-
-    Current canonical amount is converted to bulk solution concentration.
-    Root and fungal sparse requests use their cached resistances; continuous
-    requests use the same bulk field. Both consumer pairs are interpolated by
-    the shared hyphal-overlap weight, after which the existing inventory cap
-    is applied exactly once. Only accepted µmol P leave soil, and those amounts
-    cross the unit boundary to the corresponding organism pools in mg P.
-    """
-    updated_state, _ = _apply_blended_uptake_with_diagnostics(
-        state,
-        dt_days,
-        species,
-        cell_volumes_cm3,
-        theta_water,
-        b_p,
-        root_sparse_resistance,
-        fungus_sparse_resistance,
-        continuous_weight,
-    )
-    return updated_state
-
-
 def _apply_blended_uptake_with_diagnostics(
     state: State,
     dt_days: float,

@@ -1,0 +1,2149 @@
+{
+  "schema": 1,
+  "scenario": {
+    "config": {
+      "max_steps": 12,
+      "dt": 0.25,
+      "allocation_rate_step": 0.02,
+      "allocation_max_substeps": 65536,
+      "consumer_mode": "plant-only",
+      "soil_radius_cm": 2.0,
+      "soil_depth_cm": 2.0,
+      "radial_interval_cm": 0.5,
+      "depth_interval_cm": 0.5,
+      "initial_solution_p_um": 10.0,
+      "initial_solution_p_depth_profile": null,
+      "phosphate_diffusion_coefficient_cm2_s": 1e-05,
+      "b_p": 239.0,
+      "phosphate_impedance_factor": 0.308,
+      "diffusion_cfl_safety": 0.8,
+      "uptake_reference_time_days": 1.0,
+      "uptake_transition_exponent": 2.0,
+      "theta_water": 0.3
+    },
+    "species": {
+      "plant": {
+        "initial_biomass": 0.01,
+        "initial_c_pool": 0.02,
+        "initial_p_pool": 0.08,
+        "kleaf": 0.68,
+        "kfroot": 0.18,
+        "amass": 0.05,
+        "jmax": 3.26e-06,
+        "km": 0.0058,
+        "root_radius": 0.01,
+        "specific_root_length": 25434.3,
+        "root_length_density": 1.0,
+        "beta_root_distribution": 0.96,
+        "max_rooting_depth_cm": 150.0,
+        "gamma_c": 0.402,
+        "gamma_p": 1.92,
+        "reproduction_cost_scale": 1.0,
+        "kappa_c": 0.007,
+        "kappa_p": 0.0,
+        "death_fraction": 0.2,
+        "biomass_cap": 50.0,
+        "biomass_observation_reference": 50.0
+      },
+      "fungus": {
+        "initial_biomass": 0.001,
+        "initial_c_pool": 0.005,
+        "initial_p_pool": 0.01,
+        "gamma_c": 0.5,
+        "gamma_p": 1.3,
+        "reproduction_cost_scale": 1.0,
+        "kappa_c": 0.015,
+        "kappa_p": 0.0,
+        "death_fraction": 0.05,
+        "hyphal_radius": 0.0005,
+        "hyphal_tissue_carbon_density": 0.1155,
+        "saturation_density": 2000.0,
+        "jmax": 3.26e-06,
+        "km": 0.0058
+      }
+    },
+    "actions": {
+      "plant": [
+        0.3,
+        0.2,
+        0.1
+      ],
+      "fungus": [
+        0.4,
+        0.15,
+        0.1
+      ]
+    },
+    "seed": 7,
+    "checkpoint_steps": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ]
+  },
+  "result": {
+    "mode": "plant-only",
+    "initial_p_micromolar": 10.0,
+    "seed": 7,
+    "status": "completed",
+    "rejection_reasons": [],
+    "steps": 12,
+    "uniform_initial_p": true,
+    "initial_solution_p_profiled": false,
+    "biomass": {
+      "plant": 0.026744015514850616,
+      "fungus": 0.0
+    },
+    "final_living_biomass": {
+      "plant": 0.026744015514850616,
+      "fungus": 0.0
+    },
+    "c_pools": {
+      "plant": 0.011571435257792473,
+      "fungus": 0.0
+    },
+    "p_pools": {
+      "plant": 0.034482795745134354,
+      "fungus": 0.0
+    },
+    "uptake": {
+      "plant": 0.002705570310354233,
+      "fungus": 0.0
+    },
+    "transfers": {
+      "plant_c_out": 0.0,
+      "fungus_p_out": 0.0
+    },
+    "biological_deaths": {
+      "plant": 0,
+      "fungus": 0
+    },
+    "commanded_rate_actions": {
+      "plant": [
+        0.30000001192092896,
+        0.20000000298023224,
+        0.10000000149011612
+      ],
+      "fungus": [
+        0.4000000059604645,
+        0.15000000596046448,
+        0.10000000149011612
+      ]
+    },
+    "cumulative_growth": {
+      "plant": 0.016744017601013184,
+      "fungus": 0.0
+    },
+    "cumulative_reproductive_fitness": {
+      "plant": 0.008372008800506592,
+      "fungus": 0.0
+    },
+    "cumulative_direct_p_uptake_mg": {
+      "plant": 0.002705570310354233,
+      "fungus": 0.0
+    },
+    "cumulative_carbon_fixed": 0.0020636434201151133,
+    "soil_inventory_initial": 1.8628466129302979,
+    "soil_inventory_final": 1.8601410388946533,
+    "p_loss_or_export": 0.016074255126322202,
+    "p_loss_or_export_counters": {
+      "plant_mortality": 1.7488888809369385e-11,
+      "fungus_mortality": 0.0,
+      "plant_maintenance": 0.0,
+      "fungus_maintenance": 0.0,
+      "plant_reproduction": 0.016074255108833313,
+      "fungus_reproduction": 0.0
+    },
+    "p_accounting_residual": 1.4883672305038287e-08,
+    "terminated": true,
+    "resource_accounting": {
+      "plant": {
+        "c": {
+          "acquired": 0.0020636434201151133,
+          "maintenance": 0.00039556570118293166,
+          "growth": 0.006731094792485237,
+          "trade_in": 0.0,
+          "trade_out": 0.0,
+          "reproduction": 0.0033655473962426186
+        },
+        "p": {
+          "acquired": 0.002705570310354233,
+          "maintenance": 0.0,
+          "growth": 0.032148510217666626,
+          "trade_in": 0.0,
+          "trade_out": 0.0,
+          "reproduction": 0.016074255108833313
+        }
+      },
+      "fungus": {
+        "c": {
+          "acquired": 0.0,
+          "maintenance": 0.0,
+          "growth": 0.0,
+          "trade_in": 0.0,
+          "trade_out": 0.0,
+          "reproduction": 0.0
+        },
+        "p": {
+          "acquired": 0.0,
+          "maintenance": 0.0,
+          "growth": 0.0,
+          "trade_in": 0.0,
+          "trade_out": 0.0,
+          "reproduction": 0.0
+        }
+      }
+    },
+    "resource_accounting_definition": {
+      "resources": "C and P amounts in the model's native units",
+      "destinations": "cumulative flows observed during each timestep; final pools are reported separately",
+      "acquired": "photosynthetic fixation or direct uptake plus incoming trade",
+      "growth": "resource consumed for realized structural biomass growth",
+      "reproduction": "cost-scaled resource exports, distinct from reproductive output",
+      "trade_in_out": "resource transferred between agents"
+    },
+    "checkpoints": [
+      {
+        "flows": null,
+        "observations": {
+          "fungus": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "plant": [
+            0.00019996000628452748,
+            0.8326394557952881,
+            0.8064516186714172,
+            0.0,
+            0.0
+          ]
+        },
+        "rewards": {
+          "fungus": 0.0,
+          "plant": 0.0
+        },
+        "state": {
+          "cumulative_direct_plant_p_uptake_micromol": [
+            0.0
+          ],
+          "cumulative_fungus_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_mortality_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_reproduction_export_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_mortality_loss_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_reproduction_export_mg": [
+            0.0
+          ],
+          "fungus_biomass": [
+            0.0
+          ],
+          "fungus_c_pool": [
+            0.0
+          ],
+          "fungus_dead": [
+            true
+          ],
+          "fungus_history_max_biomass": [
+            0.0
+          ],
+          "fungus_last_c_received": [
+            0.0
+          ],
+          "fungus_p_pool": [
+            0.0
+          ],
+          "hyphae_length_density": [
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "plant_biomass": [
+            0.009999999776482582
+          ],
+          "plant_c_pool": [
+            0.019999999552965164
+          ],
+          "plant_dead": [
+            false
+          ],
+          "plant_history_max_biomass": [
+            0.009999999776482582
+          ],
+          "plant_last_p_received": [
+            0.0
+          ],
+          "plant_p_pool": [
+            0.07999999821186066
+          ],
+          "root_length_density": [
+            [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            [
+              0.45353835821151733,
+              0.4376393258571625,
+              0.4220629632472992,
+              0.40679988265037537
+            ],
+            [
+              1.2828374806872489e-08,
+              2.3173914343033175e-08,
+              1.4340900911236076e-08,
+              2.1840762087776966e-08
+            ],
+            [
+              9.163125369582303e-09,
+              1.6552796466839936e-08,
+              1.0243501158413437e-08,
+              1.5600544855942644e-08
+            ]
+          ],
+          "soil_labile_p": [
+            [
+              0.9397289752960205,
+              0.9397289752960205,
+              0.9397289752960205,
+              0.9397289752960205
+            ],
+            [
+              2.8191869258880615,
+              2.8191869258880615,
+              2.8191869258880615,
+              2.8191869258880615
+            ],
+            [
+              4.698645114898682,
+              4.698645114898682,
+              4.698645114898682,
+              4.698645114898682
+            ],
+            [
+              6.578103065490723,
+              6.578103065490723,
+              6.578103065490723,
+              6.578103065490723
+            ]
+          ],
+          "step": 0,
+          "terminal": false
+        },
+        "transitions": null,
+        "day": 0.0
+      },
+      {
+        "flows": {
+          "fungus": {
+            "allocation_converged": true,
+            "c_deficit": [
+              0.0
+            ],
+            "direct_p_uptake_mg": [
+              0.0
+            ],
+            "growth": [
+              0.0
+            ],
+            "maint_c_used": [
+              0.0
+            ],
+            "maint_p_used": [
+              0.0
+            ],
+            "p_deficit": [
+              0.0
+            ],
+            "reproduction_c": [
+              0.0
+            ],
+            "reproduction_p": [
+              0.0
+            ],
+            "trade_cancelled": [
+              false
+            ],
+            "trade_in": [
+              0.0
+            ],
+            "trade_out": [
+              0.0
+            ]
+          },
+          "plant": {
+            "allocation_converged": true,
+            "c_deficit": [
+              -2.8273715833859736e-13
+            ],
+            "direct_p_uptake_mg": [
+              0.00015482306480407715
+            ],
+            "growth": [
+              0.001865461003035307
+            ],
+            "maint_c_used": [
+              2.101247082464397e-05
+            ],
+            "maint_p_used": [
+              0.0
+            ],
+            "p_deficit": [
+              0.0
+            ],
+            "reproduction_c": [
+              0.00037495765718631446
+            ],
+            "reproduction_p": [
+              0.0017908425070345402
+            ],
+            "trade_cancelled": [
+              false
+            ],
+            "trade_in": [
+              0.0
+            ],
+            "trade_out": [
+              0.0
+            ]
+          }
+        },
+        "observations": {
+          "fungus": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "plant": [
+            0.0002773747546598315,
+            0.7619108557701111,
+            0.7218853831291199,
+            0.0,
+            0.0
+          ]
+        },
+        "rewards": {
+          "fungus": 0.0,
+          "plant": 0.0009327305015176535
+        },
+        "state": {
+          "cumulative_direct_plant_p_uptake_micromol": [
+            0.009326247498393059
+          ],
+          "cumulative_fungus_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_mortality_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_reproduction_export_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_mortality_loss_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_reproduction_export_mg": [
+            0.0037176834885030985
+          ],
+          "fungus_biomass": [
+            0.0
+          ],
+          "fungus_c_pool": [
+            0.0
+          ],
+          "fungus_dead": [
+            true
+          ],
+          "fungus_history_max_biomass": [
+            0.0
+          ],
+          "fungus_last_c_received": [
+            0.0
+          ],
+          "fungus_p_pool": [
+            0.0
+          ],
+          "hyphae_length_density": [
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "plant_biomass": [
+            0.013872586190700531
+          ],
+          "plant_c_pool": [
+            0.01784629374742508
+          ],
+          "plant_dead": [
+            false
+          ],
+          "plant_history_max_biomass": [
+            0.013872586190700531
+          ],
+          "plant_last_p_received": [
+            0.0
+          ],
+          "plant_p_pool": [
+            0.06913581490516663
+          ],
+          "root_length_density": [
+            [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            [
+              0.7582611441612244,
+              0.7362050414085388,
+              0.7145964503288269,
+              0.6934229135513306
+            ],
+            [
+              1.379916891863786e-08,
+              2.002325416583517e-08,
+              0.0,
+              2.2049581716032662e-08
+            ],
+            [
+              9.856549354481103e-09,
+              1.430232465793324e-08,
+              0.0,
+              1.5749701987033404e-08
+            ]
+          ],
+          "soil_labile_p": [
+            [
+              0.9389423131942749,
+              0.9389423131942749,
+              0.9389423131942749,
+              0.9389423131942749
+            ],
+            [
+              2.817570686340332,
+              2.8176190853118896,
+              2.81766676902771,
+              2.8177132606506348
+            ],
+            [
+              4.698644638061523,
+              4.698644638061523,
+              4.698644638061523,
+              4.698644638061523
+            ],
+            [
+              6.578103065490723,
+              6.578103065490723,
+              6.578103065490723,
+              6.578103065490723
+            ]
+          ],
+          "step": 2,
+          "terminal": false
+        },
+        "transitions": {
+          "fungus": {
+            "allocation_executed": false,
+            "final_observation": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "operational_at_end": false,
+            "operational_at_start": false,
+            "realised_action": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "requested_action": [
+              0.4000000059604645,
+              0.15000000596046448,
+              0.10000000149011612
+            ],
+            "trade_executed": false,
+            "truncated": false
+          },
+          "plant": {
+            "allocation_executed": true,
+            "final_observation": [
+              0.0002773747546598315,
+              0.7619108557701111,
+              0.7218853831291199,
+              0.0,
+              0.0
+            ],
+            "operational_at_end": true,
+            "operational_at_start": true,
+            "realised_action": [
+              0.0,
+              0.20000000298023224,
+              0.10000000149011612
+            ],
+            "requested_action": [
+              0.30000001192092896,
+              0.20000000298023224,
+              0.10000000149011612
+            ],
+            "trade_executed": false,
+            "truncated": false
+          }
+        },
+        "day": 0.5
+      },
+      {
+        "flows": {
+          "fungus": {
+            "allocation_converged": true,
+            "c_deficit": [
+              0.0
+            ],
+            "direct_p_uptake_mg": [
+              0.0
+            ],
+            "growth": [
+              0.0
+            ],
+            "maint_c_used": [
+              0.0
+            ],
+            "maint_p_used": [
+              0.0
+            ],
+            "p_deficit": [
+              0.0
+            ],
+            "reproduction_c": [
+              0.0
+            ],
+            "reproduction_p": [
+              0.0
+            ],
+            "trade_cancelled": [
+              false
+            ],
+            "trade_in": [
+              0.0
+            ],
+            "trade_out": [
+              0.0
+            ]
+          },
+          "plant": {
+            "allocation_converged": true,
+            "c_deficit": [
+              7.41182939675844e-13
+            ],
+            "direct_p_uptake_mg": [
+              0.0001920647919178009
+            ],
+            "growth": [
+              0.0016135895857587457
+            ],
+            "maint_c_used": [
+              2.7312495149089955e-05
+            ],
+            "maint_p_used": [
+              0.0
+            ],
+            "p_deficit": [
+              0.0
+            ],
+            "reproduction_c": [
+              0.00032433151500299573
+            ],
+            "reproduction_p": [
+              0.0015490460209548473
+            ],
+            "trade_cancelled": [
+              false
+            ],
+            "trade_in": [
+              0.0
+            ],
+            "trade_out": [
+              0.0
+            ]
+          }
+        },
+        "observations": {
+          "fungus": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "plant": [
+            0.00034429601510055363,
+            0.698717474937439,
+            0.6441812515258789,
+            0.0,
+            0.0
+          ]
+        },
+        "rewards": {
+          "fungus": 0.0,
+          "plant": 0.0008067947928793728
+        },
+        "state": {
+          "cumulative_direct_plant_p_uptake_micromol": [
+            0.02114897221326828
+          ],
+          "cumulative_fungus_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_mortality_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_reproduction_export_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_mortality_loss_mg": [
+            3.539978206401617e-12
+          ],
+          "cumulative_plant_p_reproduction_export_mg": [
+            0.006931900978088379
+          ],
+          "fungus_biomass": [
+            0.0
+          ],
+          "fungus_c_pool": [
+            0.0
+          ],
+          "fungus_dead": [
+            true
+          ],
+          "fungus_history_max_biomass": [
+            0.0
+          ],
+          "fungus_last_c_received": [
+            0.0
+          ],
+          "fungus_p_pool": [
+            0.0
+          ],
+          "hyphae_length_density": [
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "plant_biomass": [
+            0.01722072996199131
+          ],
+          "plant_c_pool": [
+            0.01605481095612049
+          ],
+          "plant_dead": [
+            false
+          ],
+          "plant_history_max_biomass": [
+            0.01722072996199131
+          ],
+          "plant_last_p_received": [
+            0.0
+          ],
+          "plant_p_pool": [
+            0.05985935032367706
+          ],
+          "root_length_density": [
+            [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              0.9943377375602722,
+              0.9675139784812927,
+              0.9412299990653992
+            ],
+            [
+              0.01303024310618639,
+              9.351231788912173e-09,
+              1.561918239190163e-08,
+              2.314404845549234e-08
+            ],
+            [
+              8.689053032640004e-09,
+              6.679451214353094e-09,
+              1.1156559232006202e-08,
+              1.653146419755558e-08
+            ]
+          ],
+          "soil_labile_p": [
+            [
+              0.9381565451622009,
+              0.9381566047668457,
+              0.9381566047668457,
+              0.9381566047668457
+            ],
+            [
+              2.8153371810913086,
+              2.8154213428497314,
+              2.8155293464660645,
+              2.8156349658966064
+            ],
+            [
+              4.698616981506348,
+              4.698643207550049,
+              4.698643207550049,
+              4.698643207550049
+            ],
+            [
+              6.578103065490723,
+              6.578103065490723,
+              6.578103065490723,
+              6.578103065490723
+            ]
+          ],
+          "step": 4,
+          "terminal": false
+        },
+        "transitions": {
+          "fungus": {
+            "allocation_executed": false,
+            "final_observation": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "operational_at_end": false,
+            "operational_at_start": false,
+            "realised_action": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "requested_action": [
+              0.4000000059604645,
+              0.15000000596046448,
+              0.10000000149011612
+            ],
+            "trade_executed": false,
+            "truncated": false
+          },
+          "plant": {
+            "allocation_executed": true,
+            "final_observation": [
+              0.00034429601510055363,
+              0.698717474937439,
+              0.6441812515258789,
+              0.0,
+              0.0
+            ],
+            "operational_at_end": true,
+            "operational_at_start": true,
+            "realised_action": [
+              0.0,
+              0.20000000298023224,
+              0.10000000149011612
+            ],
+            "requested_action": [
+              0.30000001192092896,
+              0.20000000298023224,
+              0.10000000149011612
+            ],
+            "trade_executed": false,
+            "truncated": false
+          }
+        },
+        "day": 1.0
+      },
+      {
+        "flows": {
+          "fungus": {
+            "allocation_converged": true,
+            "c_deficit": [
+              0.0
+            ],
+            "direct_p_uptake_mg": [
+              0.0
+            ],
+            "growth": [
+              0.0
+            ],
+            "maint_c_used": [
+              0.0
+            ],
+            "maint_p_used": [
+              0.0
+            ],
+            "p_deficit": [
+              0.0
+            ],
+            "reproduction_c": [
+              0.0
+            ],
+            "reproduction_p": [
+              0.0
+            ],
+            "trade_cancelled": [
+              false
+            ],
+            "trade_in": [
+              0.0
+            ],
+            "trade_out": [
+              0.0
+            ]
+          },
+          "plant": {
+            "allocation_converged": true,
+            "c_deficit": [
+              -2.9834208020718123e-13
+            ],
+            "direct_p_uptake_mg": [
+              0.000224284827709198
+            ],
+            "growth": [
+              0.0013985371915623546
+            ],
+            "maint_c_used": [
+              3.276445568189956e-05
+            ],
+            "maint_p_used": [
+              0.0
+            ],
+            "p_deficit": [
+              0.0
+            ],
+            "reproduction_c": [
+              0.0002811059821397066
+            ],
+            "reproduction_p": [
+              0.0013425956713035703
+            ],
+            "trade_cancelled": [
+              false
+            ],
+            "trade_in": [
+              0.0
+            ],
+            "trade_out": [
+              0.0
+            ]
+          }
+        },
+        "observations": {
+          "fungus": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "plant": [
+            0.00040225975681096315,
+            0.6430707573890686,
+            0.5734604001045227,
+            0.0,
+            0.0
+          ]
+        },
+        "rewards": {
+          "fungus": 0.0,
+          "plant": 0.0006992685957811773
+        },
+        "state": {
+          "cumulative_direct_plant_p_uptake_micromol": [
+            0.03512978181242943
+          ],
+          "cumulative_fungus_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_mortality_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_reproduction_export_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_mortality_loss_mg": [
+            5.619701318876347e-12
+          ],
+          "cumulative_plant_p_reproduction_export_mg": [
+            0.009716239757835865
+          ],
+          "fungus_biomass": [
+            0.0
+          ],
+          "fungus_c_pool": [
+            0.0
+          ],
+          "fungus_dead": [
+            true
+          ],
+          "fungus_history_max_biomass": [
+            0.0
+          ],
+          "fungus_last_c_received": [
+            0.0
+          ],
+          "fungus_p_pool": [
+            0.0
+          ],
+          "hyphae_length_density": [
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "plant_biomass": [
+            0.020121082663536072
+          ],
+          "plant_c_pool": [
+            0.014573168009519577
+          ],
+          "plant_dead": [
+            false
+          ],
+          "plant_history_max_biomass": [
+            0.020121082663536072
+          ],
+          "plant_last_p_received": [
+            0.0
+          ],
+          "plant_p_pool": [
+            0.05193936824798584
+          ],
+          "root_length_density": [
+            [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            [
+              0.1499624252319336,
+              0.1307682991027832,
+              0.11196346580982208,
+              0.09353704750537872
+            ],
+            [
+              0.0,
+              9.158084068872085e-09,
+              0.0,
+              3.308738527607602e-08
+            ]
+          ],
+          "soil_labile_p": [
+            [
+              0.9373713731765747,
+              0.937371551990509,
+              0.937371551990509,
+              0.937371551990509
+            ],
+            [
+              2.8129830360412598,
+              2.8130671977996826,
+              2.8131752014160156,
+              2.8132808208465576
+            ],
+            [
+              4.698152542114258,
+              4.698251247406006,
+              4.698324203491211,
+              4.698393821716309
+            ],
+            [
+              6.578103065490723,
+              6.578103065490723,
+              6.578103065490723,
+              6.578103065490723
+            ]
+          ],
+          "step": 6,
+          "terminal": false
+        },
+        "transitions": {
+          "fungus": {
+            "allocation_executed": false,
+            "final_observation": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "operational_at_end": false,
+            "operational_at_start": false,
+            "realised_action": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "requested_action": [
+              0.4000000059604645,
+              0.15000000596046448,
+              0.10000000149011612
+            ],
+            "trade_executed": false,
+            "truncated": false
+          },
+          "plant": {
+            "allocation_executed": true,
+            "final_observation": [
+              0.00040225975681096315,
+              0.6430707573890686,
+              0.5734604001045227,
+              0.0,
+              0.0
+            ],
+            "operational_at_end": true,
+            "operational_at_start": true,
+            "realised_action": [
+              0.0,
+              0.20000000298023224,
+              0.10000000149011612
+            ],
+            "requested_action": [
+              0.30000001192092896,
+              0.20000000298023224,
+              0.10000000149011612
+            ],
+            "trade_executed": false,
+            "truncated": false
+          }
+        },
+        "day": 1.5
+      },
+      {
+        "flows": {
+          "fungus": {
+            "allocation_converged": true,
+            "c_deficit": [
+              0.0
+            ],
+            "direct_p_uptake_mg": [
+              0.0
+            ],
+            "growth": [
+              0.0
+            ],
+            "maint_c_used": [
+              0.0
+            ],
+            "maint_p_used": [
+              0.0
+            ],
+            "p_deficit": [
+              0.0
+            ],
+            "reproduction_c": [
+              0.0
+            ],
+            "reproduction_p": [
+              0.0
+            ],
+            "trade_cancelled": [
+              false
+            ],
+            "trade_in": [
+              0.0
+            ],
+            "trade_out": [
+              0.0
+            ]
+          },
+          "plant": {
+            "allocation_converged": true,
+            "c_deficit": [
+              -1.4038726778298205e-12
+            ],
+            "direct_p_uptake_mg": [
+              0.00025223568081855774
+            ],
+            "growth": [
+              0.0012149426620453596
+            ],
+            "maint_c_used": [
+              3.749234019778669e-05
+            ],
+            "maint_p_used": [
+              0.0
+            ],
+            "p_deficit": [
+              0.0
+            ],
+            "reproduction_c": [
+              0.00024420348927378654
+            ],
+            "reproduction_p": [
+              0.0011663449695333838
+            ],
+            "trade_cancelled": [
+              false
+            ],
+            "trade_in": [
+              0.0
+            ],
+            "trade_out": [
+              0.0
+            ]
+          }
+        },
+        "observations": {
+          "fungus": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "plant": [
+            0.00045257777674123645,
+            0.5947495102882385,
+            0.5096520781517029,
+            0.0,
+            0.0
+          ]
+        },
+        "rewards": {
+          "fungus": 0.0,
+          "plant": 0.0006074713310226798
+        },
+        "state": {
+          "cumulative_direct_plant_p_uptake_micromol": [
+            0.05098152160644531
+          ],
+          "cumulative_fungus_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_mortality_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_reproduction_export_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_mortality_loss_mg": [
+            9.142703955022924e-12
+          ],
+          "cumulative_plant_p_reproduction_export_mg": [
+            0.01213357038795948
+          ],
+          "fungus_biomass": [
+            0.0
+          ],
+          "fungus_c_pool": [
+            0.0
+          ],
+          "fungus_dead": [
+            true
+          ],
+          "fungus_history_max_biomass": [
+            0.0
+          ],
+          "fungus_last_c_received": [
+            0.0
+          ],
+          "fungus_p_pool": [
+            0.0
+          ],
+          "hyphae_length_density": [
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "plant_biomass": [
+            0.022639134898781776
+          ],
+          "plant_c_pool": [
+            0.013356616720557213
+          ],
+          "plant_dead": [
+            false
+          ],
+          "plant_history_max_biomass": [
+            0.022639134898781776
+          ],
+          "plant_last_p_received": [
+            0.0
+          ],
+          "plant_p_pool": [
+            0.0451783649623394
+          ],
+          "root_length_density": [
+            [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            [
+              0.26884546875953674,
+              0.24724923074245453,
+              0.22609110176563263,
+              0.20535841584205627
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "soil_labile_p": [
+            [
+              0.9365867972373962,
+              0.9365870952606201,
+              0.9365870952606201,
+              0.9365870952606201
+            ],
+            [
+              2.8106327056884766,
+              2.8107168674468994,
+              2.8108248710632324,
+              2.8109304904937744
+            ],
+            [
+              4.697202682495117,
+              4.697384357452393,
+              4.697537899017334,
+              4.697686672210693
+            ],
+            [
+              6.5781025886535645,
+              6.5781025886535645,
+              6.5781025886535645,
+              6.578103065490723
+            ]
+          ],
+          "step": 8,
+          "terminal": false
+        },
+        "transitions": {
+          "fungus": {
+            "allocation_executed": false,
+            "final_observation": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "operational_at_end": false,
+            "operational_at_start": false,
+            "realised_action": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "requested_action": [
+              0.4000000059604645,
+              0.15000000596046448,
+              0.10000000149011612
+            ],
+            "trade_executed": false,
+            "truncated": false
+          },
+          "plant": {
+            "allocation_executed": true,
+            "final_observation": [
+              0.00045257777674123645,
+              0.5947495102882385,
+              0.5096520781517029,
+              0.0,
+              0.0
+            ],
+            "operational_at_end": true,
+            "operational_at_start": true,
+            "realised_action": [
+              0.0,
+              0.20000000298023224,
+              0.10000000149011612
+            ],
+            "requested_action": [
+              0.30000001192092896,
+              0.20000000298023224,
+              0.10000000149011612
+            ],
+            "trade_executed": false,
+            "truncated": false
+          }
+        },
+        "day": 2.0
+      },
+      {
+        "flows": {
+          "fungus": {
+            "allocation_converged": true,
+            "c_deficit": [
+              0.0
+            ],
+            "direct_p_uptake_mg": [
+              0.0
+            ],
+            "growth": [
+              0.0
+            ],
+            "maint_c_used": [
+              0.0
+            ],
+            "maint_p_used": [
+              0.0
+            ],
+            "p_deficit": [
+              0.0
+            ],
+            "reproduction_c": [
+              0.0
+            ],
+            "reproduction_p": [
+              0.0
+            ],
+            "trade_cancelled": [
+              false
+            ],
+            "trade_in": [
+              0.0
+            ],
+            "trade_out": [
+              0.0
+            ]
+          },
+          "plant": {
+            "allocation_converged": true,
+            "c_deficit": [
+              1.2550147553136437e-12
+            ],
+            "direct_p_uptake_mg": [
+              0.0002765245735645294
+            ],
+            "growth": [
+              0.0010582255199551582
+            ],
+            "maint_c_used": [
+              4.1602081182645634e-05
+            ],
+            "maint_p_used": [
+              0.0
+            ],
+            "p_deficit": [
+              0.0
+            ],
+            "reproduction_c": [
+              0.00021270333672873676
+            ],
+            "reproduction_p": [
+              0.0010158964432775974
+            ],
+            "trade_cancelled": [
+              false
+            ],
+            "trade_in": [
+              0.0
+            ],
+            "trade_out": [
+              0.0
+            ]
+          }
+        },
+        "observations": {
+          "fungus": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "plant": [
+            0.0004963703686371446,
+            0.5533565878868103,
+            0.4525299370288849,
+            0.0,
+            0.0
+          ]
+        },
+        "rewards": {
+          "fungus": 0.0,
+          "plant": 0.0005291127599775791
+        },
+        "state": {
+          "cumulative_direct_plant_p_uptake_micromol": [
+            0.06845851242542267
+          ],
+          "cumulative_fungus_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_mortality_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_reproduction_export_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_mortality_loss_mg": [
+            1.5136803269144572e-11
+          ],
+          "cumulative_plant_p_reproduction_export_mg": [
+            0.014237610623240471
+          ],
+          "fungus_biomass": [
+            0.0
+          ],
+          "fungus_c_pool": [
+            0.0
+          ],
+          "fungus_dead": [
+            true
+          ],
+          "fungus_history_max_biomass": [
+            0.0
+          ],
+          "fungus_last_c_received": [
+            0.0
+          ],
+          "fungus_p_pool": [
+            0.0
+          ],
+          "hyphae_length_density": [
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "plant_biomass": [
+            0.02483084425330162
+          ],
+          "plant_c_pool": [
+            0.012366925366222858
+          ],
+          "plant_dead": [
+            false
+          ],
+          "plant_history_max_biomass": [
+            0.02483084425330162
+          ],
+          "plant_last_p_received": [
+            0.0
+          ],
+          "plant_p_pool": [
+            0.03940756991505623
+          ],
+          "root_length_density": [
+            [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            [
+              0.37232112884521484,
+              0.3486340641975403,
+              0.32542744278907776,
+              0.30268803238868713
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.434890317675297e-09
+            ]
+          ],
+          "soil_labile_p": [
+            [
+              0.9358028769493103,
+              0.9358032941818237,
+              0.9358032941818237,
+              0.9358032941818237
+            ],
+            [
+              2.808285713195801,
+              2.8083698749542236,
+              2.8084778785705566,
+              2.8085834980010986
+            ],
+            [
+              4.695830821990967,
+              4.696103572845459,
+              4.696345806121826,
+              4.696582317352295
+            ],
+            [
+              6.57810115814209,
+              6.57810115814209,
+              6.578101634979248,
+              6.578102111816406
+            ]
+          ],
+          "step": 10,
+          "terminal": false
+        },
+        "transitions": {
+          "fungus": {
+            "allocation_executed": false,
+            "final_observation": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "operational_at_end": false,
+            "operational_at_start": false,
+            "realised_action": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "requested_action": [
+              0.4000000059604645,
+              0.15000000596046448,
+              0.10000000149011612
+            ],
+            "trade_executed": false,
+            "truncated": false
+          },
+          "plant": {
+            "allocation_executed": true,
+            "final_observation": [
+              0.0004963703686371446,
+              0.5533565878868103,
+              0.4525299370288849,
+              0.0,
+              0.0
+            ],
+            "operational_at_end": true,
+            "operational_at_start": true,
+            "realised_action": [
+              0.0,
+              0.20000000298023224,
+              0.10000000149011612
+            ],
+            "requested_action": [
+              0.30000001192092896,
+              0.20000000298023224,
+              0.10000000149011612
+            ],
+            "trade_executed": false,
+            "truncated": false
+          }
+        },
+        "day": 2.5
+      },
+      {
+        "flows": {
+          "fungus": {
+            "allocation_converged": true,
+            "c_deficit": [
+              0.0
+            ],
+            "direct_p_uptake_mg": [
+              0.0
+            ],
+            "growth": [
+              0.0
+            ],
+            "maint_c_used": [
+              0.0
+            ],
+            "maint_p_used": [
+              0.0
+            ],
+            "p_deficit": [
+              0.0
+            ],
+            "reproduction_c": [
+              0.0
+            ],
+            "reproduction_p": [
+              0.0
+            ],
+            "trade_cancelled": [
+              false
+            ],
+            "trade_in": [
+              0.0
+            ],
+            "trade_out": [
+              0.0
+            ]
+          },
+          "plant": {
+            "allocation_converged": true,
+            "c_deficit": [
+              4.924680455098418e-13
+            ],
+            "direct_p_uptake_mg": [
+              0.00029769167304039
+            ],
+            "growth": [
+              0.0009244718821719289
+            ],
+            "maint_c_used": [
+              4.518420246313326e-05
+            ],
+            "maint_p_used": [
+              0.0
+            ],
+            "p_deficit": [
+              0.0
+            ],
+            "reproduction_c": [
+              0.00018581884796731174
+            ],
+            "reproduction_p": [
+              0.0008874929626472294
+            ],
+            "trade_cancelled": [
+              false
+            ],
+            "trade_in": [
+              0.0
+            ],
+            "trade_out": [
+              0.0
+            ]
+          }
+        },
+        "observations": {
+          "fungus": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "plant": [
+            0.0005345943500287831,
+            0.5183747410774231,
+            0.4017508327960968,
+            0.0,
+            0.0
+          ]
+        },
+        "rewards": {
+          "fungus": 0.0,
+          "plant": 0.00046223594108596444
+        },
+        "state": {
+          "cumulative_direct_plant_p_uptake_micromol": [
+            0.08735067397356033
+          ],
+          "cumulative_fungus_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_mortality_loss_mg": [
+            0.0
+          ],
+          "cumulative_fungus_p_reproduction_export_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_maintenance_loss_mg": [
+            0.0
+          ],
+          "cumulative_plant_p_mortality_loss_mg": [
+            1.7488888809369385e-11
+          ],
+          "cumulative_plant_p_reproduction_export_mg": [
+            0.016074255108833313
+          ],
+          "fungus_biomass": [
+            0.0
+          ],
+          "fungus_c_pool": [
+            0.0
+          ],
+          "fungus_dead": [
+            true
+          ],
+          "fungus_history_max_biomass": [
+            0.0
+          ],
+          "fungus_last_c_received": [
+            0.0
+          ],
+          "fungus_p_pool": [
+            0.0
+          ],
+          "hyphae_length_density": [
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "plant_biomass": [
+            0.026744015514850616
+          ],
+          "plant_c_pool": [
+            0.011571435257792473
+          ],
+          "plant_dead": [
+            false
+          ],
+          "plant_history_max_biomass": [
+            0.026744015514850616
+          ],
+          "plant_last_p_received": [
+            0.0
+          ],
+          "plant_p_pool": [
+            0.034482795745134354
+          ],
+          "root_length_density": [
+            [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            [
+              0.4626463055610657,
+              0.4371340870857239,
+              0.4121396243572235,
+              0.3876481056213379
+            ],
+            [
+              0.0,
+              0.0,
+              1.182010267442024e-09,
+              0.0
+            ]
+          ],
+          "soil_labile_p": [
+            [
+              0.9350196123123169,
+              0.9350201487541199,
+              0.9350201487541199,
+              0.9350201487541199
+            ],
+            [
+              2.8059418201446533,
+              2.8060262203216553,
+              2.8061342239379883,
+              2.8062398433685303
+            ],
+            [
+              4.694091320037842,
+              4.694462776184082,
+              4.694801330566406,
+              4.695132255554199
+            ],
+            [
+              6.578098773956299,
+              6.578098773956299,
+              6.578099250793457,
+              6.578100204467773
+            ]
+          ],
+          "step": 12,
+          "terminal": true
+        },
+        "transitions": {
+          "fungus": {
+            "allocation_executed": false,
+            "final_observation": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "operational_at_end": false,
+            "operational_at_start": false,
+            "realised_action": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "requested_action": [
+              0.4000000059604645,
+              0.15000000596046448,
+              0.10000000149011612
+            ],
+            "trade_executed": false,
+            "truncated": true
+          },
+          "plant": {
+            "allocation_executed": true,
+            "final_observation": [
+              0.0005345943500287831,
+              0.5183747410774231,
+              0.4017508327960968,
+              0.0,
+              0.0
+            ],
+            "operational_at_end": true,
+            "operational_at_start": true,
+            "realised_action": [
+              0.0,
+              0.20000000298023224,
+              0.10000000149011612
+            ],
+            "requested_action": [
+              0.30000001192092896,
+              0.20000000298023224,
+              0.10000000149011612
+            ],
+            "trade_executed": false,
+            "truncated": true
+          }
+        },
+        "day": 3.0
+      }
+    ]
+  },
+  "tolerance": {
+    "relative": 2e-06,
+    "absolute": 1e-08
+  },
+  "provenance": {
+    "source_revision": "9a68fa43fb33e9fbb8c60176d2a01772f2d4cfe1",
+    "source_sha256": {
+      "src/mycormarl/__init__.py": "f893fca6b1ed504f91f108e0b2cdf2337e9080715daae68d9163d7b0ede0fb29",
+      "src/mycormarl/actions.py": "067ed23e32a4be27856e89af2fde2de5206d7a9ecb44dca750a13a1ce7af5bee",
+      "src/mycormarl/algos/__init__.py": "339082198d361a81f3e12b5c4870760ec0feab4ddab6643f09cb70d61445fd68",
+      "src/mycormarl/algos/ppo.py": "851cc3a1418a57719fa8bd92ca50043045f2700ef7cb1f501de2bcdbee920055",
+      "src/mycormarl/allocation.py": "246d94dca5857ad582f37d345428c8d05373a41ce8dae800acf2a020031ea830",
+      "src/mycormarl/checkpoint_evaluation.py": "8a7831a4ca949b30a33da67b799938143b9fed0209a58188ecffc51604b26342",
+      "src/mycormarl/environments/__init__.py": "299ba91a8e5c26f0577e3cc7644bbdd7172c2eaecd201fc3ca3eb8a920c05200",
+      "src/mycormarl/environments/autoreset.py": "16265eaffc45c126390900ef0cbcd634ec0538bf2cd3b58721240d47abbd07c1",
+      "src/mycormarl/environments/base_mycor.py": "b4bae090a8dc2d1371cb6a83b0f64f96900bd1bcaadd02f195ce983475f88fd3",
+      "src/mycormarl/environments/policy_interval.py": "f15a5e8633a4787980614784a064d462adde8b79cf6e9e2d59b668a6b74ab31c",
+      "src/mycormarl/fungus/__init__.py": "84ab3a93b6d783a5b6731bbc87bc22f68d1d45d09525028945ff6d85425c7df5",
+      "src/mycormarl/fungus/mycelium.py": "9f888e7853cf83cf300e75bd3648d71c7017778d02a41a7785139dabd0d6ba4a",
+      "src/mycormarl/fungus/traits.py": "3d8b26b61eb662897eddd70c153f64699cc10dca48eb9cf8a596dd860dc17caa",
+      "src/mycormarl/growth.py": "733db5e2ed2c1fdcff3b926b8243b176a307d0fa52037be8a8de3012ec7ed13b",
+      "src/mycormarl/maintenance.py": "e3c88bc8a473d5644b3a8ead55f0ae8ab5e4e23f3232ad8707c5cba2c33e7e0c",
+      "src/mycormarl/observations.py": "b555a7412328fcbabc1969a9e09205692db10b1e2084de1f77ac6c302c3144f3",
+      "src/mycormarl/params.py": "94a2b568e18f404931b6f38ded3f9bf22cb67972be91c464b82a7f6a7742c02b",
+      "src/mycormarl/phosphate_examples.py": "891938c68ca68d50beb39ef4c1626873edc1ad4c37ff8abe4e8f98ed9f8b6cf1",
+      "src/mycormarl/plant/__init__.py": "3c8f53a79bf0689cf1765f2b628d0c745c7529398b61aaf08610e15d53a65236",
+      "src/mycormarl/plant/photosynthesis.py": "203ff48b9bae5e1688be258c3bb84d0f8c26f42c0cb665f37b27624667ee20c8",
+      "src/mycormarl/plant/roots.py": "e27f947bb57bedf2794039240d77f923438225f8605ba730aef08d86b7308034",
+      "src/mycormarl/plant/traits.py": "e040854f19768cc5468d073c1e7ac061b257ad517c0890bf43c44b7c4969ebee",
+      "src/mycormarl/policy_artifacts.py": "a1db295b904ccf269c379875bcce46772eb2ddf10e1ed5d4c2ab40d5ae916e9d",
+      "src/mycormarl/random_streams.py": "3400a217beae479fa6e87f463d38e6318e044ee5fb7dd0975fb32faed7e7c3cb",
+      "src/mycormarl/soil/__init__.py": "df49cc9a02fb1493dce08f411c5c1eeda6b65157c7fd2c1836bb068818ad1494",
+      "src/mycormarl/soil/deep_soil_qualification.py": "0dca7aa0e67a1f90a2b6564c506047395132e460ccebcf7f173e8f154ffdd312",
+      "src/mycormarl/soil/phosphate_diffusion.py": "e870de40a52118b84ac9913bfa3281339034738d045ba6861c54bbd5c903f1b2",
+      "src/mycormarl/soil/phosphate_grid.py": "8fcb260c5569c0043712b2afdd0a19b936df1c56817d0c82a7a6fa438cde3bb5",
+      "src/mycormarl/soil/phosphate_qualification.py": "19576563024198304fc550224ef3e4e819d23bd3d4f671b8588df16cec4bb500",
+      "src/mycormarl/soil/phosphate_units.py": "d0d6098ef2333c59779c8a348807512e5686cdf944598d1f541e543a21224964",
+      "src/mycormarl/soil/phosphate_uptake.py": "c75fdd3e392357d622fdf3b0f9d6f37491ec9ce083b65953bfab97855fdb2d1e",
+      "src/mycormarl/soil/soil.py": "af8be5669cdd12e2d9a48edda079d735d3be0d00017213e22be83673e7f8aa16",
+      "src/mycormarl/state.py": "db4a68536d41e3b8fc8b407c0a02830fe429b4b1d3005a1286976381603f41bb",
+      "src/mycormarl/static_rollout.py": "3fa8068222da8420618720b85ef7a7ca3a7baa508fc5ef1f0f44234108f3c38d",
+      "src/mycormarl/trade_only.py": "f1ad4b694a5f45fa20b6afb22b390b560e91bf627d5a77912b64b3e121411a10",
+      "src/mycormarl/transition.py": "f725e4c37d48d80b9ec98545930c2ac01d79cc1bdd19695ca4b7caa409ca3ff0"
+    },
+    "action_contract": "ADR-0020 / #79\u2013#85: three-rate stoichiometric allocation",
+    "reason": "Initial single-consumer references for #74 on ADR-0020 baseline 9a68fa4, before simplification",
+    "python": "3.12.9",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "dependencies": {
+      "jax": "0.9.0",
+      "jaxlib": "0.9.0",
+      "numpy": "2.3.5",
+      "flax": "0.12.3",
+      "chex": "0.1.91"
+    },
+    "backend": "cpu",
+    "x64": false
+  }
+}

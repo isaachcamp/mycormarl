@@ -1,0 +1,62 @@
+{
+  "mixed": {
+    "first": {
+      "compilation": 0.4673322921153158,
+      "execution": 0.0009734579361975193,
+      "total": 1.489694665884599
+    },
+    "repeat": {
+      "compilation": 0.4881997078191489,
+      "execution": 0.0008900840766727924,
+      "total": 0.6234743329696357
+    },
+    "repeat_differences": 0,
+    "fixture_differences": 0,
+    "p_residual_mg": -4.4727410636324905e-08
+  },
+  "plant-only": {
+    "first": {
+      "compilation": 0.4232622080016881,
+      "execution": 0.0008603748865425587,
+      "total": 0.5527586659882218
+    },
+    "repeat": {
+      "compilation": 0.4443759589921683,
+      "execution": 0.0009930829983204603,
+      "total": 0.5728660840541124
+    },
+    "repeat_differences": 0,
+    "fixture_differences": 0,
+    "p_residual_mg": 1.4883672305038287e-08
+  },
+  "fungus-only": {
+    "first": {
+      "compilation": 0.42932704207487404,
+      "execution": 0.0008904158603399992,
+      "total": 0.6096667498350143
+    },
+    "repeat": {
+      "compilation": 0.4374579170253128,
+      "execution": 0.0008709169924259186,
+      "total": 0.5695732089225203
+    },
+    "repeat_differences": 0,
+    "fixture_differences": 0,
+    "p_residual_mg": 5.098796588502014e-08
+  },
+  "stressed": {
+    "first": {
+      "compilation": 0.4766059590037912,
+      "execution": 0.0008766660466790199,
+      "total": 0.6076593748293817
+    },
+    "repeat": {
+      "compilation": 0.44175400002859533,
+      "execution": 0.0009060830343514681,
+      "total": 0.576314999954775
+    },
+    "repeat_differences": 0,
+    "fixture_differences": 0,
+    "p_residual_mg": 1.282013165522511e-07
+  }
+}
