@@ -56,8 +56,9 @@ REDbyRBD or the animations repository. External users of these legacy APIs
 must use the production environment's `step_env`/`step` entry points instead.
 `MycorMarlState` remains an alias; blended uptake and its diagnostics remain.
 
-Keep distinct single/batched execution loops, batching, limitation traces,
+Keep the single/batched public interfaces, batching, limitation traces,
 checkpoint summaries and actor-metadata helpers: downstream studies use them.
+Issue #95 replaces the separate execution loops as described below.
 Numerical/geometry modules retain their unit and conservation boundaries.
 The previously deferred SSPRK3 stage-wise biomass-guard diagnostic concern
 remains: intermediate limiting can be missed by initial/final guard checks.
@@ -71,3 +72,54 @@ fixture regeneration or changed tests. The five code recommendations remove
 136 net production lines; the documentation consolidation removes the seven
 phase files while retaining their unique evidence and deferrals here. Final
 review found no blocking change-specific defects.
+
+
+## Shared static trajectory (#95)
+
+Single execution and homogeneous batches now use one pure-JAX trajectory;
+`vmap` supplies per-member stopping/freezing for batches. Host validation and
+result serialization stay outside it. The original key conventions remain:
+single steps use `seed + step + 1`, batches use `seed + 1`. Optional single-run
+recording is selected statically; batches return no recording arrays or histories.
+The duplicated batch stepping/accumulation loop is removed (26 net production
+lines removed), with no changes to biology, PPO or the Transition contract.
+
+One intentional correction was explicitly approved: a run rejected at the
+initial plant biomass guard executes zero steps and reports zero accumulated
+totals. The old batch loop could contaminate growth with NaNs from discarded
+allocation calculations (`0 * NaN`). Executed allocation failures still retain
+their failure step, NaNs and rejection. The public regression test fails on the
+old implementation and passes on the shared trajectory.
+
+Performance comparison on CPU (`TFRT_CPU_0`, JAX 0.9.0), against `600d808`:
+compile each executable after clearing JAX caches; warm both, then alternate
+30 synchronized executions of each, reporting medians. Compilation includes
+lowering. These bounded measurements are not production-scale guarantees.
+
+| Grid | Steps | Batch | Warm ms before → after | Compile s before → after | Temporary bytes before → after |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 4×4 | 12 | 1 | 0.118 → 0.122 | 0.621 → 0.745 | 1872 → 1528 |
+| 4×4 | 12 | 4 | 0.225 → 0.232 | 0.685 → 0.807 | 3472 → 3128 |
+| 4×4 | 12 | 16 | 0.478 → 0.488 | 0.712 → 0.777 | 9168 → 8824 |
+| 40×40 | 24 | 1 | 1.796 → 1.814 | 0.644 → 0.768 | 39952 → 39608 |
+| 40×40 | 24 | 4 | 3.230 → 3.406 | 0.685 → 0.816 | 156688 → 156344 |
+| 40×40 | 24 | 16 | 9.979 → 9.978 | 0.706 → 0.823 | 624016 → 623672 |
+| 100×100 | 24 | 1 | 4.332 → 4.356 | 0.692 → 0.762 | 281424 → 281080 |
+| 100×100 | 24 | 4 | 13.474 → 13.546 | 0.663 → 0.804 | 1122768 → 1122424 |
+| 4×4 uneven | 24 | 4 | 0.269 → 0.281 | 0.662 → 0.784 | 3472 → 3128 |
+
+Cases use dt=.25 days and actions plant [.3,.2,.1], fungus [.4,.15,.1].
+The 4×4 grid spans 2 cm; larger grids span 10 cm in each dimension. Normal
+cases use the reference mixed traits and initial P levels `5 + member_index`.
+The uneven case uses the public stopping-parity test's traits/P levels, extended
+to 24 steps, and stops members at [4,5,24,24]. Input/output bytes are unchanged
+in every case (largest: 480300/480764); temporary memory falls by 344 bytes in
+every case. Warm medians differ by 0–5.5%; compilation adds .065–.140 s.
+The user explicitly accepted this measured tradeoff for the simpler implementation.
+
+Final #95 verification: **511 passed** in 328.29 s, one existing JAXopt
+deprecation warning. All four frozen references match at zero tolerance;
+fixtures and comparison tolerances are unchanged. Public-result comparisons
+cover different member stopping times, horizon/death, initial and later guard
+contact, and executed allocation failure. Final diff review found no blocking
+change-specific defects.

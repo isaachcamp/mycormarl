@@ -199,54 +199,25 @@ def _checkpoint(state, observations, rewards, info):
     }
 
 
-def evaluate_static_policy(
-    env: BaseMycorMarl,
-    actions: dict[str, jax.Array],
-    *,
-    seed: int,
-    record_limitation_trace: bool = False,
-    record_resource_accounting: bool = False,
-    checkpoint_steps: tuple[int, ...] = (),
-) -> dict[str, Any]:
-    """Execute fixed rates; optionally retain only selected completed steps.
+def _static_trajectory(env, actions, seed, *, record_limitation_trace=False,
+                       record_resource_accounting=False, checkpoint_steps=(),
+                       constant_key=False):
+    """Build one pure-JAX trajectory, usable directly or through vmap.
 
-    Checkpoint steps are strictly increasing positive integers within the horizon.
-    The initial state and an early final state are included automatically.
-    No checkpoint storage is allocated by default.
+    Recording choices and the existing per-entry-point key convention are static.
+    Each trajectory counts its failure/contact step, then freezes independently.
     """
-    actions = _validated_actions(actions)
-    if (any(type(step) is not int or not 1 <= step <= env.max_episode_steps
-            for step in checkpoint_steps)
-            or tuple(sorted(set(checkpoint_steps))) != tuple(checkpoint_steps)):
-        raise ValueError("checkpoint_steps must be increasing unique integers within the horizon")
-    initial_obs, state = env.reset(jax.random.PRNGKey(seed))
-    snapshots = {}
-    if checkpoint_steps:
-        # Infer buffer shapes without executing or retaining a trajectory.
-        obs_shape, state_shape, reward_shape, _, info_shape = jax.eval_shape(
-            env.step_env, jax.random.PRNGKey(seed + 1), state, actions)
-        template = _checkpoint(state_shape, obs_shape, reward_shape, info_shape)
-        snapshots = jax.tree.map(
-            lambda value: jnp.zeros((len(checkpoint_steps) + 1,) + value.shape, value.dtype),
-            template)
-        initial_checkpoint = {
-            "state": {field.name: getattr(state, field.name) for field in fields(state)},
-            "observations": initial_obs, "rewards": {agent: 0. for agent in _AGENTS},
-            "transitions": None, "flows": None,
-        }
-    initial_soil, initial_p = _p_inventory(state, env.species)
-    active_field = state.soil_labile_p > 0.0
-    concentration = labile_amount_to_solution_concentration(
-        state.soil_labile_p,
-        env.cell_volumes,
-        env.config.theta_water,
-        env.config.b_p,
-    )
-    positive_values = concentration[active_field]
-    uniform = not positive_values.size or bool(jnp.all(jnp.isclose(positive_values, positive_values[0])))
-    initial_total = initial_p + initial_soil
-
     def rollout(initial_state):
+        snapshots = {}
+        if checkpoint_steps:
+            # Infer sparse buffer shapes without executing a trajectory.
+            obs_shape, state_shape, reward_shape, _, info_shape = jax.eval_shape(
+                env.step_env, jax.random.PRNGKey(seed + 1), initial_state, actions)
+            template = _checkpoint(state_shape, obs_shape, reward_shape, info_shape)
+            snapshots = jax.tree.map(
+                lambda value: jnp.zeros((len(checkpoint_steps) + 1,) + value.shape, value.dtype),
+                template)
+
         def condition(carry):
             current_state, steps = carry[:2]
             guard_contact, allocation_ok = carry[-4:-2]
@@ -257,7 +228,7 @@ def evaluate_static_policy(
              carbon_fixed, trace, prior_acquired, accounting, guard_contact,
              allocation_ok, captured, count) = carry
             observations, current, rewards, _, info = env.step_env(
-                jax.random.PRNGKey(seed + steps + 1), previous, actions
+                jax.random.PRNGKey(seed + 1 if constant_key else seed + steps + 1), previous, actions
             )
             plant_info = info[PLANT]
             fungus_info = info[FUNGUS]
@@ -388,6 +359,52 @@ def evaluate_static_policy(
              jnp.zeros((2, 2, 6)), jnp.any(initial_state.plant_biomass >= env.species.plant.biomass_cap), jnp.asarray(True), snapshots, jnp.array(0)),
         )
 
+    return rollout
+
+
+def evaluate_static_policy(
+    env: BaseMycorMarl,
+    actions: dict[str, jax.Array],
+    *,
+    seed: int,
+    record_limitation_trace: bool = False,
+    record_resource_accounting: bool = False,
+    checkpoint_steps: tuple[int, ...] = (),
+) -> dict[str, Any]:
+    """Execute fixed rates; optionally retain only selected completed steps.
+
+    Checkpoint steps are strictly increasing positive integers within the horizon.
+    The initial state and an early final state are included automatically.
+    No checkpoint storage is allocated by default.
+    """
+    actions = _validated_actions(actions)
+    if (any(type(step) is not int or not 1 <= step <= env.max_episode_steps
+            for step in checkpoint_steps)
+            or tuple(sorted(set(checkpoint_steps))) != tuple(checkpoint_steps)):
+        raise ValueError("checkpoint_steps must be increasing unique integers within the horizon")
+    initial_obs, state = env.reset(jax.random.PRNGKey(seed))
+    if checkpoint_steps:
+        initial_checkpoint = {
+            "state": {field.name: getattr(state, field.name) for field in fields(state)},
+            "observations": initial_obs, "rewards": {agent: 0. for agent in _AGENTS},
+            "transitions": None, "flows": None,
+        }
+    initial_soil, initial_p = _p_inventory(state, env.species)
+    active_field = state.soil_labile_p > 0.0
+    concentration = labile_amount_to_solution_concentration(
+        state.soil_labile_p,
+        env.cell_volumes,
+        env.config.theta_water,
+        env.config.b_p,
+    )
+    positive_values = concentration[active_field]
+    uniform = not positive_values.size or bool(jnp.all(jnp.isclose(positive_values, positive_values[0])))
+    initial_total = initial_p + initial_soil
+
+    rollout = _static_trajectory(
+        env, actions, seed, record_limitation_trace=record_limitation_trace,
+        record_resource_accounting=record_resource_accounting,
+        checkpoint_steps=checkpoint_steps)
     compiled = jax.jit(rollout)
     timing = None
     if checkpoint_steps:
@@ -509,58 +526,15 @@ def evaluate_batched_static_policy(environments: list[BaseMycorMarl], actions: d
         initial_totals.append(initial_soil + initial_p)
     environment = environments[0]
     batch_state = jax.tree.map(lambda *values: jnp.stack(values), *states)
-    batch_size = len(states)
-    batched_step = jax.vmap(environment.step_env, in_axes=(0, 0, None))
-
-    def retain_active(previous, updated, active):
-        shape = (active.shape[0],) + (1,) * (updated.ndim - 1)
-        return jnp.where(active.reshape(shape), updated, previous)
+    trajectory = _static_trajectory(environment, actions, seed, constant_key=True)
 
     def rollout(initial_state):
-        def advance(_, carry):
-            current, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed, guard_contact, allocation_ok = carry
-            active = ~current.terminal & allocation_ok & ~guard_contact
-            keys = jnp.broadcast_to(jax.random.PRNGKey(seed + 1), (batch_size, 2))
-            _, updated, rewards, _, info = batched_step(keys, current, actions)
-            allocation_ok = allocation_ok & jnp.where(active,
-                info[PLANT]['allocation_converged'] & info[FUNGUS]['allocation_converged'], True)
-            guard_contact = guard_contact | (active & info[PLANT]['biomass_guard_contact'][:,0])
-            next_state = jax.tree.map(
-                lambda previous, next_value: retain_active(previous, next_value, active),
-                current, updated,
-            )
-            active_float = active.astype(jnp.float32)
-            uptake = uptake + jnp.stack((
-                info[PLANT]["direct_p_uptake_mg"][:, 0],
-                info[FUNGUS]["direct_p_uptake_mg"][:, 0],
-            ), axis=1) * active_float[:, None]
-            transfers = transfers + jnp.stack((
-                info[PLANT]["trade_out"][:, 0], info[FUNGUS]["trade_out"][:, 0],
-            ), axis=1) * active_float[:, None]
-            deaths = deaths + jnp.stack((
-                info["transitions"][PLANT].operational_at_start
-                & ~info["transitions"][PLANT].operational_at_end,
-                info["transitions"][FUNGUS].operational_at_start
-                & ~info["transitions"][FUNGUS].operational_at_end,
-            ), axis=1).astype(jnp.int32) * active[:,None]
-            growth = growth + jnp.stack((
-                info[PLANT]["growth"][:, 0], info[FUNGUS]["growth"][:, 0],
-            ), axis=1) * active_float[:, None]
-            fitness = fitness + jnp.stack((rewards[PLANT], rewards[FUNGUS]), axis=1) * active_float[:, None]
-            carbon_fixed = carbon_fixed + info[PLANT]["carbon_fixed"][:, 0] * active_float
-            return next_state, steps + active.astype(jnp.int32), uptake, transfers, deaths, growth, fitness, carbon_fixed, guard_contact, allocation_ok
+        values = trajectory(initial_state)
+        return values[:8] + values[11:13]  # summaries need no recording outputs
 
-        return jax.lax.fori_loop(
-            0, environment.max_episode_steps, advance,
-            (initial_state, jnp.zeros(batch_size, dtype=jnp.int32),
-             jnp.zeros((batch_size, 2)), jnp.zeros((batch_size, 2)),
-             jnp.zeros((batch_size, 2), dtype=jnp.int32), jnp.zeros((batch_size, 2)),
-             jnp.zeros((batch_size, 2)), jnp.zeros(batch_size),
-             initial_state.plant_biomass[:,0] >= environment.species.plant.biomass_cap,
-             jnp.ones(batch_size,dtype=bool)),
-        )
-
-    state, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed, guard_contact, allocation_ok = jax.jit(rollout)(batch_state)
+    values = jax.jit(jax.vmap(rollout))(batch_state)
+    (state, steps, uptake, transfers, deaths, growth, fitness, carbon_fixed,
+     guard_contact, allocation_ok) = values
     entries = []
     for index, (env, initial_soil, initial_total) in enumerate(
         zip(environments, initial_soils, initial_totals, strict=True)
