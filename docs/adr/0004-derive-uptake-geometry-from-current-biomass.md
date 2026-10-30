@@ -50,6 +50,17 @@ growth.
 
 ## Potential extension
 
+**Follow-up decision, 27 October 2026:**
+[ADR-0021](0021-treat-internal-transport-capacity-as-non-limiting.md)
+explicitly defers the capacity-based extension described below. Internal
+transport is assumed non-limiting within retained connected tissue; the planned
+mortality density floor was proposed as a continuity proxy, not a measured
+transport threshold. [ADR-0022](0022-separate-fine-root-mortality-from-persistent-backbone-connectivity.md)
+subsequently removes the fine-root floor in favour of an implicit conducting
+backbone; the fungal geometry remains under revision. The original proposal is
+retained here as decision context. These decisions do not replace the current
+memoryless production rule until the cohort implementation lands.
+
 Maintenance-deficit mortality could later reduce length density within the
 established root or mycelial envelope instead of retracting the uptake
 geometry. This extension should not be introduced as proportional density
