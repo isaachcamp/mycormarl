@@ -18,9 +18,9 @@ defaulting to one. Payment shortfalls remove biomass, realised reproductive
 output generates reward, and death does not replenish C or P resources.
 
 Surviving plant biomass is mapped to a stack of depth-dependent root discs with
-uniform within-disc length density. Surviving fungal biomass is mapped to an
-external hyphal length and then to a saturated hemisphere. These fields are
-the sole geometry inputs to phosphate uptake.
+uniform within-disc length density. The extraradical fraction of surviving
+fungal biomass is mapped to external hyphal length and then to a saturated
+hemisphere. These fields are the sole geometry inputs to phosphate uptake.
 
 ## Resource-limited biomass change
 
@@ -226,16 +226,29 @@ is superseded and must not be used as the current fine-root fraction.
 
 ## Fungal biomass to hyphal geometry
 
-Fungal dry biomass $G_f$ becomes structural C, tissue volume, and cylindrical
-external-hyphal length:
+Total fungal dry biomass $G_f$ is split by the static trait
+$f=\texttt{irm_fraction}$ into intraradical mycelium (IRM) and extraradical
+mycelium (ERM):
 
 $$
-L_h=\frac{G_f\gamma_{C,f}}{M_C\pi r_h^2},
+G_{IRM}=fG_f,\qquad G_{ERM}=(1-f)G_f.
+$$
+
+Only ERM becomes external cylindrical absorbing length:
+
+$$
+L_h=\frac{(1-f)G_f\gamma_{C,f}}{M_C\pi r_h^2},
 $$
 
 where $\gamma_{C,f}$ is g C g⁻¹ dry biomass, $M_C$ is tissue C density
-(g C cm⁻³ tissue), $r_h$ is hyphal radius (cm), and $L_h$ is cm. Spores and
-intraradical structures are excluded. Implemented by
+(g C cm⁻³ tissue), $r_h$ is hyphal radius (cm), and $L_h$ is cm. The low-level
+length conversion takes **external** dry mass; its inverse returns external
+dry mass. IRM has no resolved geometry. Both fractions share the existing
+construction C/P and maintenance coefficients, charged against total $G_f$.
+Their living volumes can be derived as $V_{IRM}=fG_f\gamma_{C,f}/M_C$ and
+$V_{ERM}=(1-f)G_f\gamma_{C,f}/M_C$ under the shared tissue-density approximation.
+No extra biomass state, stock diagnostics or policy inputs are introduced.
+External conversion is implemented by
 [`hyphal_length_from_fungal_biomass`](../src/mycormarl/fungus/mycelium.py).
 
 The length fills a hemisphere at saturation density $\lambda_{sat}$:
@@ -247,8 +260,27 @@ $$
 The inverse transformations from colony radius to saturated length and from
 length to dry biomass are owned by the same mycelium module. Their composition,
 [`fungal_biomass_for_colony_radius`](../src/mycormarl/fungus/mycelium.py),
-provides the radial-fill biomass. Half of that value is used as the fungal
-actor-observation reference.
+provides total radial-fill biomass, dividing external mass by $(1-f)$:
+
+$$
+G_f(R)=\frac{(2\pi/3)R^3\lambda_{sat}M_C\pi r_h^2}
+                 {(1-f)\gamma_{C,f}}.
+$$
+
+The fungal actor-observation reference remains half the radial-fill biomass
+evaluated at **zero IRM fraction**, preserving the existing encoding of total
+biomass as allocation varies.
+
+`irm_fraction` defaults to zero, must be finite in `[0, 1)`, and must be zero
+in `fungus-only` mode. Experiments set a nonzero value explicitly; no empirical
+nonzero default is selected. Configured initial biomass always means total
+fungal biomass: increasing the fraction reduces the initial external footprint
+without increasing reset mass or free-resource endowments. Growth and mortality
+preserve the ratio. A 1 mg total loss at `irm_fraction=0.2` removes 0.2 mg IRM
+and 0.8 mg ERM; structural-P mortality exports still use the full 1 mg loss.
+Biological death disables uptake while retaining residual total biomass for
+accounting. IRM allocation adds no root-capacity constraint, colonisation state,
+establishment delay or exchange rule; see [ADR-0017](adr/0017-represent-absorbers-as-fine-root-discs-and-an-external-hyphal-hemisphere.md).
 
 Each annular cell receives $\lambda_{sat}$ times its exact occupied-volume
 fraction. Implemented by
@@ -264,8 +296,8 @@ Before boundary contact this equals $L_h$; after contact, outside structure is
 clipped without raising the in-domain density above $\lambda_{sat}$. Reaching
 one boundary does not saturate the entire soil domain: that occurs only once
 the hemisphere covers it. Geometry clipping does not cap fungal biomass.
-Current defaults imply about `5,511,859.5 cm` hyphae per gram fungal dry mass,
-as a dimensional reference rather than an empirical prediction.
+Current defaults (`irm_fraction=0`) imply about `5,511,859.5 cm` hyphae per gram
+fungal dry mass, as a dimensional reference rather than an empirical prediction.
 
 Both density fields are reconstructed from current living biomass at reset
 and after each maintenance/allocation update. Loss retracts disc radii and the
@@ -278,12 +310,18 @@ absorber age; see [ADR-0004](adr/0004-derive-uptake-geometry-from-current-biomas
 Future work should change the assumed fungal geometry with sufficient
 justification.
 
+Isolated external-cylinder construction-carbon diagnostics continue to count
+only the represented external tissue carbon. They exclude IRM allocation,
+maintenance and whole-fungus expenditure; adding IRM overhead to such an
+experiment would require an explicitly different denominator.
+
 ## Parameterisation and literature relationship
 
 | Parameter | Default | Evidence and status |
 |---|---:|---|
 | Plant initial biomass and free pools | `0.01 g`; `1.75e-6 g C`; `0 mg P` | An early-established seedling fixture above the `0.7–3.3 mg` *Daucus carota* propagule means reported by [Vandelook et al. (2024)](https://doi.org/10.1017/S0960258524000230) and below later resource-exchange harvests. The default C pool funds one maintenance timestep; default P is zero because default $\kappa_P=0$. |
-| Fungal initial biomass and free pools | `0.001 g`; `3.75e-7 g C`; `0 mg P` | Living external mycelium in an early-established fixture, deliberately below the approximately `3–17 mg` mature external-mycelium measurements in *R. irregularis* root-organ microcosms ([Sun et al. (2024)](https://doi.org/10.1007/s00572-024-01154-8)). This is not inoculum, colonized-root mass, or a spore mass. The default C pool funds one maintenance timestep; default P is zero because default $\kappa_P=0$. |
+| Fungal initial biomass and free pools | `0.001 g`; `3.75e-7 g C`; `0 mg P` | Total living fungal biomass in an early-established fixture. At default `irm_fraction=0` it is all external, deliberately below the approximately `3–17 mg` mature external-mycelium measurements in *R. irregularis* root-organ microcosms ([Sun et al. (2024)](https://doi.org/10.1007/s00572-024-01154-8)). This is not inoculum or spore mass. Nonzero allocation partitions the same total. The default C pool funds one total-biomass maintenance timestep; default P is zero because default $\kappa_P=0$. |
+| `irm_fraction` | `0` | Fixed IRM / total fungal dry mass, finite in `[0, 1)`; zero required without a host. The default preserves the legacy allocation, not an empirical estimate. |
 | Plant $\gamma_C$ | `0.402 g C g⁻¹` | Carrot-root elemental analysis from [Kaur et al. (2022)](https://doi.org/10.1038/s41598-022-20971-5); a root-dominated proxy, not whole-plant calibration. |
 | Plant $\gamma_P$ | `1.92 mg P g⁻¹` | Derived dry-mass-weighted carrot value from [Kováčik et al. (2022)](https://doi.org/10.3390/agronomy12112770), an MDPI *Agronomy* paper; independent validation remains required. |
 | $k_{froot}$, $SRL$, $r_{root}$ | `0.18`, `25,434.3 cm g⁻¹`, `0.01 cm` | `k_froot` is a representative value inside the directly observed `0.119–0.244` interval for six-month carrots in deep silica-sand greenhouse columns ([Westerveld 2005](https://bradford-crops.uoguelph.ca/sites/default/files/Sean%20Westerveld%20Thesis.pdf)); the SRL and effective radius are compatible but separately aggregated fine-root traits from [GRooT](https://doi.org/10.1111/geb.13179). This is not a field or wild-carrot default. |
@@ -319,11 +357,12 @@ the table are for `dt=0.025 day`; unspecified pools are calculated at reset as
   not biomass directly.
 - **Assumption:** Root allocation uses a static root-mass fraction as a
   marginal conversion from whole-plant biomass; allometry is constant.
-- **Assumption:** Fungal biomass is treated as external cylindrical hyphae for
-  geometry; spores and intraradical biomass are omitted.
+- **Assumption:** Fungal biomass has fixed IRM/ERM allometry with shared tissue
+  economics. Only ERM becomes external cylindrical uptake geometry; IRM is
+  implicit and spores are omitted. The split is preserved during mortality.
 - **Initial-condition assumption:** The symbiosis is pre-established. Initial
-  fungal biomass represents living, external, absorptive hyphae; the model does
-  not simulate inoculum establishment, dormancy or germination.
+  fungal biomass represents total living IRM plus ERM (all ERM by default);
+  the model does not simulate inoculum establishment, dormancy or germination.
 - **Assumption:** Mycelial density remains constant independent of soil
   P concentration.
 - **Assumption:** Represented absorbing length is $k_{froot} \times SRL$.
