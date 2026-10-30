@@ -1,6 +1,8 @@
 # ADR-0015: Pin core dependencies and retain executable policy evidence
 
-**Status:** Accepted; archive hosting and routine build budget resolved in P5; upload and snapshot tags remain cutover work
+**Status:** Accepted; initial archive publication, source tags and repository
+cutover recorded complete. A public Zenodo deposit remains deferred.
+Implementation status clarified 21 October 2026.
 
 ## Context
 
@@ -48,8 +50,11 @@ Store exploration records outside Git checkouts in a configurable data
 directory. The research repository records run identities and locations.
 Preserve existing records during extraction; relocating data is not a
 prerequisite for splitting the code. Publication evidence bundles are selected
-exports from those retained records. Exact storage and public archive
-locations remain to be selected.
+exports from those retained records. Initial publication hosting uses private
+GitHub release assets; local exploration records live outside Git checkouts
+in the sibling data directory. A later public deposit is a separate release
+decision. See the [core archive pointers](../../README.md#research-and-animations)
+and downstream provenance for concrete record locations.
 
 Retain compact per-checkpoint evaluation metrics used by reported learning
 curves even when those curves' intermediate policy weights or full training
@@ -70,7 +75,7 @@ configuration, and results before tagging its snapshot.
 
 ## Documentation across repositories
 
-When the repositories are created, document the relevant version-control and
+Document the relevant version-control and
 dependency-pinning workflow in both core and research. The user excludes the
 animation repository from this additional version-control documentation
 requirement. This does not alter animation ownership under ADR-0014.
@@ -80,9 +85,10 @@ into each new repository consistently. Keep `CONTEXT.md` as the established
 glossary location and `docs/adr/` for architectural decisions. Core owns model
 and algorithm contracts; research owns scientific protocols and
 interpretation. Preserve traceability to originating ADRs when moving a
-decision and avoid contradictory copies of the same decision. Detailed
-documentation distribution and migration mechanics remain to be
-planned.
+decision and avoid contradictory copies of the same decision. Core's
+[ADR index](README.md) records current ownership; the initial distribution and
+cutover are complete. New decisions and evidence retain separate source and
+execution identities.
 
 ## Sources
 
@@ -97,16 +103,22 @@ planned.
 - [uv Git dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/#git).
 - [showyourwork! Zenodo integration](https://show-your.work/en/latest/zenodo/).
 
-## P5 implementation — 14 October 2026
+## Historical P5 implementation — 14 October 2026
 
 The user selected private GitHub release assets initially, followed by a public
 Zenodo deposit when the paper is ready. The checksum-indexed selected archive
-retains all30 final reported policy networks, their original actor/model/seed
+retains all 30 final reported policy networks, their original actor/model/seed
 requirements and learning-curve records. Full exploration checkpoints remain
-intact. Original learned core95d36e1 is an isolated execution runtime, never
-relabelled as the current dependency pin. Ordinary build CPU budget is900s,
-with30 bounded actor-inference conditions, four contract-evaluation steps, no
-training or full historical rollout. Source/tag/descriptor mappings and actual
-release upload are completed at cutover; no release tag or DOI is fabricated.
+intact. Original learned core `95d36e1` is an isolated execution runtime, never
+relabelled as the current dependency pin. That report's ordinary build CPU
+budget was 900 s, with 30 bounded actor-inference conditions, four
+contract-evaluation steps, no training or full historical rollout.
+Source/tag/descriptor mappings and release upload were completed at cutover;
+no public DOI is implied.
 Slurm estimates explicitly request CPU/memory/time and retain strict identity
-checks. See REDbyRBD docs/reproducibility for executable requirements.
+checks. This is historical report evidence, not a requirement to reproduce
+that exact build structure in the developing paper. The
+[cutover record](../reproducibility/repository-cutover.json) identifies the
+source revisions, archive checksum, reproduction tag and CI runs. Current
+executable requirements are in
+[REDbyRBD's publication guide](https://github.com/isaachcamp/REDbyRBD/blob/main/docs/publication.md).

@@ -11,7 +11,7 @@ from flax import serialization
 
 POLICY_ARTIFACT_FORMAT = "mycormarl-ippo-policy"
 POLICY_ARTIFACT_VERSION = 1
-ACTOR_INTERFACE_VERSION = "two-head-latent-v1"
+ACTOR_INTERFACE_VERSION = "three-latent-stoichiometric-rate-v2"
 ENVIRONMENT_STATE_SCHEMA_VERSION = "state-v2"
 
 

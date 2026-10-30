@@ -9,13 +9,13 @@
 ## Executive summary
 
 Plant and fungus pay unavoidable carbon maintenance and irreversible free-P
-loss from their start-of-step pools, then execute a Physical action
-`[trade, growth, reproduction, reserve]`. Trade is independently bounded;
-growth, reproduction, and reserve form a simplex applied separately to
-remaining C and P. Growth treats C and P as essential resources: the scarcer
-resource after conversion by organism-specific stoichiometric costs limits new
-dry biomass. Payment shortfalls remove biomass, reproduction exports
-resources and generates reward, and death does not replenish C or P resources.
+loss from their start-of-step pools, then execute a Rate action
+`[trade, growth, reproduction]` in non-negative per-day rates. Trade and
+biology compete simultaneously in the evolving free pools, including incoming
+trade. Both growth and reproduction require paired C/P at organism-specific
+stoichiometric costs; reproduction scales those costs by a positive multiplier
+defaulting to one. Payment shortfalls remove biomass, realised reproductive
+output generates reward, and death does not replenish C or P resources.
 
 Surviving plant biomass is mapped to a stack of depth-dependent root discs with
 uniform within-disc length density. Surviving fungal biomass is mapped to an
@@ -24,35 +24,41 @@ the sole geometry inputs to phosphate uptake.
 
 ## Resource-limited biomass change
 
-For organism $o\in\{p,f\}$, the realised growth increment is
+For organism $o\in\{p,f\}$, instantaneous essential-resource availability and
+the unconstrained biological rates are
 
 $$
-\Delta G_o=\min\left(\frac{C_{o,g}}{\gamma_{C,o}},
-                         \frac{P_{o,g}}{\gamma_{P,o}}\right),
+Q_o=\min\left(\frac{C_o}{\gamma_{C,o}},\frac{P_o}{\gamma_{P,o}}\right),
+\qquad \dot G_o=k_{g,o}Q_o,\qquad \dot R_o=\frac{k_{r,o}Q_o}{s_o}.
 $$
 
-where $C_{o,g}$ is allocated C (g C), $P_{o,g}$ is allocated P (mg P),
+Here $C_o$ is free C (g C), $P_o$ is free P (mg P),
 $\gamma_{C,o}$ is structural C cost (g C g⁻¹ dry biomass), and
-$\gamma_{P,o}$ is structural P cost (mg P g⁻¹ dry biomass). The realised costs
-are $\Delta G_o\gamma_{C,o}$ and $\Delta G_o\gamma_{P,o}$; unused portions of
-the limiting allocation remain in the free pools. Plant growth is additionally
-clipped at its biomass cap.
+$\gamma_{P,o}$ is structural P cost (mg P g⁻¹ dry biomass), and
+$s_o=\texttt{reproduction_cost_scale}>0$. Integrating these rates gives
+structural growth $\Delta G_o$ and exported reproductive output $\Delta R_o$.
+Growth spends $\gamma\Delta G_o$ and reproduction spends
+$s_o\gamma\Delta R_o$ for each element. Surplus complementary resource and
+finite-rate residue remain in the free pools.
+The commanded intensities are per-pool rates, independent of biomass units.
+Larger available pools automatically produce larger absolute fluxes under the
+same command; uptake, maintenance and the biomass guard can still change the
+physical trajectory as biomass changes.
+Plant growth is limited to remaining biomass-guard capacity **before** charging
+these costs, so blocked growth consumes neither C nor P.
 
 ```python
-delta_biomass = jnp.minimum(
-    (allocated_c) / grow_c_cost,
-    (allocated_p) / grow_p_cost
-)
+q = jnp.minimum(c_pool / gamma_c, p_pool / gamma_p)
+growth_rate = kg * q
+reproductive_output_rate = kr * q / reproduction_cost_scale
 ```
 
 Implemented by
-[`_grow_biomass_essential_resources`](../mycormarl/mycormarl/growth.py#L8-L20)
-and called for plants and fungi in
-[`step_plant`](../mycormarl/mycormarl/environments/base_mycor.py#L473-L574) and
-[`step_fungus`](../mycormarl/mycormarl/environments/base_mycor.py#L576-L672).
+the [coupled allocation integrator](../src/mycormarl/allocation.py), called by
+[`BaseMycorMarl.step_env`](../src/mycormarl/environments/base_mycor.py).
 Start-pool timing and the biomass cap are protected by
-[`test_newly_fixed_carbon_is_not_available_for_same_step_growth`](../tests/test_base_mycor_refactor.py#L114-L128)
-and [`test_plant_growth_at_biomass_cap_charges_only_realised_structure`](../tests/test_base_mycor_refactor.py#L129-L155).
+[`test_newly_fixed_carbon_is_not_available_for_same_step_growth`](../tests/test_base_mycor_refactor.py)
+and [`test_plant_growth_at_biomass_cap_charges_only_realised_structure`](../tests/test_base_mycor_refactor.py).
 
 The default plant guard is `50 g DM`, selected as headroom above a
 `25--35 g DM` favourable carrot trajectory rather than as a carrying-capacity
@@ -106,21 +112,62 @@ $$
 $$
 
 The shared automatic payment transaction is implemented in
-[`BaseMycorMarl._pay_maintenance`](../mycormarl/mycormarl/environments/base_mycor.py).
-Reserved resources remain untouched after automatic payment, as tested by
+[`BaseMycorMarl._pay_maintenance`](../src/mycormarl/environments/base_mycor.py).
+Allocation leaves retained resources in the free pools, as tested by
 [`test_automatic_maintenance_does_not_spend_reserved_resources`](../tests/test_base_mycor_refactor.py).
 
-Reproduction removes allocated C and P and scores a Cobb–Douglas reward after
-both resources are converted to dry-biomass equivalents. Plant C trade and
-fungal P trade are calculated from the same start-of-step pools, and incoming
-trade is unavailable for same-step growth. See
-[`step_env`](../mycormarl/mycormarl/environments/base_mycor.py#L281-L377) and
-[`test_incoming_trade_is_not_available_for_same_step_growth`](../tests/test_base_mycor_refactor.py#L209-L221).
+Let $T_C=k_{t,p}C_p$, $T_P=k_{t,f}P_f$, and
+$U_o=\dot G_o+s_o\dot R_o$. During allocation the coupled balances are
+
+$$
+\dot C_p=-\gamma_{C,p}U_p-T_C,\qquad
+\dot P_p=-\gamma_{P,p}U_p+T_P,
+$$
+$$
+\dot C_f=-\gamma_{C,f}U_f+T_C,\qquad
+\dot P_f=-\gamma_{P,f}U_f-T_P.
+$$
+
+Bilateral trade is disabled if either participant is non-operational after
+maintenance. Each transfer is paired in physical units; no stoichiometric
+conversion applies to the transfer itself. Incoming resources can fund biology
+during this allocation interval. With competing biology, realised trade is not
+generally the isolated fraction $1-\exp(-k_tdt)$ of the starting donor pool.
+
+Reward is $\int\dot R_o\,dt$, with no Cobb–Douglas exponent. Output is not
+added to parental biomass or an offspring state. At fixed commands and stocks,
+changing $s_o$ divides output by that factor and leaves expenditure unchanged.
+There is no separate storage hazard or end-step surplus liquidation.
+See [ADR-0020](adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md)
+and the [incoming-trade analytical test](../tests/test_base_mycor_refactor.py).
+
+Allocation uses SSPRK3 substeps bounded by outgoing intensity, default
+`allocation_rate_step=.02`, with compensated float32 sums. Internal refinement
+holds the three rates fixed. The solver accumulates reproductive expenditure
+$E_o=\int k_{r,o}Q_o\,dt$, derives output $E_o/s_o$ once, and records native
+exports $\gamma E_o$ directly. This preserves material accounts when very small
+output increments would underflow; use the export ledger for resource budgets.
+Output below float32's normal range can round to zero without changing spending.
+Exhausting `allocation_max_substeps=65536`, or producing non-finite integrated
+stocks/output, marks a failed transition; public experiment, learning and
+evaluation workflows reject it. Growth-guard contact also invalidates qualification, even if later biomass
+falls below the guard. The [qualification report](qualification/three-rate-allocation.md)
+records tested accuracy and timings. The [static allocation guide](static-allocation.md)
+defines the separate interval-dependent total-intensity experiment contract.
+
+The legacy `growth_c_allocated`/`growth_p_allocated` diagnostics integrate
+$k_gC$ and $k_gP$ as non-consuming elemental offers. These diagnose limitation;
+actual paired spending is recorded in `growth_c_used`/`growth_p_used`.
 
 Structural P associated with biomass lost to a payment shortfall is added to
 cumulative mortality-loss diagnostics. It is not recycled to soil. Free P
 removed by $\kappa_P$ is recorded separately in the legacy-named plant and
 fungal maintenance-loss counters; unmet demand is recorded only as a deficit.
+The deficit-induced biomass loss is capped at current active biomass.
+Death is absorbing once post-maintenance biomass falls below the configured
+fraction of its historical maximum. Residual biomass and free pools remain in
+state for accounting but have zero activity; the threshold does not recycle
+them into soil. See the [extended P ledger](model-overview.md#phosphorus-accounting).
 
 ## Plant biomass to root geometry
 
@@ -130,9 +177,10 @@ $$
 L_{root}=G_p k_{root}\,SRL,
 $$
 
-where $k_{root}$ is the root dry-mass fraction (dimensionless), $SRL$ is
+where $k_{root}$ denotes `PlantTraits.kfroot`, the represented fine-root
+dry-mass fraction (dimensionless), applied exactly once; $SRL$ is
 specific root length (cm g⁻¹ root dry mass), and $L_{root}$ is cm. Implemented
-by [`root_length_from_plant_biomass`](../mycormarl/mycormarl/plant/roots.py#L9-L21).
+by [`root_length_from_plant_biomass`](../src/mycormarl/plant/roots.py).
 
 The cumulative depth distribution is $F(d)=1-\beta^d$. It is normalized over
 the intended maximum rooting depth $D_{root}$, which defaults to 150 cm, rather
@@ -162,11 +210,19 @@ because their assigned length is smaller. Layers below $D_{root}$ are empty.
 Partially crossed annular cells are volume averaged; radii beyond the radial soil
 boundary are clipped, not redistributed.
 Implemented by
-[`root_disc_radii_from_biomass`](../mycormarl/mycormarl/plant/roots.py#L60-L88)
-and [`axisymmetric_stacked_disc_root_density`](../mycormarl/mycormarl/plant/roots.py#L90-L107).
+[`root_disc_radii_from_biomass`](../src/mycormarl/plant/roots.py)
+and [`axisymmetric_stacked_disc_root_density`](../src/mycormarl/plant/roots.py).
 Tests verify depth-dependent radii, uniform density, conservation before domain
 clipping, and clipping behaviour in
-[`test_growth_geometry.py`](../tests/test_growth_geometry.py#L91-L193).
+[`test_growth_geometry.py`](../tests/test_growth_geometry.py).
+
+The integral $\sum_i\lambda_{root,i}V_i$ equals total biomass-implied root
+length only if the full rooting-depth profile and all radial discs fit inside
+the domain. Otherwise it equals the analytical disc-domain intersection;
+missing length is not redistributed into represented soil. At the current
+`kfroot=0.18` and SRL defaults, one gram of plant biomass implies about
+`4,578.2 cm` of fine roots before clipping. The early `k_root=0.62` conversion
+is superseded and must not be used as the current fine-root fraction.
 
 ## Fungal biomass to hyphal geometry
 
@@ -180,7 +236,7 @@ $$
 where $\gamma_{C,f}$ is g C g⁻¹ dry biomass, $M_C$ is tissue C density
 (g C cm⁻³ tissue), $r_h$ is hyphal radius (cm), and $L_h$ is cm. Spores and
 intraradical structures are excluded. Implemented by
-[`hyphal_length_from_fungal_biomass`](../mycormarl/mycormarl/fungus/mycelium.py#L7-L26).
+[`hyphal_length_from_fungal_biomass`](../src/mycormarl/fungus/mycelium.py).
 
 The length fills a hemisphere at saturation density $\lambda_{sat}$:
 
@@ -190,17 +246,34 @@ $$
 
 The inverse transformations from colony radius to saturated length and from
 length to dry biomass are owned by the same mycelium module. Their composition,
-[`fungal_biomass_for_colony_radius`](../mycormarl/mycormarl/fungus/mycelium.py),
+[`fungal_biomass_for_colony_radius`](../src/mycormarl/fungus/mycelium.py),
 provides the radial-fill biomass. Half of that value is used as the fungal
 actor-observation reference.
 
 Each annular cell receives $\lambda_{sat}$ times its exact occupied-volume
 fraction. Implemented by
-[`colony_radius_from_length_axisymmetric`](../mycormarl/mycormarl/fungus/mycelium.py#L28-L30),
-[`axisymmetric_hemisphere_cell_fractions`](../mycormarl/mycormarl/fungus/mycelium.py#L78-L106),
-and [`axisymmetric_density_from_biomass`](../mycormarl/mycormarl/fungus/mycelium.py#L119-L141).
+[`colony_radius_from_length_axisymmetric`](../src/mycormarl/fungus/mycelium.py),
+[`axisymmetric_hemisphere_cell_fractions`](../src/mycormarl/fungus/mycelium.py),
+and [`axisymmetric_density_from_biomass`](../src/mycormarl/fungus/mycelium.py).
 Partial-front conservation and domain saturation are tested in
-[`test_growth_geometry.py`](../tests/test_growth_geometry.py#L195-L289).
+[`test_growth_geometry.py`](../tests/test_growth_geometry.py).
+
+In particular,
+$\sum_i\lambda_{h,i}V_i=\lambda_{sat}\,\mathrm{Vol}(H(R_f)\cap\mathrm{soil})$.
+Before boundary contact this equals $L_h$; after contact, outside structure is
+clipped without raising the in-domain density above $\lambda_{sat}$. Reaching
+one boundary does not saturate the entire soil domain: that occurs only once
+the hemisphere covers it. Geometry clipping does not cap fungal biomass.
+Current defaults imply about `5,511,859.5 cm` hyphae per gram fungal dry mass,
+as a dimensional reference rather than an empirical prediction.
+
+Both density fields are reconstructed from current living biomass at reset
+and after each maintenance/allocation update. Loss retracts disc radii and the
+fungal front; later regrowth can recreate the same geometry. Equal living
+biomass and traits imply equal geometry regardless of history. Zero living
+biomass or an absent/dead organism gives exactly zero density. There is no
+persistent front, thinning/damage state, abandoned territory, or independent
+absorber age; see [ADR-0004](adr/0004-derive-uptake-geometry-from-current-biomass.md).
 
 Future work should change the assumed fungal geometry with sufficient
 justification.
@@ -210,38 +283,47 @@ justification.
 | Parameter | Default | Evidence and status |
 |---|---:|---|
 | Plant initial biomass and free pools | `0.01 g`; `1.75e-6 g C`; `0 mg P` | An early-established seedling fixture above the `0.7–3.3 mg` *Daucus carota* propagule means reported by [Vandelook et al. (2024)](https://doi.org/10.1017/S0960258524000230) and below later resource-exchange harvests. The default C pool funds one maintenance timestep; default P is zero because default $\kappa_P=0$. |
-| Fungal initial biomass and free pools | `0.001 g`; `0.0005 g C`; `0 mg P` | Living external mycelium in an early-established fixture, deliberately below the approximately `3–17 mg` mature external-mycelium measurements in *R. irregularis* root-organ microcosms ([Sun et al. (2024)](https://doi.org/10.1007/s00572-024-01154-8)). This is not inoculum, colonized-root mass, or a spore mass. The default C pool funds one maintenance timestep; default P is zero because default $\kappa_P=0$. |
+| Fungal initial biomass and free pools | `0.001 g`; `3.75e-7 g C`; `0 mg P` | Living external mycelium in an early-established fixture, deliberately below the approximately `3–17 mg` mature external-mycelium measurements in *R. irregularis* root-organ microcosms ([Sun et al. (2024)](https://doi.org/10.1007/s00572-024-01154-8)). This is not inoculum, colonized-root mass, or a spore mass. The default C pool funds one maintenance timestep; default P is zero because default $\kappa_P=0$. |
 | Plant $\gamma_C$ | `0.402 g C g⁻¹` | Carrot-root elemental analysis from [Kaur et al. (2022)](https://doi.org/10.1038/s41598-022-20971-5); a root-dominated proxy, not whole-plant calibration. |
 | Plant $\gamma_P$ | `1.92 mg P g⁻¹` | Derived dry-mass-weighted carrot value from [Kováčik et al. (2022)](https://doi.org/10.3390/agronomy12112770), an MDPI *Agronomy* paper; independent validation remains required. |
 | $k_{froot}$, $SRL$, $r_{root}$ | `0.18`, `25,434.3 cm g⁻¹`, `0.01 cm` | `k_froot` is a representative value inside the directly observed `0.119–0.244` interval for six-month carrots in deep silica-sand greenhouse columns ([Westerveld 2005](https://bradford-crops.uoguelph.ca/sites/default/files/Sean%20Westerveld%20Thesis.pdf)); the SRL and effective radius are compatible but separately aggregated fine-root traits from [GRooT](https://doi.org/10.1111/geb.13179). This is not a field or wild-carrot default. |
 | $\beta$, $D_{root}$ | `0.96`, `150 cm` | Provisional depth profile and near-infinite rooting horizon. A shallower simulated domain retains only $F(D_{soil})/F(D_{root})$ of total roots. |
 | Fungal $\gamma_C$, $M_C$ | `0.5`, `0.1155 g C cm⁻³` | Provisional values from [Bisot et al. (2026)](https://doi.org/10.1073/pnas.2512182123). |
 | Fungal $\gamma_P$ | `1.3 mg P g⁻¹` | Low-P spore concentration measured inside *Glomus intraradices*, a lineage now assigned to *Rhizophagus irregularis*, by [Olsson et al. (2008)](https://doi.org/10.1128/AEM.00376-08). This is an evidence-led low-P spore proxy used as fixed structural stoichiometry, not a maintenance measurement or a whole-extraradical-mycelium mean. |
-| Plant $a_{mass}$ | `0.05 g C g⁻¹ leaf DM d⁻¹` | Apparent-gross reference-day carbon input derived from carrot light-response curves at 450 µmol photons m⁻² s⁻¹ over a 16 h photoperiod, converted with carrot SLA. It is spread uniformly through time by the current implementation; see the [research review](research/default-biomass-stoichiometry-and-photosynthesis-parameters.md). |
+| Plant $a_{mass}$ | `0.05 g C g⁻¹ leaf DM d⁻¹` | Apparent-gross reference-day carbon input derived from carrot light-response curves at 450 µmol photons m⁻² s⁻¹ over a 16 h photoperiod, converted with carrot SLA. It is spread uniformly through time by the current implementation; see the [research review in REDbyRBD](https://github.com/isaachcamp/REDbyRBD/blob/main/docs/research/default-biomass-stoichiometry-and-photosynthesis-parameters.md). |
 | Plant $\kappa_C$ | `0.007 g C g⁻¹ whole-plant DM d⁻¹` | Full standing-biomass maintenance, rounded from the `0.00694` whole-carrot conversion of shoot and root coefficients fitted by [Reid (2019)](https://doi.org/10.1080/01140671.2019.1588134). Growth/construction efficiency remains separate and unmodelled. |
 | Plant and fungal $\kappa_P$ | `0 mg P g⁻¹ d⁻¹` | Default irreversible free-P loss is disabled for both organisms. Positive $\kappa_P$ remains an explicit sensitivity for omitted leakage or unrecovered turnover; it is not physiological maintenance or structural immobilisation. Structural P is represented only by $\gamma_P$. |
 | $\lambda_{sat}$ | `2,000 cm cm⁻³` | Lower end of the approximately `2,000–2,500 cm cm⁻³` upper external-hypha profiles observed by [Jakobsen et al. (1992)](https://doi.org/10.1111/j.1469-8137.1992.tb01077.x). It is an estimated local saturation density, not a universal AMF constant. |
 | $\lambda_{root}$, $\beta$ | `1 cm cm⁻³`, `0.96` | Provisional inherited geometry choices without empirical calibration. |
 
 Runtime defaults and units are defined in
-[`PlantTraits`](../mycormarl/mycormarl/plant/traits.py#L6-L34) and
-[`FungusTraits`](../mycormarl/mycormarl/fungus/traits.py#L6-L29), with
+[`PlantTraits`](../src/mycormarl/plant/traits.py) and
+[`FungusTraits`](../src/mycormarl/fungus/traits.py), with
 construction-time validation immediately below those definitions.
+
+The early implementation used `gamma_p,fungus=40 mg P g⁻¹` as a reported
+maximum, not a representative whole-mycelium estimate, and a converted
+`lambda_sat=168.75 cm cm⁻³` as a provisional density proxy. Those assumptions
+were replaced by the evidence and defaults above. Archived trajectories retain
+their original parameter identities; copying a current default into their
+metadata would change their scientific meaning. Initial free-pool values in
+the table are for `dt=0.025 day`; unspecified pools are calculated at reset as
+`initial_biomass*kappa*dt`, rather than fixed independently of timestep.
 
 ## Assumptions and limitations
 
 - **Assumption:** Both organisms use fixed C:P structural stoichiometry and
   follow Tilman-style essential resource with scarcer resource limiting growth.
-- **Assumption:** The plant has a biomass cap; the fungus currently does not,
-  but is ultimately limited by geometry.
+- **Assumption:** The plant has a numerical biomass guard; the fungus has no
+  explicit biomass cap. Soil boundaries limit its represented uptake geometry,
+  not biomass directly.
 - **Assumption:** Root allocation uses a static root-mass fraction as a
   marginal conversion from whole-plant biomass; allometry is constant.
 - **Assumption:** Fungal biomass is treated as external cylindrical hyphae for
   geometry; spores and intraradical biomass are omitted.
 - **Initial-condition assumption:** The symbiosis is pre-established. Initial
-  fungal biomass may use one spore's dry mass as a magnitude proxy, but all of
-  that mass is immediately mapped to living, external, absorptive hyphae; the
-  model does not simulate dormancy or germination.
+  fungal biomass represents living, external, absorptive hyphae; the model does
+  not simulate inoculum establishment, dormancy or germination.
 - **Assumption:** Mycelial density remains constant independent of soil
   P concentration.
 - **Assumption:** Represented absorbing length is $k_{froot} \times SRL$.
@@ -256,13 +338,14 @@ construction-time validation immediately below those definitions.
   networks, and their saturation/density parameters require calibration.
 - **Limitation:** No maximum tissue age, turnover, dormancy, remobilisation, or
   age-dependent uptake activity is represented.
-- **Accounting limitation:** Paid irreversible-loss P has no represented
-  destination, while mortality P and reproduction P are explicit exports.
+- **Accounting limitation:** Paid irreversible-loss P, mortality P, and
+  reproduction P are recorded as exports with no represented receiving pool;
+  none is recycled into soil.
 - **Qualification scope:** The `2,000 cm cm⁻³` fungal-density default changes
-  colony extent and the sparse/continuous uptake blend. The canonical
-  numerical qualification now includes a deep-soil confinement and extended-P
-  balance check; issue #18 remains the tracking point for future parameter
-  requalification.
+  colony extent and the sparse/continuous uptake blend. Changing this or other
+  geometry traits requires requalification rather than reuse of the early
+  parameterisation's results. The canonical numerical qualification includes
+  a deep-soil confinement and extended-P balance check.
 
 ## References
 

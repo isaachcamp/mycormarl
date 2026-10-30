@@ -2,18 +2,21 @@
 
 ## Status
 
-Accepted for implementation through a follow-up issue.
+Partially superseded by
+[ADR-0020](0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md)
+on 22 October 2026. Its three-rate model replaces the four-component/storage
+contract below. The held-rate physical-time principle remains accepted.
 
 ## Context
 
-The current Physical action is `[trade, growth, reproduction, reserve]`: a
+The previous Physical action was `[trade, growth, reproduction, reserve]`: a
 trade fraction plus a growth/reproduction/reserve simplex. When one policy
 decision is held over several numerical substeps, applying a fraction to each
 updated free pool makes biological change depend on numerical resolution.
 The one-day fixed-policy numerical qualification exposed this coupling through
 uptake, biomass-derived geometry, and subsequent uptake feedback.
 
-## Decision
+## Original decision (four-component/storage portions superseded)
 
 Replace the Physical action with a **Rate action** whose four components are
 non-negative first-order rates in `d^-1` for trade, growth, reproduction, and
@@ -37,3 +40,17 @@ This is an intentional breaking change to action units, validation, policy
 transforms, static controls, transition provenance, qualification fixtures,
 and trained-policy compatibility. It removes the allocation simplex and must
 be introduced atomically with rate-aware tests and qualification.
+
+## Implementation evidence and later work
+
+The original four-rate source baseline was `1ec2804`; its
+[qualification archive](../qualification/rate-action-49/phosphate-numerical/phosphate-numerical-qualification.md)
+retains that model's provenance. The original tracking
+[issue #49](https://github.com/isaachcamp/mycormarl/issues/49) remains open;
+its tracker state is separate from this source-level implementation status.
+
+The [three-rate specification #79](https://github.com/isaachcamp/mycormarl/issues/79)
+was subsequently implemented. ADR-0020 records simultaneous trade/biology,
+stoichiometric reproductive output, implicit retention and the separate static
+experiment contract. Current constructor and interval tests exercise that
+successor model; historical four-rate outcomes are not equivalent evidence.

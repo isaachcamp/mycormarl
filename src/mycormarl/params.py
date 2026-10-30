@@ -29,11 +29,13 @@ class EnvConfig:
 
     max_steps: int = 14600
     dt: float = 0.025
+    allocation_rate_step: float = 0.02  # maximum internal h * outgoing hazard
+    allocation_max_substeps: int = 65536  # exhausted budget invalidates the transition
     consumer_mode: str = "mixed"
     soil_radius_cm: float = 50.0
     soil_depth_cm: float = 100.0
-    radial_interval_cm: float = 0.1
-    depth_interval_cm: float = 0.1
+    radial_interval_cm: float = 0.05
+    depth_interval_cm: float = 0.05
     initial_solution_p_um: float = 1.0
     # ``None`` means uniform solution P throughout the configured domain.
     # Otherwise, knots give a relative concentration factor by depth (cm).
@@ -45,4 +47,3 @@ class EnvConfig:
     uptake_reference_time_days: float = 1.0
     uptake_transition_exponent: float = 2.0
     theta_water: float = 0.3
-    alpha: float = 0.5

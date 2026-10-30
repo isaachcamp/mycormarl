@@ -1,5 +1,10 @@
 # Independent PPO walking skeleton
 
+> **Implementation update, 22 October 2026:** The action/reward portions below describe an earlier walking skeleton.
+> The current action/reproduction baseline is [ADR-0020](../adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md),
+> verified in the [allocation report](../qualification/three-rate-allocation.md).
+> Original analysis is retained below with its original provenance.
+
 MycorMARL provides one independent actor–critic for `plant` and one for
 `fungus`. This is a development walking skeleton for checking interfaces and
 numerical execution. A successful smoke run is not evidence of convergence,

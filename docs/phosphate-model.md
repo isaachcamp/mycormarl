@@ -27,7 +27,7 @@ create negative soil P or credit more P than was removed.
 solution concentration enters in µM and is converted by
 $1\,\mu\mathrm{M}=10^{-3}\,\mu\mathrm{mol\,cm^{-3}}$. Organism P pools use mg.
 The unit boundary is explicit in
-[`phosphate_units.py`](../mycormarl/mycormarl/soil/phosphate_units.py#L16-L50).
+[`phosphate_units.py`](../src/mycormarl/soil/phosphate_units.py).
 
 For cell volume $V$ (cm³ bulk soil), solution concentration $C$
 (µmol cm⁻³), volumetric water content $\theta$ (cm³ water cm⁻³ bulk soil), and
@@ -53,11 +53,11 @@ return (
 ```
 
 Implemented by
-[`solution_concentration_to_labile_amount`](../mycormarl/mycormarl/soil/phosphate_grid.py#L195-L210)
+[`solution_concentration_to_labile_amount`](../src/mycormarl/soil/phosphate_grid.py)
 and its inverse
-[`labile_amount_to_solution_concentration`](../mycormarl/mycormarl/soil/phosphate_grid.py#L213-L227).
+[`labile_amount_to_solution_concentration`](../src/mycormarl/soil/phosphate_grid.py).
 Round-trip, initial-field, and canonical-state behaviour are tested in
-[`test_labile_phosphate_state.py`](../tests/test_labile_phosphate_state.py#L49-L180).
+[`test_labile_phosphate_state.py`](../tests/test_labile_phosphate_state.py).
 
 Initialisation immediately converts the configured solution-P field to
 canonical amount. By default, `initial_solution_p_um` is uniform in every cell
@@ -73,6 +73,14 @@ equivalents of agronomic extractable-P or total soil-P measurements. Comparison
 with extraction data needs an observation/calibration model. After reset the
 finite-inventory model evolves normally, so diffusion and uptake may create
 further spatial differences.
+
+For a uniform initial concentration, the analytical domain inventory is
+`1e-3 * initial_solution_p_um * pi * radius_cm**2 * depth_cm * (theta+b_p)`
+in µmol P. At the current `50 cm × 100 cm`, `1 µM` defaults this is about
+`187,945.8 µmol P` (`5,821.4 mg P`). The early upper-25-cm-only fixture held
+one quarter of this amount; its archived inventory must not be reused for the
+current uniform reset. All soil and density fields have shape `(n_r, n_z)`;
+there is no angular state dimension.
 
 ## Conservative diffusion
 
@@ -100,20 +108,44 @@ D_{app}=\frac{D_l\theta f_l}{\theta+b_p}.
 $$
 
 Implemented by
-[`axisymmetric_diffusion_conductances`](../mycormarl/mycormarl/soil/phosphate_diffusion.py#L41-L78),
-[`diffuse_labile_amount`](../mycormarl/mycormarl/soil/phosphate_diffusion.py#L95-L135),
-and [`apparent_diffusivity_cm2_s`](../mycormarl/mycormarl/soil/phosphate_diffusion.py#L20-L38).
+[`axisymmetric_diffusion_conductances`](../src/mycormarl/soil/phosphate_diffusion.py),
+[`diffuse_labile_amount`](../src/mycormarl/soil/phosphate_diffusion.py),
+and [`apparent_diffusivity_cm2_s`](../src/mycormarl/soil/phosphate_diffusion.py).
 Independent two-cell transfers, closed boundaries, non-negativity, and amount
 conservation are tested in
-[`test_phosphate_diffusion.py`](../tests/test_phosphate_diffusion.py#L193-L307).
+[`test_phosphate_diffusion.py`](../tests/test_phosphate_diffusion.py).
 
 An exact cellwise explicit CFL ceiling is precomputed. If a biological step is
 too large, the entire fixed-geometry diffusion-then-uptake transaction is
 repeated in equal stable substeps. This is numerical subcycling, not biological
 ageing. The number of substeps is cached during environment construction
-([`base_mycor.py:92–118`](../mycormarl/mycormarl/environments/base_mycor.py#L92-L118));
+([`base_mycor.py:92–118`](../src/mycormarl/environments/base_mycor.py));
 the schedule is tested in
-[`test_phosphate_diffusion.py`](../tests/test_phosphate_diffusion.py#L100-L168).
+[`test_phosphate_diffusion.py`](../tests/test_phosphate_diffusion.py).
+
+More explicitly, with face conductance
+$G_{ij}=D_l\theta f_l A_{ij}/d_{ij}$, the positivity ceiling is
+
+$$
+\Delta t_{CFL}=\min_i\frac{V_i(\theta+b_p)}{\sum_jG_{ij}},\qquad
+N_{soil}=\max\left(1,\left\lceil\frac{86400\,dt}
+ {s\Delta t_{CFL}}\right\rceil\right),
+$$
+
+where `dt` is the numerical environment interval in days and
+`s=diffusion_cfl_safety=0.8`. A cell with no conducting neighbours has an
+infinite ceiling; disabled diffusion therefore needs one soil substep. Each
+substep lasts `86400*dt/N_soil` seconds and performs diffusion followed by
+uptake, refreshing concentration between them. Conductances use actual
+neighbouring centre distances. Low-level helpers accept explicitly supplied
+nonuniform edges; production grid construction requires uniform cells whose
+intervals divide the domain extents exactly.
+
+Pairwise conservation and the CFL bound are separate properties: a
+conservative update can still make cells negative if stepped too far. The CFL
+trigger protects diffusion positivity, while the uptake cap protects finite
+inventory. Neither proves accuracy when uptake nearly exhausts a cell;
+such cases need timestep refinement rather than parameter retuning.
 
 ## Surface uptake requests
 
@@ -135,16 +167,16 @@ $$
 
 where $J_{max}$ is µmol cm⁻² s⁻¹, $K_m$ and $C_s$ are µmol cm⁻³, and request
 $U$ is µmol P cell⁻¹ per substep. These primitives are implemented in
-[`phosphate_units.py`](../mycormarl/mycormarl/soil/phosphate_units.py#L80-L102).
+[`phosphate_units.py`](../src/mycormarl/soil/phosphate_units.py).
 
 ### Continuous closure
 
 The continuous closure assumes $C_s\approx C_b$, the current cellwise bulk
 solution concentration. It is appropriate when depletion zones are coupled
 at the represented scale. Implemented by
-[`continuous_uptake_request`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L25-L54)
+[`continuous_uptake_request`](../src/mycormarl/soil/phosphate_uptake.py)
 and verified against an independent flux-area-time calculation in
-[`test_continuous_phosphate_uptake.py`](../tests/test_continuous_phosphate_uptake.py#L29-L80).
+[`test_continuous_phosphate_uptake.py`](../tests/test_continuous_phosphate_uptake.py).
 
 ### Sparse closure
 
@@ -164,32 +196,46 @@ $$
 k=\frac{rJ_{max}}{D_l\theta f_l}\ln\left(\frac{R_{eff}}{r}\right).
 $$
 
+Precisely,
+$R_{eff}=r+\min(\sqrt{D_{app}T_{ref}},\max(R_{soil}-r,0))$,
+with $T_{ref}$ converted to seconds. The resistance $k$ has concentration
+units. The surface concentration solves
+
+$$
+C_s^2+(K_m+k-C_b)C_s-K_mC_b=0.
+$$
+
 Equating diffusive supply to Michaelis–Menten demand produces a quadratic for
 $C_s$; the code evaluates the physical root in a numerically stable form and
 clips it to $0\le C_s\le C_b$. Implemented by
-[`effective_uptake_radius_cm`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L70-L90),
-[`sparse_uptake_resistance`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L93-L121),
-and [`sparse_surface_concentration`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L162-L187).
+[`effective_uptake_radius_cm`](../src/mycormarl/soil/phosphate_uptake.py),
+[`sparse_uptake_resistance`](../src/mycormarl/soil/phosphate_uptake.py),
+and [`sparse_surface_concentration`](../src/mycormarl/soil/phosphate_uptake.py).
 Analytical limits, bounded surface concentration, and JIT compatibility are
-tested in [`test_sparse_phosphate_uptake.py`](../tests/test_sparse_phosphate_uptake.py#L28-L206).
+tested in [`test_sparse_phosphate_uptake.py`](../tests/test_sparse_phosphate_uptake.py).
+
+The implementation switches between direct and rationalised forms of the
+positive quadratic root to avoid cancellation. Zero concentration or zero
+absorbing length gives zero uptake; zero resistance gives $C_s=C_b$;
+infinite resistance gives $C_s=0$. With diffusion disabled, sparse supply is
+zero and the overlap time is infinite. With active diffusion, a territory at
+or inside the absorber surface has zero gap and zero overlap time. These are
+explicit limiting cases, not additional sub-grid geometry states.
 
 A depletion zone here means a region whose solution P is lower than the
-far-field value; it need not be totally depleted. We set the provisional
-reference density $\lambda_{ref}$ away from the default root and hyphal
-densities, where the time-independent blend is negligibly different from a
-blend using a dynamic depletion timescale. The largest divergence between the
-time-dependent and time-independent schemes occurs near
-$\lambda\approx\lambda_{ref}$. At $\lambda=1{,}000\;\mathrm{cm\;cm^{-3}}$,
-the default soil parameters give $t_{diff}\approx0.90$ day; we rounded this to
-`T_ref=1 day`. This is a provisional static exposure scale for this first
-model, not root/hyphal lifetime and not a numerical timestep.
+far-field value; it need not be totally depleted. At the illustrative reference
+density $\lambda=1{,}000\;\mathrm{cm\;cm^{-3}}$, the default soil parameters
+give $t_{diff}\approx0.90$ day, motivating the rounded provisional choice
+`T_ref=1 day`. This static exposure scale is not root/hyphal lifetime or a
+numerical timestep, and it does not track time since a cell was occupied.
+Agreement with an age-dependent closure is not established by this choice.
 
 ## Sparse-to-continuous transition
 
 The hyphal territory gap defines an overlap timescale
 
 $$
-t_{diff}=\frac{(R_{soil,h}-r_h)^2}{D_{app}},\qquad
+t_{diff}=\frac{\max(R_{soil,h}-r_h,0)^2}{D_{app}},\qquad
 w=\frac{1}{1+(t_{diff}/T_{ref})^p}.
 $$
 
@@ -203,14 +249,14 @@ $$
 Only hyphal density determines $t_{diff}$. Consequently, a plant-only cell has
 $w=0$ and remains sparse; roots enter the continuous regime wherever sufficiently
 dense hyphae create a shared coupled depletion field. Implemented by
-[`hyphal_overlap_time_seconds`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L124-L142),
-[`continuous_regime_weight`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L145-L159),
-and [`blend_uptake_requests`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L222-L235).
+[`hyphal_overlap_time_seconds`](../src/mycormarl/soil/phosphate_uptake.py),
+[`continuous_regime_weight`](../src/mycormarl/soil/phosphate_uptake.py),
+and [`blend_uptake_requests`](../src/mycormarl/soil/phosphate_uptake.py).
 
 This is an adaptation of the depletion-zone argument in Schnepf & Roose, not a
 resolved sub-grid simulation. Colony age and front-specific exposure are
 deferred. Transition limits and the nominal overlap time are tested in
-[`test_sparse_phosphate_uptake.py`](../tests/test_sparse_phosphate_uptake.py#L39-L85).
+[`test_sparse_phosphate_uptake.py`](../tests/test_sparse_phosphate_uptake.py).
 
 ## Root–fungus competition and pool credit
 
@@ -237,20 +283,28 @@ remaining = available - accepted_total
 ```
 
 Implemented by
-[`allocate_competing_uptake`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L357-L381)
+[`allocate_competing_uptake`](../src/mycormarl/soil/phosphate_uptake.py)
 inside the shared production/qualification
-[`blended_uptake_transaction`](../mycormarl/mycormarl/soil/phosphate_uptake.py#L258-L354).
+[`blended_uptake_transaction`](../src/mycormarl/soil/phosphate_uptake.py).
 Competition symmetry, proportionality, and conservation are tested in
-[`test_continuous_phosphate_uptake.py`](../tests/test_continuous_phosphate_uptake.py#L99-L153)
+[`test_continuous_phosphate_uptake.py`](../tests/test_continuous_phosphate_uptake.py)
 and end-to-end in
-[`test_environment_phosphate_uptake.py`](../tests/test_environment_phosphate_uptake.py#L63-L238).
+[`test_environment_phosphate_uptake.py`](../tests/test_environment_phosphate_uptake.py).
 
 Accepted root and fungal amounts are summed separately and converted exactly
 once using $1\,\mu mol\,P=0.0309738\,mg\,P$ before being added to organism
 pools. The transaction is implemented in
-[`_apply_blended_uptake_with_diagnostics`](../mycormarl/mycormarl/soil/soil.py#L115-L151)
+[`_apply_blended_uptake_with_diagnostics`](../src/mycormarl/soil/soil.py)
 and its soil-to-pool balance is tested by
-[`test_end_to_end_uptake_conserves_soil_plus_free_pool_p`](../tests/test_environment_phosphate_uptake.py#L260-L282).
+[`test_end_to_end_uptake_conserves_soil_plus_free_pool_p`](../tests/test_environment_phosphate_uptake.py).
+
+Consequently, on the closed soil domain,
+`sum(M_before)-sum(M_after)=sum(U_root,accepted+U_fungus,accepted)`
+apart from floating-point error. This is a domain-total identity: diffusion
+can increase an individual cell's inventory. The corresponding organism-pool
+gain is that accepted amount times `0.0309738`; growth, internal trade, and
+explicit biological exports require the wider ledger in the
+[model overview](model-overview.md#phosphorus-accounting).
 
 ## Parameters and empirical interpretation
 
@@ -262,13 +316,13 @@ and its soil-to-pool balance is tested by
 | Root/fungal $J_{max}$ | `3.26e-6 µmol cm⁻² s⁻¹` | Tinker & Nye values as reported by Schnepf & Roose; separate trait fields are retained. |
 | Root/fungal $K_m$ | `5.8e-3 µmol cm⁻³` | Same provisional source and status. |
 | Hyphal radius | `5e-4 cm` | Schnepf & Roose. |
-| Root radius | `0.01 cm` | Unsourced provisional value requiring species/root-order calibration. |
+| Root radius | `0.01 cm` | Derived effective fine-root radius from GRooT diameter data; rounded and combined with unmatched fine-root traits. See the [growth-model provenance](growth-model.md#parameterisation-and-literature-relationship). |
 | $T_{ref}$, $p$ | `1 day`, `2` | Explicit modelling choices, not empirically inferred lifetimes. |
 
 Configuration defaults are declared in
-[`EnvConfig`](../mycormarl/mycormarl/params.py#L15-L46); organism kinetics and
-radii are in [`PlantTraits`](../mycormarl/mycormarl/plant/traits.py#L17-L34)
-and [`FungusTraits`](../mycormarl/mycormarl/fungus/traits.py#L17-L29).
+[`EnvConfig`](../src/mycormarl/params.py); organism kinetics and
+radii are in [`PlantTraits`](../src/mycormarl/plant/traits.py)
+and [`FungusTraits`](../src/mycormarl/fungus/traits.py).
 
 ## Numerical qualification and limitations
 
@@ -277,6 +331,12 @@ Focused tests cover unit conversions, buffer identities, grid geometry,
 diffusion, sparse/continuous limits, competition, JIT compilation, independent
 consumers, and end-to-end balance. The canonical convergence and performance
 results are in the [numerical qualification report](qualification/phosphate-numerical-qualification.md).
+
+Those retained coupled trajectories predate the three-rate allocation engine
+and keep their original provenance. Soil transaction choices remain in force;
+the new action, reproduction, grouping and workflow evidence is in the
+[three-rate qualification](qualification/three-rate-allocation.md). It does not
+relabel the older spatial/calibration study as a rerun of the new model.
 
 - **Code-backed:** Diffusion is conservative on a closed domain and uptake is
   capped by cell inventory.
@@ -291,13 +351,43 @@ results are in the [numerical qualification report](qualification/phosphate-nume
   mineralisation, precipitation, or external boundary supply is represented.
 - **Limitation:** Extractable P cannot be compared directly with model $C$ or
   $M$ without an assay-specific observation model.
-- **Qualification caveat:** Standard fixed-geometry soil-solver convergence is
-  evaluated separately from coupled fixed-action sensitivity. The coupled
-  fixture starts free C and P pools at one structural-biomass equivalent, but
-  changing `dt` still changes policy decision frequency until issue #24 is
-  implemented; coupled timestep comparisons are therefore diagnostic rather
-  than numerical acceptance criteria. Each scientific setup still needs its
-  own timestep sensitivity evidence.
+
+Qualification separates fixed-geometry soil convergence from coupled
+fixed-action convergence. The latter starts free C/P at one structural-biomass
+equivalent, disables automatic maintenance, and holds rate commands across a
+fixed one-day policy interval. It therefore tests numerical resolution without
+changing decision frequency. Selection requires both the next-finer and the
+finest tested reference to agree within 5%, with absolute scale guards near
+zero. Uptake by each consumer, shares, final inventory, biomass, spatial extent,
+and endpoint free pools must be considered; soil stability alone is insufficient.
+
+The retained [JSON evidence](qualification/phosphate-numerical-qualification.json)
+and comparison tables select `0.05 cm` and `0.025 day` for their tested fixture;
+the runtime defaults now use that same spatial interval and timestep. The early
+archive's `0.1 cm` pass and finest-tested timestep fallback are historical
+decisions, not the latest qualification result. Use the explicit comparison
+rows and declared fixture when choosing a study grid.
+
+The qualification matrix covers `0.1, 0.3, 1, 3, 10 µM` and root-only,
+fungus-only, and mixed fields on a reduced domain over two days, plus a
+deep-soil confinement/extended-P check. No scientific matrix row was
+inventory-capped, so those convergence results do not qualify severe depletion.
+Balance tolerance is relative `1e-5`; small well-conditioned float32 reference
+tests typically use `1e-6`. Represented-length tests use `1e-5` where applicable.
+These tolerances are numerical acceptance criteria, not empirical uncertainty.
+
+Changing `T_ref` or `p` is scientific parameter sensitivity, not numerical
+refinement: `T_ref` affects both overlap weight and sparse propagation distance,
+so total uptake need not be monotonic. Local absorber age, midpoint exposure of
+new geometry, and a separate uptake-accuracy substep trigger remain potential
+extensions. Each long-horizon or strongly depleted study needs its own
+convergence evidence. Historical full-grid CPU timings are device-specific;
+annual costs are projections of warmed soil/full-environment steps, excluding
+training, learned inference, output and transfers. Array-memory estimates are
+not peak process RSS; the latest retained run skipped the target benchmark.
+
+For reproducible small examples and qualification commands, see the
+[model overview](model-overview.md#running-and-checking-the-model).
 
 ## References
 

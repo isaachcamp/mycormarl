@@ -8,8 +8,10 @@ class FungusTraits:
     """Static functional traits for the fungus partner.
 
     Biomass is in grams dry mass. ``gamma_c`` is g C per g dry biomass,
-    ``gamma_p`` is mg P per g dry biomass, hyphal radius is in cm,
-    ``hyphal_tissue_carbon_density`` is g C per cm³ living fungal tissue, and
+    ``gamma_p`` is mg P per g dry biomass.
+    ``reproduction_cost_scale`` multiplies both growth costs per unit of
+    reproductive output, preserving C:P composition; its default is one.
+    Hyphal radius is in cm, ``hyphal_tissue_carbon_density`` is g C per cm³ living fungal tissue, and
     saturation density is cm hypha per cm³ bulk soil. ``kappa_p`` is
     irreversible free-P loss in mg P per g dry biomass per day; structural P
     is represented only by ``gamma_p``. ``jmax`` is µmol P cm^-2 s^-1 and
@@ -25,6 +27,7 @@ class FungusTraits:
     initial_p_pool: float | None = None
     gamma_c: float = 0.5
     gamma_p: float = 1.3
+    reproduction_cost_scale: float = 1.0
     kappa_c: float = 0.015
     kappa_p: float = 0.0
     death_fraction: float = 0.05
@@ -40,6 +43,7 @@ def validate_fungus_growth_geometry_traits(traits: FungusTraits) -> None:
     for name in (
         "gamma_c",
         "gamma_p",
+        "reproduction_cost_scale",
         "hyphal_radius",
         "hyphal_tissue_carbon_density",
         "saturation_density",

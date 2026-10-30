@@ -36,7 +36,6 @@ class StaticPolicy:
     trade: float
     growth: float
     reproduction: float
-    storage: float
 
     def action(self):
         """Construct the policy's action through the public action boundary."""
@@ -44,7 +43,6 @@ class StaticPolicy:
             self.trade,
             self.growth,
             self.reproduction,
-            self.storage,
         )
 
 
@@ -116,7 +114,6 @@ def _policy_record(policy: StaticPolicy) -> dict:
         "trade": policy.trade,
         "growth": policy.growth,
         "reproduction": policy.reproduction,
-        "storage_rate_per_day": policy.storage,
         "rate_action_per_day": [float(value) for value in policy.action()],
     }
 
@@ -279,6 +276,10 @@ def run_deep_soil_qualification(
                 state,
                 actions,
             )
+            if not all(bool(jnp.all(info[agent]['allocation_converged'])) for agent in (PLANT,FUNGUS)):
+                raise ValueError('allocation integration failed: exhausted budget or non-finite result')
+            if bool(jnp.any(info[PLANT]['biomass_guard_contact'])):
+                raise ValueError('plant numerical biomass guard contacted')
             plant_p_cost_mg = float(
                 info[PLANT]["growth"][0] * species.plant.gamma_p
                 + info[PLANT]["maint_p_used"][0]
@@ -333,7 +334,7 @@ def run_deep_soil_qualification(
         final_extended_p_mg - initial_extended_p_mg
     ) / max(initial_extended_p_mg, 1e-30)
     identity_inputs = {
-        "schema_version": "2",
+        "schema_version": "3",
         "duration_days": duration_days,
         "environment": _jsonable(config),
         "traits": _jsonable(species),

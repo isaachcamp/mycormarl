@@ -2,6 +2,7 @@
 
 import jax.numpy as jnp
 import jax
+import pytest
 
 from mycormarl.algos.ppo import (
     ActorCritic,
@@ -16,12 +17,13 @@ from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
 
 
-def _small_environment():
+def _small_environment(mode="mixed"):
     """Build a compact mixed-consumer environment for actor integration tests."""
     return BaseMycorMarl(
         EnvConfig(
             max_steps=2,
             dt=0.05,
+            consumer_mode=mode,
             soil_radius_cm=0.2,
             soil_depth_cm=0.2,
             radial_interval_cm=0.1,
@@ -34,14 +36,14 @@ def _small_environment():
     )
 
 
-def test_zero_latents_map_to_independent_nonnegative_per_day_rates():
+def test_zero_latents_map_to_total_biology_split_into_growth_and_reproduction():
     action = latent_to_rate_action(
         trade_latent=jnp.array(0.0),
-        biological_rate_latent=jnp.zeros(3, dtype=jnp.float32),
+        biological_rate_latent=jnp.zeros(2, dtype=jnp.float32),
     )
 
     assert action.dtype == jnp.float32
-    assert jnp.allclose(action, jnp.full(4, jnp.log(2.0)))
+    assert jnp.allclose(action, jnp.array([.6931471806, .3465735903, .3465735903]))
 
 
 def test_transformed_rate_actions_reach_the_environment_unchanged():
@@ -49,8 +51,8 @@ def test_transformed_rate_actions_reach_the_environment_unchanged():
     environment = _small_environment()
     _, state = environment.reset(jax.random.PRNGKey(1))
     actions = {
-        PLANT: latent_to_rate_action(0.25, jnp.array([0.5, -0.75, 0.0])),
-        FUNGUS: latent_to_rate_action(-0.5, jnp.array([-0.25, 1.0, 0.0])),
+        PLANT: latent_to_rate_action(0.25, jnp.array([0.5, -0.75])),
+        FUNGUS: latent_to_rate_action(-0.5, jnp.array([-0.25, 1.0])),
     }
 
     _, _, _, _, info = environment.step_env(
@@ -73,8 +75,8 @@ def test_actor_initialises_two_gaussian_heads_and_a_local_critic():
 
     assert policy.trade_loc.shape == (3,)
     assert policy.trade_log_std.shape == (3,)
-    assert policy.biological_rate_loc.shape == (3, 3)
-    assert policy.biological_rate_log_std.shape == (3, 3)
+    assert policy.biological_rate_loc.shape == (3, 2)
+    assert policy.biological_rate_log_std.shape == (3, 2)
     assert values.shape == (3,)
     assert jnp.allclose(jax.nn.softplus(policy.trade_loc), 0.1)
     assert jnp.allclose(policy.biological_rate_loc, 0.0)
@@ -123,8 +125,8 @@ def test_jitted_vectorised_rollout_retains_actions_and_factor_likelihoods():
         (PLANT, FUNGUS), output["trajectories"], strict=True
     ):
         assert trajectory.latent_trade_action.shape == (1, 2, 2)
-        assert trajectory.latent_biological_rate_action.shape == (1, 2, 2, 3)
-        assert trajectory.rate_action.shape == (1, 2, 2, 4)
+        assert trajectory.latent_biological_rate_action.shape == (1, 2, 2, 2)
+        assert trajectory.rate_action.shape == (1, 2, 2, 3)
         assert trajectory.critic_valid.shape == (1, 2, 2)
         assert trajectory.biological_rate_actor_valid.shape == (1, 2, 2)
         assert trajectory.trade_actor_valid.shape == (1, 2, 2)
@@ -332,3 +334,17 @@ def test_per_agent_critic_normalization_stays_finite_for_widely_scaled_rewards()
     for metrics in (plant_metrics, fungus_metrics):
         assert jnp.all(jnp.isfinite(metrics.critic_target_scale))
         assert jnp.all(jnp.isfinite(metrics.normalized_return_mean))
+
+
+@pytest.mark.parametrize("mode", ["mixed", "plant-only", "fungus-only"])
+def test_reported_latent_entropy_counts_action_dimensions_not_minibatch_samples(mode):
+    environment = _small_environment(mode)
+    config = PPOConfig(TOTAL_TIMESTEPS=4, NUM_STEPS=2, NUM_ENVS=2,
+                       NUM_MINIBATCHES=1, UPDATE_EPOCHS=1, LR=0., DISCOUNT_HALF_LIFE_DAYS=30.)
+    output = jax.jit(make_train(environment, config))(jax.random.PRNGKey(41))
+    for agent in (PLANT,FUNGUS):
+        inactive = (mode == "plant-only" and agent == FUNGUS) or (mode == "fungus-only" and agent == PLANT)
+        # Standard-normal differential entropy: 1.4189385332 nats per latent.
+        expected = 0. if inactive else (4.2568155996 if mode == "mixed" else 2.8378770664)
+        assert jnp.allclose(output["metrics"][agent].latent_entropy, expected, rtol=0., atol=2e-6)
+        assert jnp.all(jnp.isfinite(output["metrics"][agent].total_loss))

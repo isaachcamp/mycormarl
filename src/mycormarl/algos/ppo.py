@@ -17,8 +17,16 @@ from mycormarl.trade_only import fixed_allocation_rate_action
 from mycormarl.transition import Transition
 
 
+def _require_numerical_qualification(allocation_ok, guard_contact):
+    """Reject a failed compiled chunk before callers can checkpoint its output."""
+    if not bool(allocation_ok):
+        raise ValueError('allocation integration failed: exhausted budget or non-finite result')
+    if bool(guard_contact):
+        raise ValueError('plant numerical biomass guard contacted')
+
+
 class PolicyParameters(NamedTuple):
-    """Parameters of the factorised Gaussian latent policy."""
+    """Gaussian trade latent and two biological latents (intensity, share)."""
 
     trade_loc: jax.Array
     trade_log_std: jax.Array
@@ -155,11 +163,16 @@ def latent_to_rate_action(
     trade_latent: jax.Array,
     biological_rate_latent: jax.Array,
 ) -> jax.Array:
-    """Map four policy latents to non-negative ``d^-1`` Rate actions."""
+    """Map trade, total-biology and reproductive-share latents to rates."""
     trade_latent = jnp.asarray(trade_latent, dtype=jnp.float32)
     biological_rate_latent = jnp.asarray(biological_rate_latent, dtype=jnp.float32)
+    if biological_rate_latent.shape[-1:] != (2,):
+        raise ValueError("expected two biological latents: total intensity and reproductive share")
     trade_rate = jax.nn.softplus(trade_latent)[..., None]
-    biological_rates = jax.nn.softplus(biological_rate_latent)
+    intensity = jax.nn.softplus(biological_rate_latent[..., 0])
+    reproduction_share = jax.nn.sigmoid(biological_rate_latent[..., 1])
+    biological_rates = jnp.stack((intensity*(1-reproduction_share),
+                                  intensity*reproduction_share), axis=-1)
     return jnp.concatenate((trade_rate, biological_rates), axis=-1)
 
 
@@ -278,18 +291,18 @@ class ActorCritic(nn.Module):
             name="trade_head",
         )(policy_features)[..., 0]
         if self.trade_only:
-            biological_rate_loc = jnp.zeros(obs.shape[:-1] + (3,))
+            biological_rate_loc = jnp.zeros(obs.shape[:-1] + (2,))
         else:
             biological_rate_loc = nn.Dense(
-                3,
+                2,
                 kernel_init=constant(0.0),
                 bias_init=constant(0.0),
                 name="biological_rate_head",
             )(policy_features)
         trade_log_std = self.param("trade_log_std", constant(0.0), (1,))
         biological_rate_log_std = (
-            jnp.zeros(3) if self.trade_only else self.param(
-                "biological_rate_log_std", constant(0.0), (3,)
+            jnp.zeros(2) if self.trade_only else self.param(
+                "biological_rate_log_std", constant(0.0), (2,)
             )
         )
         policy = PolicyParameters(
@@ -889,13 +902,13 @@ def make_train(
                             old_log_probability - log_probability,
                             actor_valid,
                         )
-                        normal_entropy = lambda log_std: jnp.sum(
-                            log_std + 0.5 * (1.0 + jnp.log(2.0 * jnp.pi)), axis=-1
+                        normal_entropy = lambda log_std: (
+                            log_std + 0.5 * (1.0 + jnp.log(2.0 * jnp.pi))
                         )
                         latent_entropy = masked_mean(
                             normal_entropy(policy_parameters.trade_log_std)
                             if config.TRADE_ONLY else
-                            normal_entropy(policy_parameters.biological_rate_log_std)
+                            jnp.sum(normal_entropy(policy_parameters.biological_rate_log_std), axis=-1)
                             + jnp.where(
                                 traj_batch.trade_actor_valid,
                                 normal_entropy(policy_parameters.trade_log_std), 0.0
@@ -1053,6 +1066,10 @@ def make_train(
         ) = jax.lax.scan(
             _update_step, runner_state, None, NUM_UPDATES
         )
+        jax.debug.callback(_require_numerical_qualification,
+            jnp.all(plant_traj.info['allocation_converged'])
+            & jnp.all(fungus_traj.info['allocation_converged']),
+            jnp.any(plant_traj.info['biomass_guard_contact']))
 
         return {
             "runner_state": runner_state,

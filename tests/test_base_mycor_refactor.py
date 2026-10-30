@@ -3,7 +3,6 @@ import jax.numpy as jnp
 import pytest
 
 from mycormarl.actions import rate_action
-from mycormarl.environments import base_mycor as env_mod
 from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
@@ -56,27 +55,6 @@ def env(species, config):
     return BaseMycorMarl(config=config, species=species, max_episode_steps=3)
 
 
-@pytest.fixture(autouse=True)
-def simple_dynamics(monkeypatch):
-    def zero_density(biomass, traits, r_edges, z_edges):
-        return jnp.zeros((r_edges.shape[0] - 1, z_edges.shape[0] - 1))
-
-    def no_soil_uptake(state, *soil_args):
-        """Keep behavioural unit tests isolated from the soil transaction."""
-        return state
-
-    def pool_specific_growth(allocated_c, allocated_p, grow_c_cost, grow_p_cost, grow_type):
-        return jnp.minimum(
-            allocated_c / grow_c_cost,
-            allocated_p / grow_p_cost,
-        )
-
-    monkeypatch.setattr(env_mod.plant, "density_field_from_biomass", zero_density)
-    monkeypatch.setattr(env_mod.fungus, "density_field_from_biomass", zero_density)
-    monkeypatch.setattr(env_mod, "evolve_soil_p", no_soil_uptake)
-    monkeypatch.setattr(env_mod, "grow", pool_specific_growth)
-
-
 def test_reset_uses_zero_trade_observations(env):
     obs, state = env.reset(jax.random.PRNGKey(0))
 
@@ -97,8 +75,8 @@ def test_environment_exposes_nonnegative_unbounded_per_day_rate_actions(env):
 def test_step_trades_from_starting_pools_and_exposes_trade_in_obs(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: rate_action(1_000.0, 0.0, 0.0, 0.0),
-        FUNGUS: rate_action(1_000.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(1_000.0, 0.0, 0.0),
+        FUNGUS: rate_action(1_000.0, 0.0, 0.0),
     }
 
     obs, next_state, rewards, dones, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -122,8 +100,8 @@ def test_step_trades_from_starting_pools_and_exposes_trade_in_obs(env):
 def test_trade_rate_is_independent_and_environment_executes_requested_rate_unchanged(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: rate_action(jnp.log(2.0), 0.0, 0.0, 0.0),
-        FUNGUS: rate_action(jnp.log(2.0), 0.0, 0.0, 0.0),
+        PLANT: rate_action(jnp.log(2.0), 0.0, 0.0),
+        FUNGUS: rate_action(jnp.log(2.0), 0.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(
@@ -141,8 +119,8 @@ def test_trade_rate_is_independent_and_environment_executes_requested_rate_uncha
 def test_rate_trade_uses_the_exact_first_order_pool_transfer(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: rate_action(jnp.log(2.0), 0.0, 0.0, 0.0),
-        FUNGUS: rate_action(jnp.log(2.0), 0.0, 0.0, 0.0),
+        PLANT: rate_action(jnp.log(2.0), 0.0, 0.0),
+        FUNGUS: rate_action(jnp.log(2.0), 0.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -153,28 +131,27 @@ def test_rate_trade_uses_the_exact_first_order_pool_transfer(env):
     assert next_state.fungus_c_pool[0] == pytest.approx(22.0)
 
 
-def test_rate_growth_and_storage_compete_without_removing_stored_pool_material(env):
+def test_finite_growth_rate_retains_residue_without_a_storage_action(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: rate_action(0.0, jnp.log(2.0), 0.0, jnp.log(2.0)),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, jnp.log(2.0), 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
 
-    # Total hazard log(4) selects 75% of each pool; equal growth/storage
-    # rates give growth one half of that selected amount.
-    assert infos[PLANT]["growth_c_allocated"][0] == pytest.approx(7.5)
-    assert infos[PLANT]["growth_p_allocated"][0] == pytest.approx(3.75)
-    assert infos[PLANT]["growth"][0] == pytest.approx(3.75)
-    assert next_state.plant_p_pool[0] == pytest.approx(6.25)
+    # A log(2) hazard spends half the initially matched resource stocks.
+    assert infos[PLANT]["growth_c_allocated"][0] == pytest.approx(10.)
+    assert infos[PLANT]["growth_p_allocated"][0] == pytest.approx(5.)
+    assert infos[PLANT]["growth"][0] == pytest.approx(5.)
+    assert next_state.plant_p_pool[0] == pytest.approx(5.)
 
 
 def test_newly_fixed_carbon_is_not_available_for_same_step_growth(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: rate_action(0.0, 1_000.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, 1_000.0, 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -195,8 +172,8 @@ def test_plant_growth_at_biomass_cap_charges_only_realised_structure(env):
         plant_p_pool=jnp.array([10.0]),
     )
     actions = {
-        PLANT: rate_action(0.0, 1_000.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, 1_000.0, 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(
@@ -216,15 +193,16 @@ def test_essential_growth_returns_unused_non_limiting_allocation(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     state = state.replace(plant_c_pool=jnp.array([20.0]), plant_p_pool=jnp.array([4.0]))
     actions = {
-        PLANT: rate_action(0.0, jnp.log(2.0), 0.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, jnp.log(2.0), 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(
         jax.random.PRNGKey(1), state, actions
     )
 
-    assert infos[PLANT]["growth_c_allocated"][0] == pytest.approx(10.0)
+    # Integral of kg*C(t), with C(t)=12+8*exp(-kg*t).
+    assert infos[PLANT]["growth_c_allocated"][0] == pytest.approx(12.3177661667)
     assert infos[PLANT]["growth_p_allocated"][0] == pytest.approx(2.0)
     assert infos[PLANT]["growth_c_used"][0] == pytest.approx(4.0)
     assert infos[PLANT]["growth_p_used"][0] == pytest.approx(2.0)
@@ -249,8 +227,8 @@ def test_dead_plant_cannot_resume_biology_while_fungus_remains_alive(env):
         )
     )
     maintenance_failure = {
-        PLANT: rate_action(0.0, 0.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, 0.0, 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
     _, dead_state, _, dones, _ = env.step_env(
         jax.random.PRNGKey(1), state, maintenance_failure
@@ -266,8 +244,8 @@ def test_dead_plant_cannot_resume_biology_while_fungus_remains_alive(env):
         plant=env.species.plant.replace(kappa_c=0.0)
     )
     attempted_recovery = {
-        PLANT: rate_action(1_000.0, 1_000.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(1_000.0, 1_000.0, 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
     biomass_before = dead_state.plant_biomass.copy()
     c_before = dead_state.plant_c_pool.copy()
@@ -285,17 +263,20 @@ def test_dead_plant_cannot_resume_biology_while_fungus_remains_alive(env):
     assert jnp.all(next_state.root_length_density == 0.0)
 
 
-def test_incoming_trade_is_not_available_for_same_step_growth(env):
+def test_incoming_trade_can_fund_growth_during_the_same_allocation_interval(env):
     _, state = env.reset(jax.random.PRNGKey(0))
+    state = state.replace(plant_c_pool=jnp.array([40.]))
     actions = {
-        PLANT: rate_action(0.0, 1_000.0, 0.0, 0.0),
-        FUNGUS: rate_action(jnp.log(2.0), 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, 1_000.0, 0.0),
+        FUNGUS: rate_action(jnp.log(2.0), 0.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
 
-    assert infos[PLANT]["growth"][0] == pytest.approx(10.0)
-    assert next_state.plant_p_pool[0] == pytest.approx(8.0)
+    # Solve dPp/dt=log(2)*16*exp(-log(2)*t)-1000*Pp,
+    # Pp(0)=10. Eight incoming P units join the plant's biological budget.
+    assert infos[PLANT]["growth"][0] == pytest.approx(17.9944509763)
+    assert next_state.plant_p_pool[0] == pytest.approx(.0055490237346)
 
 
 def test_plant_pays_automatic_maintenance_before_retaining_free_resources(env):
@@ -304,8 +285,8 @@ def test_plant_pays_automatic_maintenance_before_retaining_free_resources(env):
         plant=env.species.plant.replace(kappa_c=0.1, kappa_p=0.05)
     )
     actions = {
-        PLANT: rate_action(0.0, 0.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, 0.0, 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(
@@ -328,8 +309,8 @@ def test_maintenance_p_loss_records_only_the_amount_actually_paid(env):
         plant=env.species.plant.replace(kappa_c=0.0, kappa_p=0.05)
     )
     actions = {
-        PLANT: rate_action(0.0, 0.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, 0.0, 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(
@@ -350,8 +331,8 @@ def test_fungus_pays_automatic_maintenance_before_retaining_free_resources(env):
         fungus=env.species.fungus.replace(kappa_c=0.25, kappa_p=0.125)
     )
     actions = {
-        PLANT: rate_action(0.0, 0.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, 0.0, 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(
@@ -374,8 +355,8 @@ def test_maintenance_death_cancels_bilateral_trade_and_preserves_survivor_pool(e
         plant=env.species.plant.replace(kappa_c=2.0, kappa_p=0.0)
     )
     actions = {
-        PLANT: rate_action(1_000.0, 0.0, 1_000.0, 0.0),
-        FUNGUS: rate_action(jnp.log(2.0), 0.0, 0.0, 0.0),
+        PLANT: rate_action(1_000.0, 0.0, 1_000.0),
+        FUNGUS: rate_action(jnp.log(2.0), 0.0, 0.0),
     }
 
     _, next_state, _, dones, infos = env.step_env(
@@ -396,8 +377,8 @@ def test_reproduction_spends_pools_and_returns_reward(env):
     """Exports reproduced P and records it in the cumulative plant diagnostic."""
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: rate_action(0.0, 0.0, 1_000.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, 0.0, 1_000.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, rewards, _, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -419,21 +400,22 @@ def test_fungal_reproduction_export_is_accumulated(env):
         cumulative_fungus_p_reproduction_export_mg=jnp.array([2.0])
     )
     actions = {
-        PLANT: rate_action(0.0, 0.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 1_000.0, 0.0),
+        PLANT: rate_action(0.0, 0.0, 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 1_000.0),
     }
 
     _, next_state, _, _, infos = env.step_env(
         jax.random.PRNGKey(1), state, actions
     )
 
-    assert infos[FUNGUS]["reproduction_p"][0] == pytest.approx(16.0)
+    # Twelve C units at gamma_c=2 support six stoichiometric output units.
+    assert infos[FUNGUS]["reproduction_p"][0] == pytest.approx(6.0)
     assert next_state.cumulative_fungus_p_reproduction_export_mg[0] == pytest.approx(
-        18.0
+        8.0
     )
 
 
-def test_reproduction_reward_uses_scaled_cobb_douglas(env):
+def test_reproduction_reward_uses_stoichiometric_growth_costs(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     state = state.replace(
         plant_c_pool=jnp.array([16.0]),
@@ -447,15 +429,15 @@ def test_reproduction_reward_uses_scaled_cobb_douglas(env):
     )
 
     actions = {
-        PLANT: rate_action(0.0, 0.0, 1_000.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, 0.0, 1_000.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
 
     _, _, rewards, _, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
 
     assert infos[PLANT]["reproduction_c"][0] == pytest.approx(16.0)
-    assert infos[PLANT]["reproduction_p"][0] == pytest.approx(9.0)
-    assert rewards[PLANT] == pytest.approx(6.0)
+    assert infos[PLANT]["reproduction_p"][0] == pytest.approx(4.0)
+    assert rewards[PLANT] == pytest.approx(4.0)
 
 
 def test_automatic_maintenance_does_not_spend_reserved_resources(env):
@@ -470,8 +452,8 @@ def test_automatic_maintenance_does_not_spend_reserved_resources(env):
     )
 
     actions = {
-        PLANT: rate_action(0.0, 0.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, 0.0, 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
 
     _, next_state, _, _, infos = env.step_env(jax.random.PRNGKey(1), state, actions)
@@ -489,8 +471,8 @@ def test_automatic_maintenance_does_not_spend_reserved_resources(env):
 def test_terminal_after_max_episode_steps(env):
     _, state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: rate_action(0.0, 0.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.0, 0.0, 0.0, 0.0),
+        PLANT: rate_action(0.0, 0.0, 0.0),
+        FUNGUS: rate_action(0.0, 0.0, 0.0),
     }
 
     for step in range(3):
@@ -506,14 +488,14 @@ def test_physical_resource_transaction_is_jittable_and_vectorised(env):
     actions = {
         PLANT: jnp.stack(
             [
-                rate_action(0.25, 0.5, 0.25, 0.25),
-                rate_action(0.75, 0.25, 0.5, 0.25),
+                rate_action(0.25, 0.5, 0.25),
+                rate_action(0.75, 0.25, 0.5),
             ]
         ),
         FUNGUS: jnp.stack(
             [
-                rate_action(0.5, 0.25, 0.25, 0.5),
-                rate_action(0.0, 0.5, 0.0, 0.5),
+                rate_action(0.5, 0.25, 0.25),
+                rate_action(0.0, 0.5, 0.0),
             ]
         ),
     }

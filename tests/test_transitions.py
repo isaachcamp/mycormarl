@@ -58,8 +58,8 @@ def env(species, config):
 
 def reserve_actions(*, plant_trade=0.0, fungus_trade=0.0):
     return {
-        PLANT: physical_action(plant_trade, 0.0, 0.0, 1.0),
-        FUNGUS: physical_action(fungus_trade, 0.0, 0.0, 1.0),
+        PLANT: physical_action(plant_trade, 0.0, 0.0),
+        FUNGUS: physical_action(fungus_trade, 0.0, 0.0),
     }
 
 
@@ -121,7 +121,7 @@ def test_single_consumer_step_preserves_fixed_transition_mapping(
     assert not transitions[absent_agent].allocation_executed
     assert not transitions[absent_agent].trade_executed
     assert transitions[absent_agent].realised_action == pytest.approx(
-        jnp.zeros(4)
+        jnp.zeros(3)
     )
 
 
@@ -142,8 +142,8 @@ def test_maintenance_death_differs_from_dead_padding_and_preserves_survivor_allo
         )
     )
     actions = {
-        PLANT: physical_action(1.0, 1.0, 0.0, 0.0),
-        FUNGUS: physical_action(0.5, 1.0, 0.0, 0.0),
+        PLANT: physical_action(1.0, 1.0, 0.0),
+        FUNGUS: physical_action(0.5, 1.0, 0.0),
     }
 
     _, dead_state, _, dones, info = env.step_env(
@@ -157,13 +157,13 @@ def test_maintenance_death_differs_from_dead_padding_and_preserves_survivor_allo
     assert not death[PLANT].operational_at_end
     assert not death[PLANT].allocation_executed
     assert not death[PLANT].trade_executed
-    assert death[PLANT].realised_action == pytest.approx(jnp.zeros(4))
+    assert death[PLANT].realised_action == pytest.approx(jnp.zeros(3))
     assert death[FUNGUS].operational_at_start
     assert death[FUNGUS].operational_at_end
     assert death[FUNGUS].allocation_executed
     assert not death[FUNGUS].trade_executed
     assert death[FUNGUS].realised_action == pytest.approx(
-        jnp.array([0.0, 1.0, 0.0, 0.0])
+        jnp.array([0.0, 1.0, 0.0])
     )
 
     _, _, _, _, padding_info = env.step_env(
@@ -254,7 +254,7 @@ def test_transition_contract_is_stable_under_jit_and_vectorisation(env):
         jax.random.PRNGKey(1), state, actions
     )
     assert isinstance(jitted_info["transitions"][PLANT], Transition)
-    assert jitted_info["transitions"][PLANT].requested_action.shape == (4,)
+    assert jitted_info["transitions"][PLANT].requested_action.shape == (3,)
     assert jitted_info["transitions"][PLANT].final_observation.shape == (5,)
 
     keys = jax.random.split(jax.random.PRNGKey(2), 2)
@@ -271,6 +271,6 @@ def test_transition_contract_is_stable_under_jit_and_vectorisation(env):
     for transition in batched_info["transitions"].values():
         assert isinstance(transition, Transition)
         assert transition.operational_at_start.shape == (2,)
-        assert transition.requested_action.shape == (2, 4)
+        assert transition.requested_action.shape == (2, 3)
         assert transition.final_observation.shape == (2, 5)
         assert transition.truncated.shape == (2,)

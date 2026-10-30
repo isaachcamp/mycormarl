@@ -58,7 +58,7 @@ def _environment(
 
 def test_held_policy_action_has_compatible_fixed_horizon_effect_under_substepping():
     """A held Rate action has one physical effect under numerical refinement."""
-    action = rate_action(0.0, jnp.log(2.0) / 0.10, 0.0, 0.0)
+    action = rate_action(0.0, jnp.log(2.0) / 0.10, 0.0)
     actions = {PLANT: action, FUNGUS: action}
     compatibility = _environment(dt=0.10, decision_interval_days=0.10)
     substepped = _environment(dt=0.05, decision_interval_days=0.10)
@@ -93,8 +93,8 @@ def test_decision_interval_equal_to_numerical_timestep_matches_base_environment(
     wrapped = _environment(dt=0.10, decision_interval_days=0.10, initial_solution_p_um=1.0)
     numerical = wrapped.numerical_environment
     actions = {
-        PLANT: rate_action(0.25, 0.5, 0.25, 0.0),
-        FUNGUS: rate_action(0.25, 0.5, 0.25, 0.0),
+        PLANT: rate_action(0.25, 0.5, 0.25),
+        FUNGUS: rate_action(0.25, 0.5, 0.25),
     }
     _, wrapped_state = wrapped.reset(jax.random.PRNGKey(0))
     _, numerical_state = numerical.reset(jax.random.PRNGKey(0))
@@ -114,7 +114,7 @@ def test_decision_interval_equal_to_numerical_timestep_matches_base_environment(
 
 def test_held_policy_action_preserves_nonzero_integrated_uptake_under_substepping():
     """A fixed policy schedule keeps physical phosphate fluxes comparable."""
-    action = rate_action(0.0, 0.0, 0.0, 0.0)
+    action = rate_action(0.0, 0.0, 0.0)
     actions = {PLANT: action, FUNGUS: action}
     compatibility = _environment(
         dt=0.10, decision_interval_days=0.10, initial_solution_p_um=1.0
@@ -152,7 +152,7 @@ def test_policy_interval_represents_held_numerical_substeps_as_one_jax_scan():
     """Compilation must not expand one held decision into Python substep calls."""
     environment = _environment(dt=0.05, decision_interval_days=0.10)
     _, state = environment.reset(jax.random.PRNGKey(0))
-    actions = {agent: rate_action(0.0, 0.0, 0.0, 0.0) for agent in (PLANT, FUNGUS)}
+    actions = {agent: rate_action(0.0, 0.0, 0.0) for agent in (PLANT, FUNGUS)}
 
     jaxpr = jax.make_jaxpr(environment.step_env)(jax.random.PRNGKey(1), state, actions)
 

@@ -23,6 +23,12 @@ class PolicyIntervalMycorMarl(AutoResetMixin, MultiAgentEnv):
     policy-facing seam: it holds one Rate action constant while the numerical
     environment integrates it over each numerical step, then returns one
     transition to PPO for the complete policy interval.
+
+    Resource flows, output and solver work sum over executed numerical steps.
+    Execution and cancellation events use any-step aggregation; numerical
+    qualification requires every executed step to succeed. Stocks and final
+    observations describe the final active state. A terminal boundary freezes
+    the remaining scheduled substeps, allowing a shortened final interval.
     """
 
     def __init__(
@@ -64,22 +70,35 @@ class PolicyIntervalMycorMarl(AutoResetMixin, MultiAgentEnv):
     def step_env(self, key: chex.PRNGKey, state: State, actions: Dict[str, chex.Array]):
         initial_state = state
         def numerical_substep(carry, _):
-            key, state, rewards, trade_executed = carry
+            key, state, rewards = carry
+            active = ~state.terminal
             key, substep_key = jax.random.split(key)
-            observations, state, substep_rewards, dones, infos = self.numerical_environment.step_env(
+            _, candidate, substep_rewards, _, infos = self.numerical_environment.step_env(
                 substep_key, state, actions
             )
-            rewards = {agent: rewards[agent] + substep_rewards[agent] for agent in AGENTS}
-            trade_executed = {
-                agent: trade_executed[agent] | infos["transitions"][agent].trade_executed
-                for agent in AGENTS
-            }
-            return (key, state, rewards, trade_executed), (observations, dones, infos)
+            state = jax.tree.map(lambda new, old: jnp.where(active, new, old), candidate, state)
+            observations = self.numerical_environment.get_obs(state)
+            dones = {agent: getattr(state, f"{agent}_dead").squeeze() for agent in AGENTS}
+            dones["__all__"] = state.terminal
+            for agent in AGENTS:
+                infos[agent] = {field: jnp.where(active, value, jnp.zeros_like(value))
+                                for field, value in infos[agent].items()}
+                for field in ("biomass", "c_pool", "p_pool"):
+                    infos[agent][field] = getattr(state, f"{agent}_{field}")
+                infos[agent]["allocation_converged"] = jnp.where(
+                    active, infos[agent]["allocation_converged"], True)
+                transition = infos["transitions"][agent]
+                infos["transitions"][agent] = transition.replace(
+                    allocation_executed=active & transition.allocation_executed,
+                    trade_executed=active & transition.trade_executed,
+                )
+            rewards = {agent: rewards[agent] + jnp.where(active, substep_rewards[agent], 0.)
+                       for agent in AGENTS}
+            return (key, state, rewards), (observations, dones, infos)
 
-        (_, state, rewards, trade_executed), (observations, dones, infos_history) = jax.lax.scan(
+        (_, state, rewards), (observations, dones, infos_history) = jax.lax.scan(
             numerical_substep,
-            (key, state, {PLANT: jnp.asarray(0.0), FUNGUS: jnp.asarray(0.0)},
-             {PLANT: jnp.asarray(False), FUNGUS: jnp.asarray(False)}),
+            (key, state, {PLANT: jnp.asarray(0.0), FUNGUS: jnp.asarray(0.0)}),
             xs=None,
             length=self.numerical_substeps_per_decision,
         )
@@ -90,35 +109,40 @@ class PolicyIntervalMycorMarl(AutoResetMixin, MultiAgentEnv):
         # the same accounting convention for flow-like diagnostics rather
         # than silently retaining only the final substep's values.
         for agent in AGENTS:
+            infos[agent]["allocation_converged"] = jnp.all(
+                infos_history[agent]["allocation_converged"], axis=0)
+            infos[agent]["trade_cancelled"] = jnp.any(
+                infos_history[agent]["trade_cancelled"], axis=0)
             for field in (
                 "reproduction_c", "reproduction_p", "direct_p_uptake_mg",
                 "trade_in", "trade_out", "proposed_trade_out", "growth",
+                "growth_c_allocated", "growth_p_allocated", "growth_c_used", "growth_p_used",
+                "maint_c", "maint_p", "maint_c_used", "maint_p_used", "c_deficit", "p_deficit",
+                "maintenance_p_required_mg", "allocation_substeps",
             ):
                 infos[agent][field] = jnp.sum(infos_history[agent][field], axis=0)
             if agent == PLANT:
+                infos[agent]['biomass_guard_contact'] = jnp.any(
+                    infos_history[agent]['biomass_guard_contact'],axis=0)
                 infos[agent]["carbon_fixed"] = jnp.sum(
                     infos_history[agent]["carbon_fixed"], axis=0
                 )
-            alpha = self.config.alpha
-            c = infos_history[agent]["reproduction_c"] / getattr(
-                self.species, agent
-            ).gamma_c
-            p = infos_history[agent]["reproduction_p"] / getattr(
-                self.species, agent
-            ).gamma_p
             infos[agent]["reproductive_fitness_from_components"] = jnp.sum(
-                (c ** alpha) * (p ** (1.0 - alpha)), axis=0
+                infos_history[agent]["reproductive_fitness_from_components"], axis=0
             )
         for agent, active in ((PLANT, self.numerical_environment.plant_active), (FUNGUS, self.numerical_environment.fungus_active)):
             start = jnp.logical_and(active, ~getattr(initial_state, f"{agent}_dead")).squeeze()
             end = jnp.logical_and(active, ~getattr(state, f"{agent}_dead")).squeeze()
+            allocation_executed = jnp.any(infos_history["transitions"][agent].allocation_executed)
+            trade_executed = jnp.any(infos_history["transitions"][agent].trade_executed)
+            executed = jnp.array([trade_executed, allocation_executed, allocation_executed])
             infos["transitions"][agent] = Transition(
                 requested_action=actions[agent],
-                realised_action=jnp.where(end, actions[agent], jnp.zeros_like(actions[agent])),
+                realised_action=jnp.where(executed, actions[agent], jnp.zeros_like(actions[agent])),
                 operational_at_start=start,
                 operational_at_end=end,
-                allocation_executed=end,
-                trade_executed=trade_executed[agent],
+                allocation_executed=allocation_executed,
+                trade_executed=trade_executed,
                 truncated=state.step >= self.numerical_environment.max_episode_steps,
                 final_observation=observations[agent],
             )

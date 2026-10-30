@@ -3,6 +3,11 @@
 MycorMARL is a JAX/JaxMARL model of plant–mycorrhizal resource exchange. Its
 soil phosphate component stores finite labile P amounts on an axisymmetric
 grid and couples buffered diffusion with root/fungal uptake and competition.
+Agents command three per-day rates for simultaneous trade, growth and
+stoichiometric reproductive output. Retained resources remain free stocks.
+
+The importable Python package lives in `src/mycormarl/`. Install the project
+with `uv sync`; public imports remain `mycormarl`.
 
 ## Start here
 
@@ -10,17 +15,24 @@ grid and couples buffered diffusion with root/fungal uptake and competition.
   shared state, axisymmetric geometry, and growth–phosphate coupling.
 - [Growth model](docs/growth-model.md):
   resource allocation, biomass change, and root/fungal geometry.
+- [Three-rate qualification](docs/qualification/three-rate-allocation.md):
+  implemented action baseline, reference cases, resource budgets, workflow checks
+  and measured short-run timings.
+- [Static allocation experiments](docs/static-allocation.md):
+  declared shares and interval-dependent total intensity, with reproducible examples.
 - [Phosphate model](docs/phosphate-model.md):
   buffering, diffusion, uptake regimes, competition, and verification.
 - [Module map](docs/module-map.md):
   code ownership, pipeline boundaries, executables, and test locations.
-- [Independent PPO walking skeleton](docs/implementation-docs/ippo-walking-skeleton.md):
-  actor observations, Physical actions, lifecycle semantics, training, and
-  saved-policy compatibility.
+- [Current action/PPO contract](docs/adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md):
+  sampling, lifecycle facts and the saved-policy compatibility break.
+- [Independent PPO walking skeleton history](docs/implementation-docs/ippo-walking-skeleton.md):
+  earlier actor/interface decisions, with superseded action portions identified.
 - [Model Parameter Register](docs/model-parameter-register.md): register
   for all model parameters, estimated values and related literature.
-- [Numerical qualification](docs/qualification/phosphate-numerical-qualification.md):
-  convergence, balance, sensitivity, and performance evidence.
+- [Soil and historical coupled qualification](docs/qualification/phosphate-numerical-qualification.md):
+  retained convergence, balance, sensitivity and performance evidence with its
+  original source-model provenance.
 - [Open questions](docs/open-questions.md):
   unresolved scientific, calibration, and modelling decisions.
 
