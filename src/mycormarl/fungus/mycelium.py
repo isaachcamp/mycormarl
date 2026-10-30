@@ -10,12 +10,12 @@ def hyphal_length_from_fungal_biomass(
         tissue_carbon_density_g_c_cm3: float,
         hyphal_radius_cm: float,
     ) -> chex.Array:
-    """Convert fungal dry biomass to cylindrical external-hyphal length.
+    """Convert external fungal dry biomass to cylindrical hyphal length.
 
     Dry biomass becomes structural carbon through ``gamma_c``, carbon becomes
     living tissue volume through its tissue carbon density, and cylindrical
-    volume becomes length through ``pi * radius²``. Spores and intraradical
-    fungal structures are intentionally omitted in this first model.
+    volume becomes length through ``pi * radius²``. Callers with total fungal
+    biomass must first take its ERM fraction; this helper excludes IRM mass.
     """
     biomass_g = jnp.maximum(jnp.asarray(biomass_g), 0.0)
     cross_section_cm2 = jnp.pi * hyphal_radius_cm ** 2
@@ -32,7 +32,7 @@ def fungal_biomass_from_hyphal_length(
         tissue_carbon_density_g_c_cm3: float,
         hyphal_radius_cm: float,
     ) -> chex.Array:
-    """Convert cylindrical external-hyphal length to fungal dry biomass."""
+    """Convert cylindrical external-hyphal length to external fungal dry mass."""
     total_length_cm = jnp.maximum(jnp.asarray(total_length_cm), 0.0)
     cross_section_cm2 = jnp.pi * hyphal_radius_cm ** 2
     structural_carbon_g = (
@@ -61,17 +61,18 @@ def fungal_biomass_for_colony_radius(
         colony_radius_cm: chex.Array,
         traits,
     ) -> chex.Array:
-    """Invert the fungal biomass-to-saturated-hemisphere radius pipeline."""
+    """Return total IRM plus ERM dry mass for a saturated-hemisphere radius."""
     total_length_cm = hyphal_length_for_colony_radius_axisymmetric(
         colony_radius_cm,
         traits.saturation_density,
     )
-    return fungal_biomass_from_hyphal_length(
+    external_biomass = fungal_biomass_from_hyphal_length(
         total_length_cm,
         traits.gamma_c,
         traits.hyphal_tissue_carbon_density,
         traits.hyphal_radius,
     )
+    return external_biomass / (1.0 - traits.irm_fraction)
 
 
 def colony_radius_from_length_axisymmetric(total_length, saturation_density):
@@ -179,13 +180,13 @@ def axisymmetric_density_from_biomass(
         r_edges: chex.Array,
         z_edges: chex.Array,
     ) -> chex.Array:
-    """Construct axisymmetric hyphal density from fungal biomass.
+    """Construct external hyphal density from total IRM plus ERM biomass.
 
-    Biomass is first converted to total hyphal length, then to the radius of a
+    Only the ERM fraction is converted to hyphal length, then to the radius of a
     saturated hemisphere, with partially crossed cells volume-averaged.
     """
     total_length = hyphal_length_from_fungal_biomass(
-        biomass,
+        biomass * (1.0 - traits.irm_fraction),
         traits.gamma_c,
         traits.hyphal_tissue_carbon_density,
         traits.hyphal_radius,

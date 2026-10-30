@@ -28,6 +28,14 @@ available for allocation at the next numerical step. Incoming trade participates
 inside coupled allocation, as recorded by
 [ADR-0020](adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md).
 
+Internal root and hyphal transport capacity is assumed non-limiting within
+retained living, connected tissue. In particular, reduced interior density will
+not independently throttle delivery or add a compensatory carbon charge under
+the planned mortality extension. Density still affects uptake and tissue
+economics; an explicit distance-dependent transport cost remains a separate
+design. This deliberate scope and its interpretation limits are recorded in
+[ADR-0021](adr/0021-treat-internal-transport-capacity-as-non-limiting.md).
+
 ## Shared state and geometry
 
 The dynamic state contains organism dry biomass and free C/P pools, canonical
@@ -279,9 +287,18 @@ its own source revision, configuration and runtime, not today's defaults.
 
 ### Fungus
 
-- **Assumption:** Fungal biomass is represented as living, extraradical,
-  uptake-active hyphae. Spores, vesicles, arbuscules, and intraradical
-  mycelium are omitted from the geometry.
+- **Assumption:** Total fungal biomass comprises fixed `irm_fraction` IRM and
+  complementary ERM, with shared construction C/P and maintenance coefficients.
+  Growth and biomass loss change both fractions proportionally. Only ERM gives
+  external uptake geometry; IRM, spores, vesicles and arbuscules have no separate
+  spatial geometry. The default IRM fraction is zero, is finite in `[0, 1)`,
+  and must be zero in `fungus-only` mode. Reset holds total biomass fixed.
+  IRM/ERM mass and volume are derived when needed, without separate state,
+  stock diagnostics or actor inputs; the biomass observation scale is unchanged.
+  Total structural-P and mortality-export accounts include IRM, including
+  retained residual mass after death, while dead tissue has no uptake geometry.
+  This allocation adds no colonisation or exchange rule. See the
+  [growth equations](growth-model.md#fungal-biomass-to-hyphal-geometry).
 - **Assumption:** Mycelium grows as a centred, isotropic saturated hemisphere.
   Explicit branching, network topology, anastomosis, gaps, and directional
   growth are not represented.
@@ -292,7 +309,7 @@ its own source revision, configuration and runtime, not today's defaults.
 - **Limitation:** Existing hyphae remain active indefinitely unless the fungal
   organism dies; local senescence, turnover, fragmentation, and abandoned
   territory are not represented.
-- **Limitation:** Fungal biomass is converted directly to hyphal length,
+- **Limitation:** External fungal biomass is converted directly to hyphal length,
   without a construction delay or a distinction between structural and
   metabolically active biomass.
 - **Limitation:** Fungal mortality is represented as an organism-level event,

@@ -2,6 +2,83 @@
 
 ## Glossary
 
+### Static intraradical mycelium allocation
+
+`irm_fraction` is the fixed fraction of total fungal dry biomass allocated to
+intraradical mycelium (IRM). Extraradical mycelium (ERM) is the remaining
+`1 - irm_fraction`; only ERM produces external soil-uptake geometry. Both
+fractions share the existing fungal construction stoichiometry and maintenance
+coefficients. Growth and mortality change both fractions proportionally; IRM
+is not protected from biomass loss. Total biomass remains the single state
+and accounting quantity, including retained residual mass after death.
+
+The trait defaults to zero, must be finite in `[0, 1)`, and must be zero in
+`fungus-only` mode. Varying it holds configured total initial biomass fixed.
+It is not a colonised-root fraction, root-capacity limit or exchange rule.
+IRM/ERM mass and volume can be derived when needed; no separate state, stock
+diagnostics or policy inputs are added. See [ADR-0017](docs/adr/0017-represent-absorbers-as-fine-root-discs-and-an-external-hyphal-hemisphere.md)
+and [issue #96](https://github.com/isaachcamp/mycormarl/issues/96).
+
+### Non-limiting internal transport capacity
+
+An approximation under which retained living, connected root and hyphal tissue
+does not constrain resource delivery through its conducting capacity. Reduced
+interior density therefore causes no independent throughput limit, delivery
+delay or compensatory transport-carbon surcharge. Density can still affect
+uptake, tissue investment, maintenance and a separately specified route distance.
+See [ADR-0021](docs/adr/0021-treat-internal-transport-capacity-as-non-limiting.md).
+
+### Oldest-first maintenance mortality
+
+Tissue loss triggered by insufficient maintenance resources, allocated to the
+oldest eligible living tissue first. The planned fungal rule retains a minimum
+living density; the revised fine-root rule permits complete cohort removal,
+with stem connectivity supplied by an implicit conducting-root backbone.
+This is not current production behaviour. [Issue #89](https://github.com/isaachcamp/mycormarl/issues/89)
+and dependent tickets #90–93 require reconciliation with
+[ADR-0022](docs/adr/0022-separate-fine-root-mortality-from-persistent-backbone-connectivity.md)
+before implementation of the revised root rule.
+
+### Implicit conducting-root backbone
+
+An unresolved root transport structure assumed to maintain stem connectivity
+to surviving distal fine roots while the plant is operational. Its
+root-containing footprint persists where roots have grown even when local
+absorbing fine-root density becomes zero. It adds no separately represented
+biomass or uptake surface. All cells in this footprint are assumed available
+for fungal exchange without separately tracked colonisation or establishment
+delay, including backbone-only cells. They count as root-containing cells for
+fungal transport-cost distance. Availability does not compel trade or bypass
+organism-death gates. See [ADR-0022](docs/adr/0022-separate-fine-root-mortality-from-persistent-backbone-connectivity.md).
+
+### Fungal root contact
+
+A surviving connection between the living fungal network and an
+exchange-available cell in the persistent root footprint. Contact can be lost
+without immediate organism death; loss of all contact disables bilateral C/P
+trade while ordinary maintenance and survival dynamics continue. This is agreed
+future behaviour, not current production behaviour. The distance approximation
+uses the existing reference fine-root density as its within-cell spacing proxy,
+independently of post-mortality absorbing density. See
+[ADR-0022](docs/adr/0022-separate-fine-root-mortality-from-persistent-backbone-connectivity.md).
+
+### Transport-front shell
+
+A finite-width band of living hyphae immediately behind the outer growth front,
+used as a proxy for transport source/destination distance. Its width is a
+physical parameter in cm, independent of timestep or grid spacing. It does not
+restrict phosphate uptake or spread actual new tissue construction over that
+band. Uptake-FWHM and tip-density dynamics are deferred alternatives; no width
+value or energetic coefficient is selected. See the
+[transport-shell derivation](docs/technical-summaries/transport-shell-geometries/README.md).
+
+### Front-only absorber growth
+
+Addition of new absorbing tissue exclusively at the current outer growth
+boundary, without replacement or densification of established inner tissue.
+This is a core approximation of the planned absorber-mortality extension;
+tissue retained at its minimum density remains living and uptake-active.
+
 ### Operational agent
 
 An agent that is configured as present, biologically alive, and able to

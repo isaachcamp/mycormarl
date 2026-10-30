@@ -3,6 +3,87 @@ from mycormarl.plant.traits import PlantTraits
 from mycormarl.fungus.traits import FungusTraits
 import pytest
 
+
+def assert_rollout_equal(actual, expected):
+    """Compare public results, keeping discrete facts exact and NaNs explicit."""
+    if isinstance(expected, dict):
+        assert actual.keys() == expected.keys()
+        for key in expected:
+            assert_rollout_equal(actual[key], expected[key])
+    elif isinstance(expected, list):
+        assert len(actual) == len(expected)
+        for left, right in zip(actual, expected, strict=True):
+            assert_rollout_equal(left, right)
+    elif isinstance(expected, float):
+        import numpy as np
+        np.testing.assert_allclose(actual, expected, rtol=2e-6, atol=1e-8, equal_nan=True)
+    else:
+        assert type(actual) is type(expected)
+        assert actual == expected
+
+
+def test_batched_results_match_independent_runs_with_different_biological_stopping_times():
+    from dataclasses import replace
+    from mycormarl.params import EnvConfig
+    from mycormarl.environments.base_mycor import BaseMycorMarl
+    from mycormarl.static_rollout import evaluate_static_policy, evaluate_batched_static_policy
+
+    config = EnvConfig(max_steps=12, dt=.25, soil_radius_cm=2., soil_depth_cm=2.,
+                       radial_interval_cm=.5, depth_interval_cm=.5)
+    species = SpeciesParams(
+        PlantTraits(initial_c_pool=.02, initial_p_pool=0., kappa_p=.5,
+                    death_fraction=.8, jmax=1e-3),
+        FungusTraits(initial_c_pool=.005, initial_p_pool=0., kappa_p=.5,
+                     death_fraction=.8, jmax=1e-3))
+    envs = [BaseMycorMarl(replace(config, initial_solution_p_um=p), species)
+            for p in (0., .01, 1., 100.)]
+    actions = {'plant': [.3, .2, .1], 'fungus': [.4, .15, .1]}
+    actual = evaluate_batched_static_policy(envs, actions, seed=7)
+    assert [row['steps'] for row in actual] == [4, 5, 12, 12]
+    assert [row['biological_deaths'] for row in actual] == [
+        {'plant': 1, 'fungus': 1}, {'plant': 1, 'fungus': 1},
+        {'plant': 0, 'fungus': 0}, {'plant': 0, 'fungus': 0}]
+    for env, row in zip(envs, actual, strict=True):
+        assert_rollout_equal(row, evaluate_static_policy(env, actions, seed=7))
+
+
+@pytest.mark.parametrize('plant,budget,rate,steps,reason', [
+    ({'biomass_cap': 1.}, 65536, 1., 0, 'guard'),
+    ({}, 1, 1., 1, 'allocation'),
+    ({'initial_biomass': .99, 'biomass_cap': 1., 'initial_c_pool': .04,
+      'kappa_c': .02}, 65536, 10., 1, 'guard'),
+])
+def test_batched_rejected_summaries_match_single_execution(plant, budget, rate, steps, reason):
+    from mycormarl.environments.base_mycor import BaseMycorMarl
+    from mycormarl.static_rollout import evaluate_static_policy, evaluate_batched_static_policy
+    from test_stoichiometric_actions import pool_environment
+
+    base = pool_environment(dt=1., max_steps=4, plant=plant,
+                            allocation_max_substeps=budget)
+    envs = [BaseMycorMarl(base.config.replace(initial_solution_p_um=p), base.species)
+            for p in (0., 1.)]
+    actions = {'plant': [0., rate, 0.], 'fungus': [0., 0., 0.]}
+    for env, result in zip(envs, evaluate_batched_static_policy(envs, actions, seed=7), strict=True):
+        assert result['steps'] == steps
+        assert result['status'] == 'rejected'
+        assert any(reason in message for message in result['rejection_reasons'])
+        assert_rollout_equal(result, evaluate_static_policy(env, actions, seed=7))
+
+
+def test_initial_guard_rejection_keeps_zero_totals_when_discarded_allocation_would_fail():
+    from mycormarl.static_rollout import evaluate_static_policy, evaluate_batched_static_policy
+    from test_stoichiometric_actions import pool_environment
+
+    env = pool_environment(max_steps=2, allocation_max_substeps=1,
+                           plant=dict(biomass_cap=1.))
+    actions = {'plant': [0., 1., 0.], 'fungus': [0., 0., 0.]}
+    result = evaluate_batched_static_policy([env], actions, seed=7)[0]
+    assert result['steps'] == 0
+    assert result['rejection_reasons'] == ['plant numerical biomass guard contacted']
+    assert result['cumulative_growth'] == {'plant': 0., 'fungus': 0.}
+    assert_rollout_equal(result, evaluate_static_policy(env, actions, seed=7))
+
+
 def test_public_generic_static_seam():
     from mycormarl.static_rollout import evaluate_static_policy
     from mycormarl.environments.base_mycor import BaseMycorMarl

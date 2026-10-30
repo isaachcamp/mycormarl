@@ -35,10 +35,6 @@ from mycormarl.state import State
 from mycormarl.transition import Transition
 
 
-# TODO: consider more complex allocation strategies based on past allocations.
-# TODO: decouple constraints from the environment step function.
-
-
 PLANT = "plant"
 FUNGUS = "fungus"
 AGENTS = (PLANT, FUNGUS)
@@ -70,6 +66,8 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
 
         plant.validate_plant_growth_geometry_traits(self.species.plant)
         fungus.validate_fungus_growth_geometry_traits(self.species.fungus)
+        if self.config.consumer_mode == "fungus-only" and self.species.fungus.irm_fraction != 0.0:
+            raise ValueError("fungus irm_fraction must be zero in fungus-only mode")
         self._validate_soil_config(self.config)
         self.r_edges, self.z_edges = axisymmetric_edges_from_intervals(
             self.config.soil_radius_cm,
@@ -152,13 +150,12 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
             self.species.plant.biomass_observation_reference
         )
 
-        # Calculate ref biomass based on maximum radius possible constrained by
-        # grid boundaries.
+        # Preserve the legacy biomass encoding independently of IRM allocation.
         fungus_biomass_reference = (
             0.5
             * fungus.fungal_biomass_for_colony_radius(
                 self.config.soil_radius_cm,
-                self.species.fungus,
+                self.species.fungus.replace(irm_fraction=0.0),
             )
         )
 
@@ -304,13 +301,12 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
             state: State,
             actions: Dict[str, chex.Array]
         ) -> Tuple[Dict[str, chex.Array], State, Dict[str, float], Dict[str, bool], Dict]:
-        """Apply a valid Physical action to the environment state.
+        """Apply valid three-rate actions over one numerical step.
 
-        Checks plant/fungus operational status, pays maintenance, applies growth and
-        reproduction, and updates the soil P field. Returns the next observation, state,
-        rewards, dones, and infos. The labile P field is a conserved quantity.
-
-        # TODO: decrease root/hyphal density with biomass loss.
+        Pay maintenance and determine death, then integrate coupled trade,
+        growth and reproduction. Add photosynthate, rebuild living uptake
+        geometry and evolve soil P. Returns observations, state, rewards,
+        dones and infos. Whole-system P includes recorded losses/exports.
         """
         for agent in AGENTS:
             if actions[agent].shape != (3,):
@@ -341,7 +337,7 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
         plant_biomass_after_maintenance = plant_maintenance["biomass"]
         fungus_biomass_after_maintenance = fungus_maintenance["biomass"]
 
-        # Check biomass has not fallen below death threshold. If so, mark dead and zero pools.
+        # Death is absorbing; retain residual biomass and pools for P accounting.
         plant_dead = jnp.logical_or(
             state.plant_dead,
             jnp.logical_or(
@@ -369,8 +365,8 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
             self.fungus_active, jnp.logical_not(fungus_dead)
         )
 
-        # Bilateral trade is resolved after maintenance. If either organism died
-        # while paying maintenance, neither proposed transfer leaves its owner.
+        # These isolated-pool proposals describe cancellation diagnostics only.
+        # Actual trade competes with biology in the coupled allocation below.
         trading_enabled = jnp.logical_and(
             plant_operational_at_end, fungus_operational_at_end
         )
@@ -701,20 +697,6 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
                             "allocation_substeps": substeps,
                         })
         return outcome(0), outcome(1), (result[0, 4:5], result[1, 4:5])
-
-    def step_plant(self, key: jax.Array, state: State, action: jax.Array) -> dict:
-        """Apply isolated plant biology; trade is resolved only by step_env."""
-        rates = jnp.asarray(action).at[Actions.trade].set(0.)
-        return self._allocate_both(state, {
-            PLANT: rates, FUNGUS: jnp.zeros(3, dtype=rates.dtype),
-        })[0]
-
-    def step_fungus(self, key: jax.Array, state: State, action: jax.Array) -> dict:
-        """Apply isolated fungal biology; trade is resolved only by step_env."""
-        rates = jnp.asarray(action).at[Actions.trade].set(0.)
-        return self._allocate_both(state, {
-            PLANT: jnp.zeros(3, dtype=rates.dtype), FUNGUS: rates,
-        })[1]
 
     @staticmethod
     def _validate_soil_config(config: EnvConfig) -> None:

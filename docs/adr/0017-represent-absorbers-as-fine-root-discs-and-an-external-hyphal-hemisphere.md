@@ -3,6 +3,19 @@
 **Status:** Accepted; retrospective record of the implemented geometry,
 recorded 21 October 2026.
 
+**Allocation revision, 30 October 2026 ([#96](https://github.com/isaachcamp/mycormarl/issues/96)):**
+Fungal biomass now denotes total IRM plus ERM dry mass. The static trait
+`irm_fraction` allocates IRM; convert only `(1 - irm_fraction)` of total mass
+to external cylindrical length. IRM is accounted for implicitly, without
+spatial colonisation geometry. Both fractions pay the same existing tissue
+costs and grow or die proportionally, preserving ADR-0018's total structural-P
+ledger. Default zero retains the original all-external reference; require a
+finite fraction in `[0, 1)` and zero in `fungus-only` mode. Hold total reset
+biomass fixed and preserve the existing fungal observation reference using
+the zero-IRM geometry. Physical radius-to-total-mass inverses include IRM.
+This revises the all-external conversion below, without altering ADR-0004's
+current memoryless geometry or ADR-0022's planned exchange assumptions.
+
 ## Context and decision
 
 Growth must change absorbing length and surface in a physically interpretable
@@ -18,10 +31,11 @@ two biomass-derived spatial closures on the common axisymmetric soil grid:
   each layer a disc radius implied by its assigned length and the common
   within-disc length density. The profile controls depth allocation while
   growth changes radial extent.
-- Convert fungal dry biomass through structural C and tissue C density to
+- Convert external fungal dry biomass through structural C and tissue C density to
   cylindrical external-hyphal length. Represent that length as an isotropic
-  hemisphere at fixed local saturation density. Spores, intraradical hyphae,
-  vesicles and arbuscules are not separate geometry compartments.
+  hemisphere at fixed local saturation density. Spores, vesicles, arbuscules
+  and intraradical hyphae are not separate geometry compartments; implicit IRM
+  mass is accounted for by the allocation revision above.
 - Volume-average partially occupied cells using the disc/hemisphere
   intersection. Clip structure outside the represented soil rather than
   redistributing its length into the domain or increasing local density.

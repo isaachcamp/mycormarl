@@ -37,7 +37,7 @@ scripts and tests remain outside the importable package.
 | `plant/roots.py` | Converts plant biomass to depth-weighted stacked-disc root density. | Reset and post-growth geometry refresh. |
 | `fungus/mycelium.py` | Converts fungal biomass to a volume-averaged saturated hemispherical hyphal field. | Reset and post-growth geometry refresh. |
 | `plant/traits.py`, `fungus/traits.py` | Organism stoichiometry, kinetics, geometry, maintenance, and initial pools. | Biological and soil calculations. |
-| `growth.py`, `maintenance.py` | Shared realised-growth and maintenance calculations. | Plant and fungal environment steps. |
+| `allocation.py` | Coupled trade, essential-resource growth and stoichiometric reproduction. | Environment allocation after maintenance. |
 | `observations.py` | Finite bounded transforms for the stable five-feature actor observations. | Environment observation construction. |
 | `algos/ppo.py` | Two-policy PPO integration using the `plant` and `fungus` interfaces. | Training launcher and experiments. |
 | `policy_artifacts.py` | Versioned persistence and compatibility checks for the current actor and environment-state contracts. | Training launcher and policy consumers. |
