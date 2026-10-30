@@ -93,9 +93,9 @@ R_{\mathrm{soil}}=(\pi\lambda_{\mathrm{length}})^{-1/2}.
 $$
 
 These choices are implemented in
-[`effective_uptake_radius_cm`](../../mycormarl/mycormarl/soil/phosphate_uptake.py#L70-L90)
+[`effective_uptake_radius_cm`](../../src/mycormarl/soil/phosphate_uptake.py#L70-L90)
 and
-[`sparse_uptake_resistance`](../../mycormarl/mycormarl/soil/phosphate_uptake.py#L93-L121).
+[`sparse_uptake_resistance`](../../src/mycormarl/soil/phosphate_uptake.py#L93-L121).
 The density-derived cap, fixed reference time, and later sparse/continuous
 blend have no counterpart in Roose et al. (2001).
 
@@ -252,7 +252,7 @@ C_s^2-(C_b-K_m-k)C_s-C_bK_m=0.
 $$
 
 The repository evaluates the stable physical root of this quadratic in
-[`sparse_surface_concentration`](../../mycormarl/mycormarl/soil/phosphate_uptake.py#L162-L187).
+[`sparse_surface_concentration`](../../src/mycormarl/soil/phosphate_uptake.py#L162-L187).
 
 For $Pe=0$, Roose et al.'s matched inner solution gives, in their dimensionless
 variables (paper eqs. 2.22--2.24),
@@ -333,16 +333,15 @@ problems.
   redistributes that amount by conservative diffusion, derives a fresh solution
   concentration, removes accepted root/fungal uptake, and stores the remaining
   amount. See
-  [`soil_diffusion_uptake_substep_with_diagnostics`](../../mycormarl/mycormarl/soil/soil.py#L190-L230),
-  [`labile_amount_to_solution_concentration`](../../mycormarl/mycormarl/soil/phosphate_grid.py#L221-L235),
-  and the inventory update in
-  [`_apply_blended_uptake_with_diagnostics`](../../mycormarl/mycormarl/soil/soil.py#L115-L151).
+  [`soil_diffusion_uptake_substep_with_diagnostics`](../../src/mycormarl/soil/soil.py),
+  [`labile_amount_to_solution_concentration`](../../src/mycormarl/soil/phosphate_grid.py#L221-L235),
+  and the inventory update in that same soil substep.
   Therefore the bulk concentration **does evolve**.
 - The sparse surface concentration also changes whenever current $C_b$ changes,
   because it is recalculated each substep. Its resistance, however, is held
   fixed over the biological step and reconstructed from current geometry with
   the same fixed $T_{\mathrm{ref}}$ on later steps
-  ([`evolve_soil_p`](../../mycormarl/mycormarl/soil/soil.py#L233-L285)).
+  ([`evolve_soil_p`](../../src/mycormarl/soil/soil.py#L233-L285)).
 - There is no state for time since a root/hypha arrived, no stored radial
   profile, and no depletion-front radius. Newly represented absorbing length
   therefore immediately receives the same reference-age resistance as older

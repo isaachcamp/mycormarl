@@ -1,0 +1,1531 @@
+{
+  "revision": "451586489d884a250be8fbbf2e34f1f8773834eb",
+  "generator_sha256": "9e09bd378735775f6928fd47fbc49de7ebaaca08d16ae0f90beae4a9060541a4",
+  "runtime": {
+    "python": "3.12.9",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "packages": {
+      "jax": "0.9.0",
+      "jaxlib": "0.9.0",
+      "numpy": "2.3.5",
+      "flax": "0.12.3",
+      "optax": "0.2.6",
+      "pytest": "9.0.2"
+    },
+    "devices": [
+      "TFRT_CPU_0"
+    ],
+    "jax_enable_x64": false
+  },
+  "tolerances": {
+    "reference_absolute": 2e-05,
+    "reference_relative": 2e-05,
+    "budget_absolute": 4e-06
+  },
+  "reference_origin": "Independent DOP853 illustrative values retained in test_stoichiometric_actions.py; no second biological engine in this runner",
+  "cases": [
+    {
+      "name": "A",
+      "reference": [
+        0.4740904191,
+        0.1580301397,
+        0.3678794412,
+        0.3678794412,
+        0.0
+      ],
+      "absolute_errors": [
+        9.74672302311852e-08,
+        2.7522023021697706e-08,
+        1.3989041441897498e-07,
+        1.3989041441897498e-07,
+        0.0
+      ],
+      "environment": {
+        "max_steps": 1,
+        "dt": 1.0,
+        "allocation_rate_step": 0.02,
+        "allocation_max_substeps": 65536,
+        "consumer_mode": "mixed",
+        "soil_radius_cm": 0.2,
+        "soil_depth_cm": 0.2,
+        "radial_interval_cm": 0.1,
+        "depth_interval_cm": 0.1,
+        "initial_solution_p_um": 0.0,
+        "initial_solution_p_depth_profile": null,
+        "phosphate_diffusion_coefficient_cm2_s": 1e-05,
+        "b_p": 239.0,
+        "phosphate_impedance_factor": 0.308,
+        "diffusion_cfl_safety": 0.8,
+        "uptake_reference_time_days": 1.0,
+        "uptake_transition_exponent": 2.0,
+        "theta_water": 0.3
+      },
+      "species": {
+        "plant": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 1.0,
+          "initial_p_pool": 1.0,
+          "kleaf": 0.0,
+          "kfroot": 0.18,
+          "amass": 0.05,
+          "jmax": 0.0,
+          "km": 0.0058,
+          "root_radius": 0.01,
+          "specific_root_length": 25434.3,
+          "root_length_density": 1.0,
+          "beta_root_distribution": 0.96,
+          "max_rooting_depth_cm": 150.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.2,
+          "biomass_cap": 50.0,
+          "biomass_observation_reference": 50.0
+        },
+        "fungus": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 0.0,
+          "initial_p_pool": 0.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.05,
+          "hyphal_radius": 0.0005,
+          "hyphal_tissue_carbon_density": 0.1155,
+          "saturation_density": 2000.0,
+          "jmax": 0.0,
+          "km": 0.0058
+        }
+      },
+      "actions": {
+        "plant": [
+          0.0,
+          0.75,
+          0.25
+        ],
+        "fungus": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "plant_vector": [
+        0.4740905165672302,
+        0.158030167222023,
+        0.36787930130958557,
+        0.36787930130958557,
+        0.0
+      ],
+      "organisms": {
+        "plant": {
+          "growth": 0.4740905165672302,
+          "output": 0.158030167222023,
+          "trade_out": 0.0,
+          "trade_in": 0.0,
+          "final_c": 0.36787930130958557,
+          "reproduction_c": 0.158030167222023,
+          "final_p": 0.36787930130958557,
+          "reproduction_p": 0.158030167222023
+        },
+        "fungus": {
+          "growth": 0.0,
+          "output": 0.0,
+          "trade_out": 0.0,
+          "trade_in": 0.0,
+          "final_c": 0.0,
+          "reproduction_c": 0.0,
+          "final_p": 0.0,
+          "reproduction_p": 0.0
+        }
+      },
+      "budget_residuals": {
+        "plant_c": 2.9802322387695312e-08,
+        "plant_p": 2.9802322387695312e-08,
+        "fungus_c": 0.0,
+        "fungus_p": 0.0
+      },
+      "allocation_substeps": 50,
+      "timing": {
+        "compile_and_first_seconds": 0.3310277920681983,
+        "warm_seconds_per_step": 8.338340558111668e-05,
+        "repeats": 5,
+        "protocol": "repeat one public step from identical initial state"
+      }
+    },
+    {
+      "name": "B",
+      "reference": [
+        0.2370452096,
+        0.0790150699,
+        0.5518191618,
+        0.1839397206,
+        1.1321205588
+      ],
+      "absolute_errors": [
+        3.980131529912612e-09,
+        1.190149687135822e-09,
+        7.572517091158915e-08,
+        1.0340562434096867e-08,
+        5.0483447200377896e-08
+      ],
+      "environment": {
+        "max_steps": 1,
+        "dt": 1.0,
+        "allocation_rate_step": 0.02,
+        "allocation_max_substeps": 65536,
+        "consumer_mode": "mixed",
+        "soil_radius_cm": 0.2,
+        "soil_depth_cm": 0.2,
+        "radial_interval_cm": 0.1,
+        "depth_interval_cm": 0.1,
+        "initial_solution_p_um": 0.0,
+        "initial_solution_p_depth_profile": null,
+        "phosphate_diffusion_coefficient_cm2_s": 1e-05,
+        "b_p": 239.0,
+        "phosphate_impedance_factor": 0.308,
+        "diffusion_cfl_safety": 0.8,
+        "uptake_reference_time_days": 1.0,
+        "uptake_transition_exponent": 2.0,
+        "theta_water": 0.3
+      },
+      "species": {
+        "plant": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 2.0,
+          "initial_p_pool": 0.5,
+          "kleaf": 0.0,
+          "kfroot": 0.18,
+          "amass": 0.05,
+          "jmax": 0.0,
+          "km": 0.0058,
+          "root_radius": 0.01,
+          "specific_root_length": 25434.3,
+          "root_length_density": 1.0,
+          "beta_root_distribution": 0.96,
+          "max_rooting_depth_cm": 150.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.2,
+          "biomass_cap": 50.0,
+          "biomass_observation_reference": 50.0
+        },
+        "fungus": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 0.0,
+          "initial_p_pool": 0.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.05,
+          "hyphal_radius": 0.0005,
+          "hyphal_tissue_carbon_density": 0.1155,
+          "saturation_density": 2000.0,
+          "jmax": 0.0,
+          "km": 0.0058
+        }
+      },
+      "actions": {
+        "plant": [
+          1.0,
+          0.75,
+          0.25
+        ],
+        "fungus": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "plant_vector": [
+        0.23704521358013153,
+        0.07901506870985031,
+        0.5518190860748291,
+        0.18393971025943756,
+        1.1321206092834473
+      ],
+      "organisms": {
+        "plant": {
+          "growth": 0.23704521358013153,
+          "output": 0.07901506870985031,
+          "trade_out": 1.1321206092834473,
+          "trade_in": 0.0,
+          "final_c": 0.5518190860748291,
+          "reproduction_c": 0.07901506870985031,
+          "final_p": 0.18393971025943756,
+          "reproduction_p": 0.07901506870985031
+        },
+        "fungus": {
+          "growth": 0.0,
+          "output": 0.0,
+          "trade_out": 0.0,
+          "trade_in": 1.1321206092834473,
+          "final_c": 1.1321206092834473,
+          "reproduction_c": 0.0,
+          "final_p": 0.0,
+          "reproduction_p": 0.0
+        }
+      },
+      "budget_residuals": {
+        "plant_c": 2.9802322387695312e-08,
+        "plant_p": 1.4901161193847656e-08,
+        "fungus_c": 0.0,
+        "fungus_p": 0.0
+      },
+      "allocation_substeps": 100,
+      "timing": {
+        "compile_and_first_seconds": 0.27204720792360604,
+        "warm_seconds_per_step": 7.24999699741602e-05,
+        "repeats": 5,
+        "protocol": "repeat one public step from identical initial state"
+      }
+    },
+    {
+      "name": "C",
+      "reference": [
+        0.3242492688,
+        0.1080830896,
+        0.1353352832,
+        0.5676676416,
+        0.4323323584
+      ],
+      "absolute_errors": [
+        2.8580447397619224e-08,
+        9.526815794580479e-09,
+        9.111568755049149e-08,
+        3.8107263233833066e-08,
+        3.8107263178321915e-08
+      ],
+      "environment": {
+        "max_steps": 1,
+        "dt": 1.0,
+        "allocation_rate_step": 0.02,
+        "allocation_max_substeps": 65536,
+        "consumer_mode": "mixed",
+        "soil_radius_cm": 0.2,
+        "soil_depth_cm": 0.2,
+        "radial_interval_cm": 0.1,
+        "depth_interval_cm": 0.1,
+        "initial_solution_p_um": 0.0,
+        "initial_solution_p_depth_profile": null,
+        "phosphate_diffusion_coefficient_cm2_s": 1e-05,
+        "b_p": 239.0,
+        "phosphate_impedance_factor": 0.308,
+        "diffusion_cfl_safety": 0.8,
+        "uptake_reference_time_days": 1.0,
+        "uptake_transition_exponent": 2.0,
+        "theta_water": 0.3
+      },
+      "species": {
+        "plant": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 1.0,
+          "initial_p_pool": 1.0,
+          "kleaf": 0.0,
+          "kfroot": 0.18,
+          "amass": 0.05,
+          "jmax": 0.0,
+          "km": 0.0058,
+          "root_radius": 0.01,
+          "specific_root_length": 25434.3,
+          "root_length_density": 1.0,
+          "beta_root_distribution": 0.96,
+          "max_rooting_depth_cm": 150.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.2,
+          "biomass_cap": 50.0,
+          "biomass_observation_reference": 50.0
+        },
+        "fungus": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 0.0,
+          "initial_p_pool": 0.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.05,
+          "hyphal_radius": 0.0005,
+          "hyphal_tissue_carbon_density": 0.1155,
+          "saturation_density": 2000.0,
+          "jmax": 0.0,
+          "km": 0.0058
+        }
+      },
+      "actions": {
+        "plant": [
+          1.0,
+          0.75,
+          0.25
+        ],
+        "fungus": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "plant_vector": [
+        0.3242492973804474,
+        0.1080830991268158,
+        0.13533519208431244,
+        0.5676676034927368,
+        0.4323323965072632
+      ],
+      "organisms": {
+        "plant": {
+          "growth": 0.3242492973804474,
+          "output": 0.1080830991268158,
+          "trade_out": 0.4323323965072632,
+          "trade_in": 0.0,
+          "final_c": 0.13533519208431244,
+          "reproduction_c": 0.1080830991268158,
+          "final_p": 0.5676676034927368,
+          "reproduction_p": 0.1080830991268158
+        },
+        "fungus": {
+          "growth": 0.0,
+          "output": 0.0,
+          "trade_out": 0.0,
+          "trade_in": 0.4323323965072632,
+          "final_c": 0.4323323965072632,
+          "reproduction_c": 0.0,
+          "final_p": 0.0,
+          "reproduction_p": 0.0
+        }
+      },
+      "budget_residuals": {
+        "plant_c": 1.4901161193847656e-08,
+        "plant_p": 0.0,
+        "fungus_c": 0.0,
+        "fungus_p": 0.0
+      },
+      "allocation_substeps": 100,
+      "timing": {
+        "compile_and_first_seconds": 0.26645316695794463,
+        "warm_seconds_per_step": 7.145823910832405e-05,
+        "repeats": 5,
+        "protocol": "repeat one public step from identical initial state"
+      }
+    },
+    {
+      "name": "D",
+      "reference": [
+        0.4133337997,
+        0.1377779332,
+        0.3818521706,
+        0.7159243635,
+        1.0670360965
+      ],
+      "absolute_errors": [
+        1.55343606261793e-06,
+        5.128783004682003e-07,
+        1.5405550628511122e-06,
+        2.544289947503664e-06,
+        5.406604615121324e-07
+      ],
+      "environment": {
+        "max_steps": 1,
+        "dt": 1.0,
+        "allocation_rate_step": 0.02,
+        "allocation_max_substeps": 65536,
+        "consumer_mode": "mixed",
+        "soil_radius_cm": 0.2,
+        "soil_depth_cm": 0.2,
+        "radial_interval_cm": 0.1,
+        "depth_interval_cm": 0.1,
+        "initial_solution_p_um": 0.0,
+        "initial_solution_p_depth_profile": null,
+        "phosphate_diffusion_coefficient_cm2_s": 1e-05,
+        "b_p": 239.0,
+        "phosphate_impedance_factor": 0.308,
+        "diffusion_cfl_safety": 0.8,
+        "uptake_reference_time_days": 1.0,
+        "uptake_transition_exponent": 2.0,
+        "theta_water": 0.3
+      },
+      "species": {
+        "plant": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 2.0,
+          "initial_p_pool": 0.2,
+          "kleaf": 0.0,
+          "kfroot": 0.18,
+          "amass": 0.05,
+          "jmax": 0.0,
+          "km": 0.0058,
+          "root_radius": 0.01,
+          "specific_root_length": 25434.3,
+          "root_length_density": 1.0,
+          "beta_root_distribution": 0.96,
+          "max_rooting_depth_cm": 150.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.2,
+          "biomass_cap": 50.0,
+          "biomass_observation_reference": 50.0
+        },
+        "fungus": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 0.2,
+          "initial_p_pool": 2.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.05,
+          "hyphal_radius": 0.0005,
+          "hyphal_tissue_carbon_density": 0.1155,
+          "saturation_density": 2000.0,
+          "jmax": 0.0,
+          "km": 0.0058
+        }
+      },
+      "actions": {
+        "plant": [
+          1.0,
+          0.75,
+          0.25
+        ],
+        "fungus": [
+          1.0,
+          0.75,
+          0.25
+        ]
+      },
+      "plant_vector": [
+        0.4133353531360626,
+        0.13777844607830048,
+        0.38185063004493713,
+        0.7159218192100525,
+        1.0670355558395386
+      ],
+      "organisms": {
+        "plant": {
+          "growth": 0.4133353531360626,
+          "output": 0.13777844607830048,
+          "trade_out": 1.0670355558395386,
+          "trade_in": 1.0670355558395386,
+          "final_c": 0.38185063004493713,
+          "reproduction_c": 0.13777844607830048,
+          "final_p": 0.7159218192100525,
+          "reproduction_p": 0.13777844607830048
+        },
+        "fungus": {
+          "growth": 0.4133353531360626,
+          "output": 0.13777844607830048,
+          "trade_out": 1.0670355558395386,
+          "trade_in": 1.0670355558395386,
+          "final_c": 0.7159218192100525,
+          "reproduction_c": 0.13777844607830048,
+          "final_p": 0.38185063004493713,
+          "reproduction_p": 0.13777844607830048
+        }
+      },
+      "budget_residuals": {
+        "plant_c": 2.9802322387695312e-08,
+        "plant_p": -4.470348358154297e-08,
+        "fungus_c": -4.470348358154297e-08,
+        "fungus_p": 2.9802322387695312e-08
+      },
+      "allocation_substeps": 100,
+      "timing": {
+        "compile_and_first_seconds": 0.2595378749538213,
+        "warm_seconds_per_step": 7.097497582435608e-05,
+        "repeats": 5,
+        "protocol": "repeat one public step from identical initial state"
+      }
+    },
+    {
+      "name": "E",
+      "reference": [
+        0.1080830896,
+        0.3242492688,
+        0.1353352832,
+        0.5676676416,
+        0.4323323584
+      ],
+      "absolute_errors": [
+        9.526815794580479e-09,
+        2.8580447397619224e-08,
+        9.111568755049149e-08,
+        3.8107263233833066e-08,
+        3.8107263178321915e-08
+      ],
+      "environment": {
+        "max_steps": 1,
+        "dt": 1.0,
+        "allocation_rate_step": 0.02,
+        "allocation_max_substeps": 65536,
+        "consumer_mode": "mixed",
+        "soil_radius_cm": 0.2,
+        "soil_depth_cm": 0.2,
+        "radial_interval_cm": 0.1,
+        "depth_interval_cm": 0.1,
+        "initial_solution_p_um": 0.0,
+        "initial_solution_p_depth_profile": null,
+        "phosphate_diffusion_coefficient_cm2_s": 1e-05,
+        "b_p": 239.0,
+        "phosphate_impedance_factor": 0.308,
+        "diffusion_cfl_safety": 0.8,
+        "uptake_reference_time_days": 1.0,
+        "uptake_transition_exponent": 2.0,
+        "theta_water": 0.3
+      },
+      "species": {
+        "plant": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 1.0,
+          "initial_p_pool": 1.0,
+          "kleaf": 0.0,
+          "kfroot": 0.18,
+          "amass": 0.05,
+          "jmax": 0.0,
+          "km": 0.0058,
+          "root_radius": 0.01,
+          "specific_root_length": 25434.3,
+          "root_length_density": 1.0,
+          "beta_root_distribution": 0.96,
+          "max_rooting_depth_cm": 150.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.2,
+          "biomass_cap": 50.0,
+          "biomass_observation_reference": 50.0
+        },
+        "fungus": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 0.0,
+          "initial_p_pool": 0.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.05,
+          "hyphal_radius": 0.0005,
+          "hyphal_tissue_carbon_density": 0.1155,
+          "saturation_density": 2000.0,
+          "jmax": 0.0,
+          "km": 0.0058
+        }
+      },
+      "actions": {
+        "plant": [
+          1.0,
+          0.25,
+          0.75
+        ],
+        "fungus": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "plant_vector": [
+        0.1080830991268158,
+        0.3242492973804474,
+        0.13533519208431244,
+        0.5676676034927368,
+        0.4323323965072632
+      ],
+      "organisms": {
+        "plant": {
+          "growth": 0.1080830991268158,
+          "output": 0.3242492973804474,
+          "trade_out": 0.4323323965072632,
+          "trade_in": 0.0,
+          "final_c": 0.13533519208431244,
+          "reproduction_c": 0.3242492973804474,
+          "final_p": 0.5676676034927368,
+          "reproduction_p": 0.3242492973804474
+        },
+        "fungus": {
+          "growth": 0.0,
+          "output": 0.0,
+          "trade_out": 0.0,
+          "trade_in": 0.4323323965072632,
+          "final_c": 0.4323323965072632,
+          "reproduction_c": 0.0,
+          "final_p": 0.0,
+          "reproduction_p": 0.0
+        }
+      },
+      "budget_residuals": {
+        "plant_c": 1.4901161193847656e-08,
+        "plant_p": 0.0,
+        "fungus_c": 0.0,
+        "fungus_p": 0.0
+      },
+      "allocation_substeps": 100,
+      "timing": {
+        "compile_and_first_seconds": 0.31401979085057974,
+        "warm_seconds_per_step": 7.825000211596489e-05,
+        "repeats": 5,
+        "protocol": "repeat one public step from identical initial state"
+      }
+    },
+    {
+      "name": "F",
+      "reference": [
+        0.3242492688,
+        0.0540415448,
+        0.1353352832,
+        0.5676676416,
+        0.4323323584
+      ],
+      "absolute_errors": [
+        2.8580447397619224e-08,
+        4.763407897290239e-09,
+        9.111568755049149e-08,
+        3.8107263233833066e-08,
+        3.8107263178321915e-08
+      ],
+      "environment": {
+        "max_steps": 1,
+        "dt": 1.0,
+        "allocation_rate_step": 0.02,
+        "allocation_max_substeps": 65536,
+        "consumer_mode": "mixed",
+        "soil_radius_cm": 0.2,
+        "soil_depth_cm": 0.2,
+        "radial_interval_cm": 0.1,
+        "depth_interval_cm": 0.1,
+        "initial_solution_p_um": 0.0,
+        "initial_solution_p_depth_profile": null,
+        "phosphate_diffusion_coefficient_cm2_s": 1e-05,
+        "b_p": 239.0,
+        "phosphate_impedance_factor": 0.308,
+        "diffusion_cfl_safety": 0.8,
+        "uptake_reference_time_days": 1.0,
+        "uptake_transition_exponent": 2.0,
+        "theta_water": 0.3
+      },
+      "species": {
+        "plant": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 1.0,
+          "initial_p_pool": 1.0,
+          "kleaf": 0.0,
+          "kfroot": 0.18,
+          "amass": 0.05,
+          "jmax": 0.0,
+          "km": 0.0058,
+          "root_radius": 0.01,
+          "specific_root_length": 25434.3,
+          "root_length_density": 1.0,
+          "beta_root_distribution": 0.96,
+          "max_rooting_depth_cm": 150.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 2.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.2,
+          "biomass_cap": 50.0,
+          "biomass_observation_reference": 50.0
+        },
+        "fungus": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 0.0,
+          "initial_p_pool": 0.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.05,
+          "hyphal_radius": 0.0005,
+          "hyphal_tissue_carbon_density": 0.1155,
+          "saturation_density": 2000.0,
+          "jmax": 0.0,
+          "km": 0.0058
+        }
+      },
+      "actions": {
+        "plant": [
+          1.0,
+          0.75,
+          0.25
+        ],
+        "fungus": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "plant_vector": [
+        0.3242492973804474,
+        0.0540415495634079,
+        0.13533519208431244,
+        0.5676676034927368,
+        0.4323323965072632
+      ],
+      "organisms": {
+        "plant": {
+          "growth": 0.3242492973804474,
+          "output": 0.0540415495634079,
+          "trade_out": 0.4323323965072632,
+          "trade_in": 0.0,
+          "final_c": 0.13533519208431244,
+          "reproduction_c": 0.1080830991268158,
+          "final_p": 0.5676676034927368,
+          "reproduction_p": 0.1080830991268158
+        },
+        "fungus": {
+          "growth": 0.0,
+          "output": 0.0,
+          "trade_out": 0.0,
+          "trade_in": 0.4323323965072632,
+          "final_c": 0.4323323965072632,
+          "reproduction_c": 0.0,
+          "final_p": 0.0,
+          "reproduction_p": 0.0
+        }
+      },
+      "budget_residuals": {
+        "plant_c": 1.4901161193847656e-08,
+        "plant_p": 0.0,
+        "fungus_c": 0.0,
+        "fungus_p": 0.0
+      },
+      "allocation_substeps": 100,
+      "timing": {
+        "compile_and_first_seconds": 0.2979858329053968,
+        "warm_seconds_per_step": 6.937501020729542e-05,
+        "repeats": 5,
+        "protocol": "repeat one public step from identical initial state"
+      }
+    }
+  ],
+  "refinement": [
+    {
+      "rate_step": 0.1,
+      "plant_c_error": 1.5089140829482872e-05,
+      "environment": {
+        "max_steps": 1,
+        "dt": 1.0,
+        "allocation_rate_step": 0.1,
+        "allocation_max_substeps": 65536,
+        "consumer_mode": "mixed",
+        "soil_radius_cm": 0.2,
+        "soil_depth_cm": 0.2,
+        "radial_interval_cm": 0.1,
+        "depth_interval_cm": 0.1,
+        "initial_solution_p_um": 0.0,
+        "initial_solution_p_depth_profile": null,
+        "phosphate_diffusion_coefficient_cm2_s": 1e-05,
+        "b_p": 239.0,
+        "phosphate_impedance_factor": 0.308,
+        "diffusion_cfl_safety": 0.8,
+        "uptake_reference_time_days": 1.0,
+        "uptake_transition_exponent": 2.0,
+        "theta_water": 0.3
+      },
+      "species": {
+        "plant": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 2.0,
+          "initial_p_pool": 0.2,
+          "kleaf": 0.0,
+          "kfroot": 0.18,
+          "amass": 0.05,
+          "jmax": 0.0,
+          "km": 0.0058,
+          "root_radius": 0.01,
+          "specific_root_length": 25434.3,
+          "root_length_density": 1.0,
+          "beta_root_distribution": 0.96,
+          "max_rooting_depth_cm": 150.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.2,
+          "biomass_cap": 50.0,
+          "biomass_observation_reference": 50.0
+        },
+        "fungus": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 0.2,
+          "initial_p_pool": 2.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.05,
+          "hyphal_radius": 0.0005,
+          "hyphal_tissue_carbon_density": 0.1155,
+          "saturation_density": 2000.0,
+          "jmax": 0.0,
+          "km": 0.0058
+        }
+      },
+      "actions": {
+        "plant": [
+          1.0,
+          0.75,
+          0.25
+        ],
+        "fungus": [
+          1.0,
+          0.75,
+          0.25
+        ]
+      },
+      "plant_vector": [
+        0.41330406069755554,
+        0.13776801526546478,
+        0.38186725974082947,
+        0.7159886360168457,
+        1.0670607089996338
+      ],
+      "organisms": {
+        "plant": {
+          "growth": 0.41330406069755554,
+          "output": 0.13776801526546478,
+          "trade_out": 1.0670607089996338,
+          "trade_in": 1.0670607089996338,
+          "final_c": 0.38186725974082947,
+          "reproduction_c": 0.13776801526546478,
+          "final_p": 0.7159886360168457,
+          "reproduction_p": 0.13776801526546478
+        },
+        "fungus": {
+          "growth": 0.41330406069755554,
+          "output": 0.13776801526546478,
+          "trade_out": 1.0670607089996338,
+          "trade_in": 1.0670607089996338,
+          "final_c": 0.7159886360168457,
+          "reproduction_c": 0.13776801526546478,
+          "final_p": 0.38186725974082947,
+          "reproduction_p": 0.13776801526546478
+        }
+      },
+      "budget_residuals": {
+        "plant_c": -2.9802322387695312e-08,
+        "plant_p": 1.4901161193847656e-08,
+        "fungus_c": 1.4901161193847656e-08,
+        "fungus_p": -2.9802322387695312e-08
+      },
+      "allocation_substeps": 20,
+      "timing": {
+        "compile_and_first_seconds": 0.26114670909009874,
+        "warm_seconds_per_step": 7.240823470056057e-05,
+        "repeats": 5,
+        "protocol": "repeat one public step from identical initial state"
+      }
+    },
+    {
+      "rate_step": 0.02,
+      "plant_c_error": 1.5405550628511122e-06,
+      "environment": {
+        "max_steps": 1,
+        "dt": 1.0,
+        "allocation_rate_step": 0.02,
+        "allocation_max_substeps": 65536,
+        "consumer_mode": "mixed",
+        "soil_radius_cm": 0.2,
+        "soil_depth_cm": 0.2,
+        "radial_interval_cm": 0.1,
+        "depth_interval_cm": 0.1,
+        "initial_solution_p_um": 0.0,
+        "initial_solution_p_depth_profile": null,
+        "phosphate_diffusion_coefficient_cm2_s": 1e-05,
+        "b_p": 239.0,
+        "phosphate_impedance_factor": 0.308,
+        "diffusion_cfl_safety": 0.8,
+        "uptake_reference_time_days": 1.0,
+        "uptake_transition_exponent": 2.0,
+        "theta_water": 0.3
+      },
+      "species": {
+        "plant": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 2.0,
+          "initial_p_pool": 0.2,
+          "kleaf": 0.0,
+          "kfroot": 0.18,
+          "amass": 0.05,
+          "jmax": 0.0,
+          "km": 0.0058,
+          "root_radius": 0.01,
+          "specific_root_length": 25434.3,
+          "root_length_density": 1.0,
+          "beta_root_distribution": 0.96,
+          "max_rooting_depth_cm": 150.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.2,
+          "biomass_cap": 50.0,
+          "biomass_observation_reference": 50.0
+        },
+        "fungus": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 0.2,
+          "initial_p_pool": 2.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.05,
+          "hyphal_radius": 0.0005,
+          "hyphal_tissue_carbon_density": 0.1155,
+          "saturation_density": 2000.0,
+          "jmax": 0.0,
+          "km": 0.0058
+        }
+      },
+      "actions": {
+        "plant": [
+          1.0,
+          0.75,
+          0.25
+        ],
+        "fungus": [
+          1.0,
+          0.75,
+          0.25
+        ]
+      },
+      "plant_vector": [
+        0.4133353531360626,
+        0.13777844607830048,
+        0.38185063004493713,
+        0.7159218192100525,
+        1.0670355558395386
+      ],
+      "organisms": {
+        "plant": {
+          "growth": 0.4133353531360626,
+          "output": 0.13777844607830048,
+          "trade_out": 1.0670355558395386,
+          "trade_in": 1.0670355558395386,
+          "final_c": 0.38185063004493713,
+          "reproduction_c": 0.13777844607830048,
+          "final_p": 0.7159218192100525,
+          "reproduction_p": 0.13777844607830048
+        },
+        "fungus": {
+          "growth": 0.4133353531360626,
+          "output": 0.13777844607830048,
+          "trade_out": 1.0670355558395386,
+          "trade_in": 1.0670355558395386,
+          "final_c": 0.7159218192100525,
+          "reproduction_c": 0.13777844607830048,
+          "final_p": 0.38185063004493713,
+          "reproduction_p": 0.13777844607830048
+        }
+      },
+      "budget_residuals": {
+        "plant_c": 2.9802322387695312e-08,
+        "plant_p": -4.470348358154297e-08,
+        "fungus_c": -4.470348358154297e-08,
+        "fungus_p": 2.9802322387695312e-08
+      },
+      "allocation_substeps": 100,
+      "timing": {
+        "compile_and_first_seconds": 0.2580891659017652,
+        "warm_seconds_per_step": 7.031676359474659e-05,
+        "repeats": 5,
+        "protocol": "repeat one public step from identical initial state"
+      }
+    },
+    {
+      "rate_step": 0.005,
+      "plant_c_error": 9.165701309044039e-09,
+      "environment": {
+        "max_steps": 1,
+        "dt": 1.0,
+        "allocation_rate_step": 0.005,
+        "allocation_max_substeps": 65536,
+        "consumer_mode": "mixed",
+        "soil_radius_cm": 0.2,
+        "soil_depth_cm": 0.2,
+        "radial_interval_cm": 0.1,
+        "depth_interval_cm": 0.1,
+        "initial_solution_p_um": 0.0,
+        "initial_solution_p_depth_profile": null,
+        "phosphate_diffusion_coefficient_cm2_s": 1e-05,
+        "b_p": 239.0,
+        "phosphate_impedance_factor": 0.308,
+        "diffusion_cfl_safety": 0.8,
+        "uptake_reference_time_days": 1.0,
+        "uptake_transition_exponent": 2.0,
+        "theta_water": 0.3
+      },
+      "species": {
+        "plant": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 2.0,
+          "initial_p_pool": 0.2,
+          "kleaf": 0.0,
+          "kfroot": 0.18,
+          "amass": 0.05,
+          "jmax": 0.0,
+          "km": 0.0058,
+          "root_radius": 0.01,
+          "specific_root_length": 25434.3,
+          "root_length_density": 1.0,
+          "beta_root_distribution": 0.96,
+          "max_rooting_depth_cm": 150.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.2,
+          "biomass_cap": 50.0,
+          "biomass_observation_reference": 50.0
+        },
+        "fungus": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 0.2,
+          "initial_p_pool": 2.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.05,
+          "hyphal_radius": 0.0005,
+          "hyphal_tissue_carbon_density": 0.1155,
+          "saturation_density": 2000.0,
+          "jmax": 0.0,
+          "km": 0.0058
+        }
+      },
+      "actions": {
+        "plant": [
+          1.0,
+          0.75,
+          0.25
+        ],
+        "fungus": [
+          1.0,
+          0.75,
+          0.25
+        ]
+      },
+      "plant_vector": [
+        0.4133337736129761,
+        0.1377779245376587,
+        0.3818521797657013,
+        0.7159244418144226,
+        1.0670361518859863
+      ],
+      "organisms": {
+        "plant": {
+          "growth": 0.4133337736129761,
+          "output": 0.1377779245376587,
+          "trade_out": 1.0670361518859863,
+          "trade_in": 1.0670361518859863,
+          "final_c": 0.3818521797657013,
+          "reproduction_c": 0.1377779245376587,
+          "final_p": 0.7159244418144226,
+          "reproduction_p": 0.1377779245376587
+        },
+        "fungus": {
+          "growth": 0.4133337736129761,
+          "output": 0.1377779245376587,
+          "trade_out": 1.0670361518859863,
+          "trade_in": 1.0670361518859863,
+          "final_c": 0.7159244418144226,
+          "reproduction_c": 0.1377779245376587,
+          "final_p": 0.3818521797657013,
+          "reproduction_p": 0.1377779245376587
+        }
+      },
+      "budget_residuals": {
+        "plant_c": -2.9802322387695312e-08,
+        "plant_p": 1.4901161193847656e-08,
+        "fungus_c": 1.4901161193847656e-08,
+        "fungus_p": -2.9802322387695312e-08
+      },
+      "allocation_substeps": 400,
+      "timing": {
+        "compile_and_first_seconds": 0.26472700014710426,
+        "warm_seconds_per_step": 9.176661260426044e-05,
+        "repeats": 5,
+        "protocol": "repeat one public step from identical initial state"
+      }
+    }
+  ],
+  "fast_static": {
+    "declaration": {
+      "mode": "mixed",
+      "initial_p_micromolar": 0.0,
+      "seed": 7,
+      "status": "completed",
+      "rejection_reasons": [],
+      "steps": 1,
+      "uniform_initial_p": true,
+      "initial_solution_p_profiled": false,
+      "biomass": {
+        "plant": 1.949049949645996,
+        "fungus": 1.0
+      },
+      "final_living_biomass": {
+        "plant": 1.949049949645996,
+        "fungus": 1.0
+      },
+      "c_pools": {
+        "plant": 0.0009999978356063366,
+        "fungus": 0.0499500036239624
+      },
+      "p_pools": {
+        "plant": 0.05094999819993973,
+        "fungus": 0.0
+      },
+      "uptake": {
+        "plant": 0.0,
+        "fungus": 0.0
+      },
+      "transfers": {
+        "plant_c_out": 0.0499500036239624,
+        "fungus_p_out": 0.0
+      },
+      "biological_deaths": {
+        "plant": 0,
+        "fungus": 0
+      },
+      "commanded_rate_actions": {
+        "plant": [
+          6.907755374908447,
+          131.24734497070312,
+          0.0
+        ],
+        "fungus": [
+          0.0,
+          138.1551055908203,
+          0.0
+        ]
+      },
+      "cumulative_growth": {
+        "plant": 0.9490500092506409,
+        "fungus": 0.0
+      },
+      "cumulative_reproductive_fitness": {
+        "plant": 0.0,
+        "fungus": 0.0
+      },
+      "cumulative_direct_p_uptake_mg": {
+        "plant": 0.0,
+        "fungus": 0.0
+      },
+      "cumulative_carbon_fixed": 0.0,
+      "soil_inventory_initial": 0.0,
+      "soil_inventory_final": 0.0,
+      "p_loss_or_export": 0.0,
+      "p_loss_or_export_counters": {
+        "plant_mortality": 0.0,
+        "fungus_mortality": 0.0,
+        "plant_maintenance": 0.0,
+        "fungus_maintenance": 0.0,
+        "plant_reproduction": 0.0,
+        "fungus_reproduction": 0.0
+      },
+      "p_accounting_residual": 0.0,
+      "terminated": true,
+      "resource_accounting": {
+        "plant": {
+          "c": {
+            "acquired": 0.0,
+            "maintenance": 0.0,
+            "growth": 0.9490500092506409,
+            "trade_in": 0.0,
+            "trade_out": 0.0499500036239624,
+            "reproduction": 0.0
+          },
+          "p": {
+            "acquired": 0.0,
+            "maintenance": 0.0,
+            "growth": 0.9490500092506409,
+            "trade_in": 0.0,
+            "trade_out": 0.0,
+            "reproduction": 0.0
+          }
+        },
+        "fungus": {
+          "c": {
+            "acquired": 0.0499500036239624,
+            "maintenance": 0.0,
+            "growth": 0.0,
+            "trade_in": 0.0499500036239624,
+            "trade_out": 0.0,
+            "reproduction": 0.0
+          },
+          "p": {
+            "acquired": 0.0,
+            "maintenance": 0.0,
+            "growth": 0.0,
+            "trade_in": 0.0,
+            "trade_out": 0.0,
+            "reproduction": 0.0
+          }
+        }
+      },
+      "resource_accounting_definition": {
+        "resources": "C and P amounts in the model's native units",
+        "destinations": "cumulative flows observed during each timestep; final pools are reported separately",
+        "acquired": "photosynthetic fixation or direct uptake plus incoming trade",
+        "growth": "resource consumed for realized structural biomass growth",
+        "reproduction": "cost-scaled resource exports, distinct from reproductive output",
+        "trade_in_out": "resource transferred between agents"
+      },
+      "static_allocation": {
+        "protocol": "rate-static-allocation-v1",
+        "interval_days": 0.05,
+        "environment_interval_days": 0.05,
+        "policy_interval_days": 0.05,
+        "target_residual_fraction": 0.001,
+        "total_rate_per_day": 138.15510557964274,
+        "strategies": {
+          "plant": {
+            "trade_share": 0.05,
+            "reproductive_share": 0.0,
+            "reproduction_cost_scale": 1.0
+          },
+          "fungus": {
+            "trade_share": 0.0,
+            "reproductive_share": 0.0,
+            "reproduction_cost_scale": 1.0
+          }
+        },
+        "supplied_total_rate_per_day": null,
+        "total_rate_validation_tolerance": {
+          "relative": 1e-07,
+          "absolute_per_day": 1e-10
+        },
+        "allocation_solver": {
+          "rate_step": 0.02,
+          "max_substeps": 65536
+        }
+      }
+    },
+    "step": {
+      "environment": {
+        "max_steps": 1,
+        "dt": 0.05,
+        "allocation_rate_step": 0.02,
+        "allocation_max_substeps": 65536,
+        "consumer_mode": "mixed",
+        "soil_radius_cm": 0.2,
+        "soil_depth_cm": 0.2,
+        "radial_interval_cm": 0.1,
+        "depth_interval_cm": 0.1,
+        "initial_solution_p_um": 0.0,
+        "initial_solution_p_depth_profile": null,
+        "phosphate_diffusion_coefficient_cm2_s": 1e-05,
+        "b_p": 239.0,
+        "phosphate_impedance_factor": 0.308,
+        "diffusion_cfl_safety": 0.8,
+        "uptake_reference_time_days": 1.0,
+        "uptake_transition_exponent": 2.0,
+        "theta_water": 0.3
+      },
+      "species": {
+        "plant": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 1.0,
+          "initial_p_pool": 1.0,
+          "kleaf": 0.0,
+          "kfroot": 0.18,
+          "amass": 0.05,
+          "jmax": 0.0,
+          "km": 0.0058,
+          "root_radius": 0.01,
+          "specific_root_length": 25434.3,
+          "root_length_density": 1.0,
+          "beta_root_distribution": 0.96,
+          "max_rooting_depth_cm": 150.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.2,
+          "biomass_cap": 50.0,
+          "biomass_observation_reference": 50.0
+        },
+        "fungus": {
+          "initial_biomass": 1.0,
+          "initial_c_pool": 0.0,
+          "initial_p_pool": 0.0,
+          "gamma_c": 1.0,
+          "gamma_p": 1.0,
+          "reproduction_cost_scale": 1.0,
+          "kappa_c": 0.0,
+          "kappa_p": 0.0,
+          "death_fraction": 0.05,
+          "hyphal_radius": 0.0005,
+          "hyphal_tissue_carbon_density": 0.1155,
+          "saturation_density": 2000.0,
+          "jmax": 0.0,
+          "km": 0.0058
+        }
+      },
+      "actions": {
+        "plant": [
+          6.907755374908447,
+          131.24734497070312,
+          0.0
+        ],
+        "fungus": [
+          0.0,
+          138.1551055908203,
+          0.0
+        ]
+      },
+      "plant_vector": [
+        0.9490500092506409,
+        0.0,
+        0.0009999978356063366,
+        0.05094999819993973,
+        0.0499500036239624
+      ],
+      "organisms": {
+        "plant": {
+          "growth": 0.9490500092506409,
+          "output": 0.0,
+          "trade_out": 0.0499500036239624,
+          "trade_in": 0.0,
+          "final_c": 0.0009999978356063366,
+          "reproduction_c": 0.0,
+          "final_p": 0.05094999819993973,
+          "reproduction_p": 0.0
+        },
+        "fungus": {
+          "growth": 0.0,
+          "output": 0.0,
+          "trade_out": 0.0,
+          "trade_in": 0.0499500036239624,
+          "final_c": 0.0499500036239624,
+          "reproduction_c": 0.0,
+          "final_p": 0.0,
+          "reproduction_p": 0.0
+        }
+      },
+      "budget_residuals": {
+        "plant_c": -1.0710209608078003e-08,
+        "plant_p": -7.450580596923828e-09,
+        "fungus_c": 0.0,
+        "fungus_p": 0.0
+      },
+      "allocation_substeps": 346,
+      "timing": {
+        "compile_and_first_seconds": 0.25980974989943206,
+        "warm_seconds_per_step": 7.653343491256236e-05,
+        "repeats": 5,
+        "protocol": "repeat one public step from identical initial state"
+      }
+    }
+  },
+  "coupled_benchmark": {
+    "environment": {
+      "max_steps": 20,
+      "dt": 0.05,
+      "allocation_rate_step": 0.02,
+      "allocation_max_substeps": 65536,
+      "consumer_mode": "mixed",
+      "soil_radius_cm": 1.0,
+      "soil_depth_cm": 2.0,
+      "radial_interval_cm": 0.5,
+      "depth_interval_cm": 0.5,
+      "initial_solution_p_um": 1.0,
+      "initial_solution_p_depth_profile": null,
+      "phosphate_diffusion_coefficient_cm2_s": 1e-05,
+      "b_p": 239.0,
+      "phosphate_impedance_factor": 0.308,
+      "diffusion_cfl_safety": 0.8,
+      "uptake_reference_time_days": 1.0,
+      "uptake_transition_exponent": 2.0,
+      "theta_water": 0.3
+    },
+    "species": {
+      "plant": {
+        "initial_biomass": 0.01,
+        "initial_c_pool": 0.00402,
+        "initial_p_pool": 0.0192,
+        "kleaf": 0.68,
+        "kfroot": 0.18,
+        "amass": 0.05,
+        "jmax": 3.26e-06,
+        "km": 0.0058,
+        "root_radius": 0.01,
+        "specific_root_length": 25434.3,
+        "root_length_density": 1.0,
+        "beta_root_distribution": 0.96,
+        "max_rooting_depth_cm": 150.0,
+        "gamma_c": 0.402,
+        "gamma_p": 1.92,
+        "reproduction_cost_scale": 1.0,
+        "kappa_c": 0.0,
+        "kappa_p": 0.0,
+        "death_fraction": 0.2,
+        "biomass_cap": 50.0,
+        "biomass_observation_reference": 50.0
+      },
+      "fungus": {
+        "initial_biomass": 0.0001,
+        "initial_c_pool": 5e-05,
+        "initial_p_pool": 0.00013000000000000002,
+        "gamma_c": 0.5,
+        "gamma_p": 1.3,
+        "reproduction_cost_scale": 1.0,
+        "kappa_c": 0.0,
+        "kappa_p": 0.0,
+        "death_fraction": 0.05,
+        "hyphal_radius": 0.0005,
+        "hyphal_tissue_carbon_density": 0.1155,
+        "saturation_density": 2000.0,
+        "jmax": 3.26e-06,
+        "km": 0.0058
+      }
+    },
+    "measurements": {
+      "grid_shape": [
+        2,
+        4
+      ],
+      "cell_count": 8,
+      "soil_substeps": 1,
+      "compile_and_first_step_seconds": 0.09671733295544982,
+      "warmed_seconds_per_step": 3.296658396720886e-05,
+      "state_array_bytes": 171,
+      "cached_geometry_bytes": 192,
+      "temporary_array_estimate_bytes": 576,
+      "temporary_array_estimate_count": 18,
+      "temporary_array_dtype_bytes": 4,
+      "estimated_core_working_array_bytes": 939,
+      "timing_repeats": 5,
+      "full_compile_and_first_step_seconds": 0.23607175005599856,
+      "warmed_full_seconds_per_step": 4.865000955760479e-05
+    }
+  }
+}

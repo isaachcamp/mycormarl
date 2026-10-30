@@ -39,8 +39,8 @@ def _transition(
     truncated=False,
 ):
     return Transition(
-        requested_action=jnp.zeros(4, dtype=jnp.float32),
-        realised_action=jnp.zeros(4, dtype=jnp.float32),
+        requested_action=jnp.zeros(3, dtype=jnp.float32),
+        realised_action=jnp.zeros(3, dtype=jnp.float32),
         operational_at_start=jnp.asarray(operational_at_start),
         operational_at_end=jnp.asarray(operational_at_end),
         allocation_executed=jnp.asarray(allocation_executed),

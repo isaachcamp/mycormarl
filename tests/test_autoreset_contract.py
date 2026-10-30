@@ -23,7 +23,7 @@ def test_autoreset_matches_explicit_keys_and_preserves_terminal_transition(held)
                                  max_episode_steps=1) if held else base
     _, initial = env.reset(jax.random.PRNGKey(3))
     key = jax.random.PRNGKey(17)
-    actions = {agent: jnp.asarray([0.0, 0.1, 0.3, 0.2]) for agent in env.agents}
+    actions = {agent: jnp.asarray([0.0, 0.1, 0.3]) for agent in env.agents}
     step_key, reset_key = jax.random.split(key)
     _, terminal, expected_rewards, _, expected_infos = env.step_env(step_key, initial, actions)
     expected_observations, expected_state = env.reset(reset_key)

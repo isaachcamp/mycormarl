@@ -1,11 +1,13 @@
 """Public checkpoint-evaluation contracts."""
 
 import jax
+import pytest
 from flax import serialization
 from flax.core import freeze, unfreeze
 
 import mycormarl.checkpoint_evaluation as checkpoint_evaluation_module
 from mycormarl.algos.ppo import ActorCritic
+from mycormarl.policy_artifacts import ACTOR_INTERFACE_VERSION
 from mycormarl.checkpoint_evaluation import (
     LatentLocationEvaluation,
     SampledPolicyEvaluation,
@@ -19,6 +21,26 @@ from mycormarl.environments.base_mycor import FUNGUS, PLANT, BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
 from mycormarl.plant.traits import PlantTraits
+
+
+def test_held_evaluation_reports_physical_duration_and_short_final_interval_growth_rates():
+    import math
+    from mycormarl.environments.policy_interval import PolicyIntervalMycorMarl
+    from test_stoichiometric_actions import pool_environment
+    env = PolicyIntervalMycorMarl(pool_environment(dt=.05,max_steps=3),
+        decision_interval_days=.1,max_episode_steps=2)
+    actor = ActorCritic()
+    observations,_ = env.reset(jax.random.PRNGKey(0))
+    parameters = {a:actor.init(jax.random.PRNGKey(i+1),observations[a]) for i,a in enumerate(env.agents)}
+    episode = evaluate_policy_parameters(env,parameters,episodes=1,actor=actor).episodes[0]
+    assert episode.summary['duration_days'] == pytest.approx(.15)
+    assert [row['time_days'] for row in episode.trace] == pytest.approx([.1,.15])
+    initial = episode.initial_state['living_biomass'][PLANT]
+    first = episode.trace[0]['state']['living_biomass'][PLANT]
+    final = episode.trace[1]['state']['living_biomass'][PLANT]
+    assert episode.trace[0]['interval_rgr_per_day'][PLANT] == pytest.approx(math.log(first/initial)/.1)
+    assert episode.trace[1]['interval_rgr_per_day'][PLANT] == pytest.approx(math.log(final/first)/.05)
+    assert episode.summary['episode_rgr_per_day'][PLANT] == pytest.approx(math.log(final/initial)/.15)
 
 
 def _environment():
@@ -61,6 +83,21 @@ def test_latent_location_evaluation_is_reproducible_at_declared_horizon():
     assert len(first.episodes) == 1
     assert len(first.episodes[0].trace) == 2
     assert first.episodes[0].trace[-1]["truncated"] is True
+    for agent in (PLANT, FUNGUS):
+        assert first.episodes[0].trace[0]['actions'][agent] == pytest.approx(
+            [.1,.3465735903,.3465735903], abs=1e-7)
+
+
+def test_training_checkpoint_with_old_four_rate_metadata_is_rejected(tmp_path):
+    checkpoint = tmp_path / 'legacy-training.msgpack'
+    checkpoint.write_bytes(serialization.msgpack_serialize({
+        'format':'mycormarl-ppo-checkpoint', 'format_version':1,
+        'metadata':{'actor_interface_version':'two-head-latent-v1',
+                    'environment_state_schema_version':'state-v2'},
+        'runner_state':{},
+    }))
+    with pytest.raises(ValueError, match='incompatible training checkpoint'):
+        evaluate_checkpoint(checkpoint, _environment(), episodes=1)
 
 
 def test_sampled_diagnostic_has_a_distinct_type_and_complete_recomputable_trace():
@@ -105,7 +142,7 @@ def test_checkpoint_evaluation_and_artifact_preserve_the_complete_trace(tmp_path
         "format": "mycormarl-ppo-checkpoint",
         "format_version": 1,
         "metadata": {
-            "actor_interface_version": "two-head-latent-v1",
+            "actor_interface_version": ACTOR_INTERFACE_VERSION,
             "environment_state_schema_version": "state-v2",
         },
         "runner_state": {
@@ -144,7 +181,7 @@ def test_checkpoint_evaluation_reconstructs_the_saved_actor_activation(tmp_path)
         "format": "mycormarl-ppo-checkpoint",
         "format_version": 1,
         "metadata": {
-            "actor_interface_version": "two-head-latent-v1",
+            "actor_interface_version": ACTOR_INTERFACE_VERSION,
             "environment_state_schema_version": "state-v2",
             "actor_configuration": {"activation": "tanh"},
         },

@@ -1,0 +1,149 @@
+"""PPO-facing policy scheduler over a numerical MycorMARL environment."""
+
+from __future__ import annotations
+
+import math
+from typing import Dict, Tuple
+
+import chex
+import jax
+import jax.numpy as jnp
+from jaxmarl.environments.multi_agent_env import MultiAgentEnv
+from mycormarl.environments.autoreset import AutoResetMixin
+
+from mycormarl.environments.base_mycor import AGENTS, FUNGUS, PLANT, BaseMycorMarl
+from mycormarl.state import State
+from mycormarl.transition import Transition
+
+
+class PolicyIntervalMycorMarl(AutoResetMixin, MultiAgentEnv):
+    """Hold one policy decision across integral numerical timesteps.
+
+    ``BaseMycorMarl`` remains the numerical environment. This wrapper is the
+    policy-facing seam: it holds one Rate action constant while the numerical
+    environment integrates it over each numerical step, then returns one
+    transition to PPO for the complete policy interval.
+
+    Resource flows, output and solver work sum over executed numerical steps.
+    Execution and cancellation events use any-step aggregation; numerical
+    qualification requires every executed step to succeed. Stocks and final
+    observations describe the final active state. A terminal boundary freezes
+    the remaining scheduled substeps, allowing a shortened final interval.
+    """
+
+    def __init__(
+        self,
+        numerical_environment: BaseMycorMarl,
+        *,
+        decision_interval_days: float,
+        max_episode_steps: int,
+    ) -> None:
+        super().__init__(num_agents=2)
+        if not math.isfinite(decision_interval_days) or decision_interval_days <= 0.0:
+            raise ValueError("decision_interval_days must be finite and positive")
+        ratio = decision_interval_days / numerical_environment.config.dt
+        if not math.isclose(ratio, round(ratio), rel_tol=0.0, abs_tol=1e-9):
+            raise ValueError("decision_interval_days must contain whole numerical timesteps")
+        self.numerical_environment = numerical_environment
+        self.decision_interval_days = decision_interval_days
+        self.numerical_substeps_per_decision = round(ratio)
+        self.max_episode_steps = max_episode_steps
+        self.agents = numerical_environment.agents
+        self.action_spaces = numerical_environment.action_spaces
+        self.observation_spaces = numerical_environment.observation_spaces
+
+    @property
+    def agent_classes(self) -> dict:
+        return self.numerical_environment.agent_classes
+
+    @property
+    def config(self):
+        return self.numerical_environment.config
+
+    @property
+    def species(self):
+        return self.numerical_environment.species
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[Dict[str, chex.Array], State]:
+        return self.numerical_environment.reset(key)
+
+    def step_env(self, key: chex.PRNGKey, state: State, actions: Dict[str, chex.Array]):
+        initial_state = state
+        def numerical_substep(carry, _):
+            key, state, rewards = carry
+            active = ~state.terminal
+            key, substep_key = jax.random.split(key)
+            _, candidate, substep_rewards, _, infos = self.numerical_environment.step_env(
+                substep_key, state, actions
+            )
+            state = jax.tree.map(lambda new, old: jnp.where(active, new, old), candidate, state)
+            observations = self.numerical_environment.get_obs(state)
+            dones = {agent: getattr(state, f"{agent}_dead").squeeze() for agent in AGENTS}
+            dones["__all__"] = state.terminal
+            for agent in AGENTS:
+                infos[agent] = {field: jnp.where(active, value, jnp.zeros_like(value))
+                                for field, value in infos[agent].items()}
+                for field in ("biomass", "c_pool", "p_pool"):
+                    infos[agent][field] = getattr(state, f"{agent}_{field}")
+                infos[agent]["allocation_converged"] = jnp.where(
+                    active, infos[agent]["allocation_converged"], True)
+                transition = infos["transitions"][agent]
+                infos["transitions"][agent] = transition.replace(
+                    allocation_executed=active & transition.allocation_executed,
+                    trade_executed=active & transition.trade_executed,
+                )
+            rewards = {agent: rewards[agent] + jnp.where(active, substep_rewards[agent], 0.)
+                       for agent in AGENTS}
+            return (key, state, rewards), (observations, dones, infos)
+
+        (_, state, rewards), (observations, dones, infos_history) = jax.lax.scan(
+            numerical_substep,
+            (key, state, {PLANT: jnp.asarray(0.0), FUNGUS: jnp.asarray(0.0)}),
+            xs=None,
+            length=self.numerical_substeps_per_decision,
+        )
+        observations = jax.tree.map(lambda values: values[-1], observations)
+        dones = jax.tree.map(lambda values: values[-1], dones)
+        infos = jax.tree.map(lambda values: values[-1], infos_history)
+        # The reward is accumulated over every numerical substep.  Preserve
+        # the same accounting convention for flow-like diagnostics rather
+        # than silently retaining only the final substep's values.
+        for agent in AGENTS:
+            infos[agent]["allocation_converged"] = jnp.all(
+                infos_history[agent]["allocation_converged"], axis=0)
+            infos[agent]["trade_cancelled"] = jnp.any(
+                infos_history[agent]["trade_cancelled"], axis=0)
+            for field in (
+                "reproduction_c", "reproduction_p", "direct_p_uptake_mg",
+                "trade_in", "trade_out", "proposed_trade_out", "growth",
+                "growth_c_allocated", "growth_p_allocated", "growth_c_used", "growth_p_used",
+                "maint_c", "maint_p", "maint_c_used", "maint_p_used", "c_deficit", "p_deficit",
+                "maintenance_p_required_mg", "allocation_substeps",
+            ):
+                infos[agent][field] = jnp.sum(infos_history[agent][field], axis=0)
+            if agent == PLANT:
+                infos[agent]['biomass_guard_contact'] = jnp.any(
+                    infos_history[agent]['biomass_guard_contact'],axis=0)
+                infos[agent]["carbon_fixed"] = jnp.sum(
+                    infos_history[agent]["carbon_fixed"], axis=0
+                )
+            infos[agent]["reproductive_fitness_from_components"] = jnp.sum(
+                infos_history[agent]["reproductive_fitness_from_components"], axis=0
+            )
+        for agent, active in ((PLANT, self.numerical_environment.plant_active), (FUNGUS, self.numerical_environment.fungus_active)):
+            start = jnp.logical_and(active, ~getattr(initial_state, f"{agent}_dead")).squeeze()
+            end = jnp.logical_and(active, ~getattr(state, f"{agent}_dead")).squeeze()
+            allocation_executed = jnp.any(infos_history["transitions"][agent].allocation_executed)
+            trade_executed = jnp.any(infos_history["transitions"][agent].trade_executed)
+            executed = jnp.array([trade_executed, allocation_executed, allocation_executed])
+            infos["transitions"][agent] = Transition(
+                requested_action=actions[agent],
+                realised_action=jnp.where(executed, actions[agent], jnp.zeros_like(actions[agent])),
+                operational_at_start=start,
+                operational_at_end=end,
+                allocation_executed=allocation_executed,
+                trade_executed=trade_executed,
+                truncated=state.step >= self.numerical_environment.max_episode_steps,
+                final_observation=observations[agent],
+            )
+        return observations, state, rewards, dones, infos

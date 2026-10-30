@@ -52,7 +52,7 @@ labile P in soil cells (µmol)
 
 The canonical soil state is an amount, `soil_labile_p` in µmol P per cell, while
 organism pools and biological loss/export counters use mg P
-([`state.py`, lines 15–29](../mycormarl/mycormarl/state.py#L15-L29)).
+([`state.py`, lines 15–29](../../src/mycormarl/state.py#L15-L29)).
 
 ## 1. Conservative diffusion between cells
 
@@ -71,7 +71,7 @@ Consequently, the face contribution cancels when the two cells are summed:
 
 The implementation constructs each radial and vertical transfer once, subtracts
 it from one cell, and adds the identical value to its neighbour
-([`phosphate_diffusion.py`, lines 117–132](../mycormarl/mycormarl/soil/phosphate_diffusion.py#L117-L132)).
+([`phosphate_diffusion.py`, lines 117–132](../../src/mycormarl/soil/phosphate_diffusion.py#L117-L132)).
 There are no exterior-face flux terms, so the represented soil boundary is
 no-flux. Thus, with uptake disabled,
 
@@ -86,7 +86,7 @@ flux is counted with opposite signs in adjacent control volumes. The explicit
 CFL ceiling is a separate requirement. Conservation alone does not prevent a
 large timestep from producing negative cell amounts; the timestep bound protects
 positivity and stability
-([`phosphate_diffusion.py`, lines 135–155](../mycormarl/mycormarl/soil/phosphate_diffusion.py#L135-L155)).
+([`phosphate_diffusion.py`, lines 135–155](../../src/mycormarl/soil/phosphate_diffusion.py#L135-L155)).
 
 The tests check both the domain sum and non-negativity at the configured safety
 limit ([`test_phosphate_diffusion.py`, lines 270–286](../tests/test_phosphate_diffusion.py#L270-L286)),
@@ -98,7 +98,7 @@ and repeat the balance through the subcycled environment loop
 Root and fungal uptake requests are first calculated independently, including
 the sparse/continuous blend. Competition is then applied once against the shared
 labile amount in each cell
-([`phosphate_uptake.py`, lines 325–354](../mycormarl/mycormarl/soil/phosphate_uptake.py#L325-L354)).
+([`phosphate_uptake.py`, lines 325–354](../../src/mycormarl/soil/phosphate_uptake.py#L325-L354)).
 
 For cell \(i\), let \(M_i\) be available P and \(R_i,F_i\) the two requests:
 
@@ -127,7 +127,7 @@ M_i-M'_i=A_{R,i}+A_{F,i}
 by construction. Assigning fungal uptake as the remainder is intentional: it
 avoids a second independently rounded multiplication and gives the strongest
 available finite-precision closure
-([`phosphate_uptake.py`, lines 357–381](../mycormarl/mycormarl/soil/phosphate_uptake.py#L357-L381)).
+([`phosphate_uptake.py`, lines 357–381](../../src/mycormarl/soil/phosphate_uptake.py#L357-L381)).
 The JIT-compiled symmetry and cellwise balance contract is tested in
 [`test_continuous_phosphate_uptake.py`, lines 141–153](../tests/test_continuous_phosphate_uptake.py#L141-L153).
 
@@ -136,7 +136,7 @@ The JIT-compiled symmetry and cellwise balance contract is tested in
 Accepted root and fungal amounts are summed, converted from µmol P to mg P, and
 credited to the corresponding free-P pools in the same state replacement that
 stores the reduced soil inventory
-([`soil.py`, lines 127–151](../mycormarl/mycormarl/soil/soil.py#L127-L151)).
+([`soil.py`, lines 127–151](../../src/mycormarl/soil/soil.py#L127-L151)).
 In a common unit, the transaction satisfies
 
 \[
@@ -162,8 +162,8 @@ P_{\mathrm{struct},o}=\gamma_{P,o}G_o,
 where \(G_o\) is plant or fungal biomass and \(\gamma_{P,o}\) is its structural
 P cost in mg P g\(^{-1}\) dry biomass. Growth deducts exactly
 \(G_{\mathrm{growth}}\gamma_P\) from the free-P pool
-([`base_mycor.py`, lines 487–505](../mycormarl/mycormarl/environments/base_mycor.py#L487-L505);
-[`base_mycor.py`, lines 589–603](../mycormarl/mycormarl/environments/base_mycor.py#L589-L603)).
+([`base_mycor.py`, lines 487–505](../../src/mycormarl/environments/base_mycor.py#L487-L505);
+[`base_mycor.py`, lines 589–603](../../src/mycormarl/environments/base_mycor.py#L589-L603)).
 
 The diagnostic extended inventory is therefore
 
@@ -183,11 +183,11 @@ This is the quantity used by the coupled qualification scenario
 ([`phosphate_qualification.py`, lines 260–275](../scripts/phosphate_qualification.py#L260-L275)).
 Fungal-to-plant P trade is internal: the same `fungus_p_trade_out` is added to
 the plant pool and subtracted from the fungal pool
-([`base_mycor.py`, lines 287–295](../mycormarl/mycormarl/environments/base_mycor.py#L287-L295);
-[`base_mycor.py`, lines 349–357](../mycormarl/mycormarl/environments/base_mycor.py#L349-L357)).
+([`base_mycor.py`, lines 287–295](../../src/mycormarl/environments/base_mycor.py#L287-L295);
+[`base_mycor.py`, lines 349–357](../../src/mycormarl/environments/base_mycor.py#L349-L357)).
 Reproduction, mortality, and irreversible free-P losses are not treated as disappearing
 silently; cumulative counters retain their amounts in the ledger
-([`base_mycor.py`, lines 358–373](../mycormarl/mycormarl/environments/base_mycor.py#L358-L373)).
+([`base_mycor.py`, lines 358–373](../../src/mycormarl/environments/base_mycor.py#L358-L373)).
 
 The extended-balance qualification test verifies closure to relative tolerance
 \(10^{-5}\)
@@ -202,8 +202,8 @@ covered separately by focused environment tests.
 
 For both organisms, `maint_p_used` is deducted automatically from the
 start-of-step free pool
-([`base_mycor.py`, lines 519–545](../mycormarl/mycormarl/environments/base_mycor.py#L519-L545);
-[`base_mycor.py`, lines 617–643](../mycormarl/mycormarl/environments/base_mycor.py#L617-L643)).
+([`base_mycor.py`, lines 519–545](../../src/mycormarl/environments/base_mycor.py#L519-L545);
+[`base_mycor.py`, lines 617–643](../../src/mycormarl/environments/base_mycor.py#L617-L643)).
 The amount actually removed is accumulated in the species-specific,
 legacy-named
 `cumulative_*_p_maintenance_loss_mg` counter. Unmet demand is not added to this

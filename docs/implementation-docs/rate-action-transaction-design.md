@@ -1,5 +1,10 @@
 # Rate-action transaction design
 
+> **Implementation update, 22 October 2026:** This is the historical four-rate transaction proposal for issue #49.
+> The current action/reproduction baseline is [ADR-0020](../adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md),
+> verified in the [allocation report](../qualification/three-rate-allocation.md).
+> Original analysis is retained below with its original provenance.
+
 This note records the proposed implementation semantics for GitHub issue #49,
 consistent with [ADR-0012](../adr/0012-adopt-rate-actions-for-held-policy-intervals.md).
 It is a design proposal pending agreement on the upper bounds of the rates.

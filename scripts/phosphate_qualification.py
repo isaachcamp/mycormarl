@@ -326,8 +326,8 @@ def run_coupled_scenario(
 
     initial_extended_p_mg = extended_p_mg(state)
     actions = {
-        PLANT: rate_action(0.25, 1.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.25, 1.0, 0.0, 0.0),
+        PLANT: rate_action(0.25, 1.0, 0.0),
+        FUNGUS: rate_action(0.25, 1.0, 0.0),
     }
     for step_index in range(round(decisions)):
         _, state, _, _, _ = env.step_env(
@@ -405,7 +405,7 @@ def run_deep_soil_scenario(
         depth_interval_cm=interval_cm,
         initial_solution_p_um=1.0,
     )
-    policy = StaticPolicy(0.25, 1.0, 0.0, 0.0)
+    policy = StaticPolicy(0.25, 1.0, 0.0)
     result = run_deep_soil_qualification(
         config=config,
         species=qualification_species(coupled=True),
@@ -619,22 +619,30 @@ def benchmark_environment(config: EnvConfig, repeats: int = 20) -> dict:
     soil_projection = annual_runtime_projection(config.dt, warmed_seconds)
     _, full_state = env.reset(jax.random.PRNGKey(0))
     actions = {
-        PLANT: rate_action(0.25, 1.0, 0.0, 0.0),
-        FUNGUS: rate_action(0.25, 1.0, 0.0, 0.0),
+        PLANT: rate_action(0.25, 1.0, 0.0),
+        FUNGUS: rate_action(0.25, 1.0, 0.0),
     }
     key = jax.random.PRNGKey(1)
-    compiled_full_step = jax.jit(
-        lambda current_state: env.step_env(key, current_state, actions)[1]
-    )
+    def full_step(carry):
+        current_state, allocation_ok, guard_contact = carry
+        _, updated, _, _, info = env.step_env(key,current_state,actions)
+        return (updated, allocation_ok & info[PLANT]['allocation_converged'],
+                guard_contact | jnp.any(info[PLANT]['biomass_guard_contact']))
+    compiled_full_step = jax.jit(full_step)
+    full_carry = (full_state,jnp.asarray(True),jnp.asarray(False))
     started = time.perf_counter()
-    full_state = compiled_full_step(full_state)
-    jax.block_until_ready(full_state)
+    full_carry = compiled_full_step(full_carry)
+    jax.block_until_ready(full_carry)
     full_compile_and_first_seconds = time.perf_counter() - started
     started = time.perf_counter()
     for _ in range(repeats):
-        full_state = compiled_full_step(full_state)
-    jax.block_until_ready(full_state)
+        full_carry = compiled_full_step(full_carry)
+    jax.block_until_ready(full_carry)
     warmed_full_seconds = (time.perf_counter() - started) / repeats
+    if not bool(full_carry[1]):
+        raise ValueError('allocation integration failed: exhausted budget or non-finite result')
+    if bool(full_carry[2]):
+        raise ValueError('plant numerical biomass guard contacted')
     full_projection = annual_runtime_projection(config.dt, warmed_full_seconds)
     return {
         "grid_shape": list(env.grid_shape),
@@ -1012,7 +1020,7 @@ def render_markdown(results: dict) -> str:
             else "- After biomass-consistent pool initialisation, coupled grids remain sensitive to quantised root/fungal extents; the selected grid is the finest-tested fallback rather than demonstrated spatial convergence."
         ),
         "- The coupled fixture uses 0.01 g plant biomass and 0.0001 g living external fungal biomass; each free C/P pool starts at one structural-biomass equivalent and automatic maintenance costs are disabled.",
-        "- Coupled Rate actions are fixed at `[trade=0.25, growth=1, reproduction=0, storage=0] d^-1` and held for a fixed 1-day policy interval. Their timestep comparisons now isolate numerical resolution and are required for timestep selection.",
+        "- Coupled Rate actions are fixed at `[trade=0.25, growth=1, reproduction=0] d^-1` and held for a fixed 1-day policy interval. These unrestricted reference commands are held fixed during timestep comparisons; they are not normalised static-screen strategies.",
         "- Annual runtime is projected from both warmed soil-only and deterministic full-environment steps. MARL training, learned-policy inference, output, and accelerator transfer costs are excluded.",
         "- The complete machine-readable tables and exact platform metadata are in `phosphate-numerical-qualification.json`.",
     ])

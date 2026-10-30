@@ -2,6 +2,83 @@
 
 ## Glossary
 
+### Static intraradical mycelium allocation
+
+`irm_fraction` is the fixed fraction of total fungal dry biomass allocated to
+intraradical mycelium (IRM). Extraradical mycelium (ERM) is the remaining
+`1 - irm_fraction`; only ERM produces external soil-uptake geometry. Both
+fractions share the existing fungal construction stoichiometry and maintenance
+coefficients. Growth and mortality change both fractions proportionally; IRM
+is not protected from biomass loss. Total biomass remains the single state
+and accounting quantity, including retained residual mass after death.
+
+The trait defaults to zero, must be finite in `[0, 1)`, and must be zero in
+`fungus-only` mode. Varying it holds configured total initial biomass fixed.
+It is not a colonised-root fraction, root-capacity limit or exchange rule.
+IRM/ERM mass and volume can be derived when needed; no separate state, stock
+diagnostics or policy inputs are added. See [ADR-0017](docs/adr/0017-represent-absorbers-as-fine-root-discs-and-an-external-hyphal-hemisphere.md)
+and [issue #96](https://github.com/isaachcamp/mycormarl/issues/96).
+
+### Non-limiting internal transport capacity
+
+An approximation under which retained living, connected root and hyphal tissue
+does not constrain resource delivery through its conducting capacity. Reduced
+interior density therefore causes no independent throughput limit, delivery
+delay or compensatory transport-carbon surcharge. Density can still affect
+uptake, tissue investment, maintenance and a separately specified route distance.
+See [ADR-0021](docs/adr/0021-treat-internal-transport-capacity-as-non-limiting.md).
+
+### Oldest-first maintenance mortality
+
+Tissue loss triggered by insufficient maintenance resources, allocated to the
+oldest eligible living tissue first. The planned fungal rule retains a minimum
+living density; the revised fine-root rule permits complete cohort removal,
+with stem connectivity supplied by an implicit conducting-root backbone.
+This is not current production behaviour. [Issue #89](https://github.com/isaachcamp/mycormarl/issues/89)
+and dependent tickets #90–93 require reconciliation with
+[ADR-0022](docs/adr/0022-separate-fine-root-mortality-from-persistent-backbone-connectivity.md)
+before implementation of the revised root rule.
+
+### Implicit conducting-root backbone
+
+An unresolved root transport structure assumed to maintain stem connectivity
+to surviving distal fine roots while the plant is operational. Its
+root-containing footprint persists where roots have grown even when local
+absorbing fine-root density becomes zero. It adds no separately represented
+biomass or uptake surface. All cells in this footprint are assumed available
+for fungal exchange without separately tracked colonisation or establishment
+delay, including backbone-only cells. They count as root-containing cells for
+fungal transport-cost distance. Availability does not compel trade or bypass
+organism-death gates. See [ADR-0022](docs/adr/0022-separate-fine-root-mortality-from-persistent-backbone-connectivity.md).
+
+### Fungal root contact
+
+A surviving connection between the living fungal network and an
+exchange-available cell in the persistent root footprint. Contact can be lost
+without immediate organism death; loss of all contact disables bilateral C/P
+trade while ordinary maintenance and survival dynamics continue. This is agreed
+future behaviour, not current production behaviour. The distance approximation
+uses the existing reference fine-root density as its within-cell spacing proxy,
+independently of post-mortality absorbing density. See
+[ADR-0022](docs/adr/0022-separate-fine-root-mortality-from-persistent-backbone-connectivity.md).
+
+### Transport-front shell
+
+A finite-width band of living hyphae immediately behind the outer growth front,
+used as a proxy for transport source/destination distance. Its width is a
+physical parameter in cm, independent of timestep or grid spacing. It does not
+restrict phosphate uptake or spread actual new tissue construction over that
+band. Uptake-FWHM and tip-density dynamics are deferred alternatives; no width
+value or energetic coefficient is selected. See the
+[transport-shell derivation](docs/technical-summaries/transport-shell-geometries/README.md).
+
+### Front-only absorber growth
+
+Addition of new absorbing tissue exclusively at the current outer growth
+boundary, without replacement or densification of established inner tissue.
+This is a core approximation of the planned absorber-mortality extension;
+tissue retained at its minimum density remains living and uptake-active.
+
 ### Operational agent
 
 An agent that is configured as present, biologically alive, and able to
@@ -16,11 +93,12 @@ transition is a biological termination event.
 ### Rate action
 
 The action command passed to `BaseMycorMarl`. It commands non-negative
-first-order **per-day** rates for trade, growth, reproduction, and storage.
-Growth, reproduction, and storage compete as pool outflow hazards rather than
-as a simplex; storage initially means retention in the existing free pool, not
-a new compartment. Newly acquired soil P, photosynthate, and received trade
-are eligible for the held rate during subsequent numerical substeps.
+first-order **per-day** rates for trade, growth and reproduction. Trade and
+stoichiometric biology compete simultaneously for evolving free C/P pools;
+received trade is eligible during allocation. Retention is the free resource
+stock left after realised spending, including essential-resource surplus and
+finite-rate residue. It has no separate controlled hazard or compartment.
+New soil P and photosynthate become eligible in the next numerical step.
 
 The policy wrapper holds the Rate action unchanged across numerical substeps.
 PPO records sampled latents, the executed Rate action, and likelihoods in
@@ -155,8 +233,10 @@ losses, maintenance, host transfer, and whole-fungus budgets.
 
 ### Cumulative reproductive fitness
 
-The time-sum of an organism's per-transition Cobb–Douglas reproduction reward
-over an evaluation episode. Plant cumulative reproductive fitness is the
+The time-sum of an organism's realised stoichiometric reproductive output
+over an evaluation episode. Both essential resources constrain output; their
+costs equal growth costs times the organism's reproductive cost scale. The
+output is exported and adds no parental biomass. Plant cumulative reproductive fitness is the
 primary plant-performance endpoint for phosphorus-response policy studies
 because it is the quantity optimized by the plant PPO objective.
 
@@ -164,6 +244,27 @@ Final living plant biomass and cumulative gross plant growth are secondary
 plant-performance endpoints. They make the simulated response comparable with
 greenhouse growth measurements, but they are not interchangeable with
 cumulative reproductive fitness and are not themselves the PPO objective.
+
+### Reproductive cost scale
+
+A finite, positive multiplier of both growth C/P costs per unit reproductive
+output, specified independently for plant and fungus and defaulting to one.
+At fixed commands, changing it scales output efficiency while preserving
+reproductive resource expenditure and composition.
+
+### Biological intensity and reproductive expenditure share
+
+Biological intensity is the sum of growth and reproduction rates. The
+reproductive expenditure share divides that intensity between the two paired
+resource sinks. It is an expenditure preference; output also depends on
+reproductive cost scale and essential-resource availability.
+
+### Declared static allocation experiment
+
+A fixed-share experiment that declares equal policy and outer environment
+intervals, a nominal residual target, and the corresponding total processing
+intensity. This contract is distinct from unrestricted fixed-rate references
+and learned policies. Numerical refinement holds the physical commands fixed.
 
 ### Plant biomass numerical guard
 
@@ -207,7 +308,7 @@ latent-to-physical-action mapping. It is the primary evaluation protocol for
 P-response studies.
 
 This protocol does not compute the expected physical action, because the
-nonlinear sigmoid and centred-simplex transforms generally make the transform
+nonlinear softplus intensity and sigmoid share transforms generally make the transform
 of a latent mean differ from the mean transformed action. Repeated sampled
 policy rollouts are a separate diagnostic of residual policy-distribution
 variability, not the primary estimate of learned strategy and not by itself

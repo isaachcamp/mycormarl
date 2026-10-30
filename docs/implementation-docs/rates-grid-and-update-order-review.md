@@ -1,5 +1,10 @@
 # Rate actions, grid resolution, and update ordering
 
+> **Implementation update, 22 October 2026:** This is the historical integration investigation; wider continuous source/soil reordering remains a proposal.
+> The current action/reproduction baseline is [ADR-0020](../adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md),
+> verified in the [allocation report](../qualification/three-rate-allocation.md).
+> Original analysis is retained below with its original provenance.
+
 15 October 2026. Design investigation requested by the user; no model code changed. Read alongside [the action-space proposal](action-space-design-review.md). **Update 21 October:** the user selected fixed-composition reproduction and three rate controls, superseding the earlier both-model requirement. Reproductive costs are growth costs multiplied by the positive dimensionless `reproduction_cost_scale`, default `1.0`; interval fitness is realised reproductive output. The flexible-model discussion below is historical. File/line references describe the checkout inspected during this investigation.
 
 ## Recommendation

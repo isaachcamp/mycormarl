@@ -21,6 +21,9 @@ configuration and organism traits
 
 ## Runtime modules
 
+The installed `mycormarl` package is sourced from `src/mycormarl/`. Repository
+scripts and tests remain outside the importable package.
+
 | Module | Responsibility | Main consumers |
 |---|---|---|
 | `params.py` | Environment and species configuration containers. | Environment construction and experiment setup. |
@@ -34,7 +37,7 @@ configuration and organism traits
 | `plant/roots.py` | Converts plant biomass to depth-weighted stacked-disc root density. | Reset and post-growth geometry refresh. |
 | `fungus/mycelium.py` | Converts fungal biomass to a volume-averaged saturated hemispherical hyphal field. | Reset and post-growth geometry refresh. |
 | `plant/traits.py`, `fungus/traits.py` | Organism stoichiometry, kinetics, geometry, maintenance, and initial pools. | Biological and soil calculations. |
-| `growth.py`, `maintenance.py` | Shared realised-growth and maintenance calculations. | Plant and fungal environment steps. |
+| `allocation.py` | Coupled trade, essential-resource growth and stoichiometric reproduction. | Environment allocation after maintenance. |
 | `observations.py` | Finite bounded transforms for the stable five-feature actor observations. | Environment observation construction. |
 | `algos/ppo.py` | Two-policy PPO integration using the `plant` and `fungus` interfaces. | Training launcher and experiments. |
 | `policy_artifacts.py` | Versioned persistence and compatibility checks for the current actor and environment-state contracts. | Training launcher and policy consumers. |
@@ -72,6 +75,18 @@ configuration and organism traits
 
 Named studies, parameter screens, foraging experiments, empirical qualifications
 and their figures live in [REDbyRBD](https://github.com/isaachcamp/REDbyRBD).
+Study-specific soil-domain selection also lives there, including candidate
+depths, stress policies, horizons and acceptance criteria. Invoke
+`redbyrbd.domain_qualification`; there is no core duplicate or forwarder.
+
+Core retains solver qualification: phosphate convergence/conservation helpers,
+deep-soil geometry and P-accounting regression checks, and
+`scripts/phosphate_qualification.py`. Its `docs/qualification/` records are
+core numerical evidence. REDbyRBD's qualification records apply to named
+study protocols and their pinned core revisions. The directories have
+different responsibilities; sharing the name does not make their evidence
+interchangeable.
+
 Core owns generic `static_rollout`, checkpoint/policy execution, action conversion
 and RNG contracts. Legacy study/static manifest forwarders were removed at
 cutover; invoke the research package directly. The animation repository owns

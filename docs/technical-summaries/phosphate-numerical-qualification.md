@@ -1,5 +1,18 @@
 # Why the phosphate model needs numerical qualification
 
+> The coupled action engine has since changed under
+> [ADR-0020](../adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md).
+> Its [allocation qualification](../qualification/three-rate-allocation.md) is
+> separate; the older numerical study below retains its original model identity.
+
+> **Historical results:** The selection and timings discussed below predate
+> the next-finer-and-finest reference gate. Current defaults are `0.05 cm`
+> spatial intervals and `0.025 day` numerical steps; use the
+> [current phosphate guide](../phosphate-model.md#numerical-qualification-and-limitations)
+> and [retained qualification tables](../qualification/phosphate-numerical-qualification.md)
+> for current selection evidence. The older `0.1 cm` pass and finest-tested
+> timestep fallback below are not current recommendations.
+
 > **Scope:** This summary explains the purpose, design, mathematics, and current
 > results of the phosphate qualification study. It covers spatial and temporal
 > refinement, the diffusion CFL limit, conservation checks, sensitivity studies,
@@ -55,21 +68,21 @@ described by Oberkampf and Trucano
 
 | Responsibility | Symbol | Location |
 |---|---|---|
-| Define scenario matrices and generate results | `run_studies` | [`scripts/phosphate_qualification.py`, lines 441–575](../scripts/phosphate_qualification.py#L441-L575) |
-| Run isolated, fixed-density soil scenarios | `run_fixed_soil_scenario` | [`scripts/phosphate_qualification.py`, lines 123–233](../scripts/phosphate_qualification.py#L123-L233) |
-| Run coupled growth–uptake scenarios | `run_coupled_scenario` | [`scripts/phosphate_qualification.py`, lines 249–351](../scripts/phosphate_qualification.py#L249-L351) |
-| Compare a candidate against a finer reference | `reference_relative_change` | [`phosphate_qualification.py`, lines 8–23](../mycormarl/mycormarl/soil/phosphate_qualification.py#L8-L23) |
-| Calculate the explicit diffusion limit | `explicit_diffusion_cfl_seconds` | [`phosphate_diffusion.py`, lines 135–155](../mycormarl/mycormarl/soil/phosphate_diffusion.py#L135-L155) |
-| Convert the biological step into stable substeps | `required_diffusion_substeps` | [`phosphate_diffusion.py`, lines 158–172](../mycormarl/mycormarl/soil/phosphate_diffusion.py#L158-L172) |
-| Execute the production subcycled solver | `evolve_soil_p` | [`soil.py`, lines 233–295](../mycormarl/mycormarl/soil/soil.py#L233-L295) |
-| Observe the same solver during qualification | `evolve_soil_p_with_diagnostics` | [`soil.py`, lines 298–348](../mycormarl/mycormarl/soil/soil.py#L298-L348) |
-| Project annual runtime | `annual_runtime_projection` | [`phosphate_qualification.py`, lines 26–46](../mycormarl/mycormarl/soil/phosphate_qualification.py#L26-L46) |
+| Define scenario matrices and generate results | `run_studies` | [`scripts/phosphate_qualification.py`, lines 441–575](../../scripts/phosphate_qualification.py) |
+| Run isolated, fixed-density soil scenarios | `run_fixed_soil_scenario` | [`scripts/phosphate_qualification.py`, lines 123–233](../../scripts/phosphate_qualification.py) |
+| Run coupled growth–uptake scenarios | `run_coupled_scenario` | [`scripts/phosphate_qualification.py`, lines 249–351](../../scripts/phosphate_qualification.py) |
+| Compare a candidate against a finer reference | `reference_relative_change` | [`phosphate_qualification.py`, lines 8–23](../../src/mycormarl/soil/phosphate_qualification.py) |
+| Calculate the explicit diffusion limit | `explicit_diffusion_cfl_seconds` | [`phosphate_diffusion.py`, lines 135–155](../../src/mycormarl/soil/phosphate_diffusion.py) |
+| Convert the biological step into stable substeps | `required_diffusion_substeps` | [`phosphate_diffusion.py`, lines 158–172](../../src/mycormarl/soil/phosphate_diffusion.py) |
+| Execute the production subcycled solver | `evolve_soil_p` | [`soil.py`, lines 233–295](../../src/mycormarl/soil/soil.py) |
+| Observe the same solver during qualification | `evolve_soil_p_with_diagnostics` | [`soil.py`, lines 298–348](../../src/mycormarl/soil/soil.py) |
+| Project annual runtime | `annual_runtime_projection` | [`phosphate_qualification.py`, lines 26–46](../../src/mycormarl/soil/phosphate_qualification.py) |
 
 The diagnostic path deliberately calls the production diffusion–uptake
 transaction rather than duplicating the scientific calculation. A test verifies
 that diagnosed and production evolution produce the same soil and organism
 pools
-([`test_phosphate_qualification.py`, lines 166–195](../tests/test_phosphate_qualification.py#L166-L195)).
+([`test_phosphate_qualification.py`, lines 166–195](../../tests/test_phosphate_qualification.py)).
 
 ## Why test several spatial intervals?
 
@@ -96,19 +109,19 @@ influencing that output:
 
 Here \(Q_{\mathrm{floor}}\) prevents meaningless relative errors when both
 values are effectively zero. The implementation is
-[`reference_relative_change`](../mycormarl/mycormarl/soil/phosphate_qualification.py#L8-L23).
+[`reference_relative_change`](../../src/mycormarl/soil/phosphate_qualification.py).
 
 The study tests intervals of 0.1, 0.05, and 0.025 cm. Each candidate is compared
 with the next finer grid, rather than assuming the finest tested answer is exact
-([`scripts/phosphate_qualification.py`, lines 453–457 and 475–479](../scripts/phosphate_qualification.py#L453-L479)).
+([`scripts/phosphate_qualification.py`, lines 453–457 and 475–479](../../scripts/phosphate_qualification.py)).
 It examines fixed-geometry soil outputs and coupled outputs including uptake,
 consumer shares, free pools, biomass, and spatial extents
-([`scripts/phosphate_qualification.py`, lines 469–500](../scripts/phosphate_qualification.py#L469-L500)).
+([`scripts/phosphate_qualification.py`, lines 469–500](../../scripts/phosphate_qualification.py)).
 
 The current 0.1 cm candidate differs from 0.05 cm by at most 0.254% for the
 fixed-soil metrics and 3.030% for the coupled metrics, passing the declared 5%
 gate
-([qualification results, lines 38–43](../docs/qualification/phosphate-numerical-qualification.md#L38-L43)).
+([qualification results, lines 38–43](../qualification/phosphate-numerical-qualification.md)).
 This supports 0.1 cm **for the tested reduced-domain scenarios and selected
 metrics**. It is not a universal guarantee for every parameterisation or a
 sharper spatial phenomenon.
@@ -130,17 +143,17 @@ allows more change to accumulate before those quantities and interactions are
 re-evaluated.
 
 The study tests biological timesteps of 0.025, 0.05, 0.1, 0.2, and 0.4 days
-([`scripts/phosphate_qualification.py`, lines 34–39](../scripts/phosphate_qualification.py#L34-L39)).
+([`scripts/phosphate_qualification.py`, lines 34–39](../../scripts/phosphate_qualification.py)).
 As with the grid study, each candidate is compared with the next smaller
 timestep
-([`scripts/phosphate_qualification.py`, lines 448–452 and 470–474](../scripts/phosphate_qualification.py#L448-L474)).
+([`scripts/phosphate_qualification.py`, lines 448–452 and 470–474](../../scripts/phosphate_qualification.py)).
 
 Fixed-geometry soil outputs changed by less than 0.5% across these candidates,
 but the coupled endpoint metrics changed by roughly 98–102%. Consequently, none
 of the larger timestep candidates passed
-([qualification results, lines 29–36 and 65–70](../docs/qualification/phosphate-numerical-qualification.md#L29-L36)).
+([qualification results, lines 29–36 and 65–70](../qualification/phosphate-numerical-qualification.md)).
 The configuration therefore uses 0.025 day, the finest value tested
-([`params.py`, lines 29–35](../mycormarl/mycormarl/params.py#L29-L35)).
+([`params.py`, lines 29–35](../../src/mycormarl/params.py)).
 
 This result needs careful interpretation: there is no smaller reference for
 0.025 day, so its selection is a fallback, **not evidence of temporal
@@ -186,7 +199,7 @@ G_{ij}
 where \(D_l\) is the solution diffusion coefficient in cm\(^2\) s\(^{-1}\) and
 \(f_l\) is the dimensionless impedance factor. The code constructs these
 conductances in
-[`axisymmetric_diffusion_conductances`](../mycormarl/mycormarl/soil/phosphate_diffusion.py#L41-L79).
+[`axisymmetric_diffusion_conductances`](../../src/mycormarl/soil/phosphate_diffusion.py).
 
 The explicit amount update is
 
@@ -216,7 +229,7 @@ The global ceiling is the most restrictive cell:
 \]
 
 This exact cellwise calculation is implemented at
-[`phosphate_diffusion.py`, lines 135–155](../mycormarl/mycormarl/soil/phosphate_diffusion.py#L135-L155).
+[`phosphate_diffusion.py`, lines 135–155](../../src/mycormarl/soil/phosphate_diffusion.py).
 The environment uses only a safety fraction \(s=0.8\) of the ceiling and chooses
 
 \[
@@ -235,11 +248,11 @@ N_{\mathrm{sub}}
 
 The CFL value and substep count are computed once because grid geometry,
 buffering, and diffusion parameters are static
-([`base_mycor.py`, lines 76–117](../mycormarl/mycormarl/environments/base_mycor.py#L76-L117)).
+([`base_mycor.py`, lines 76–117](../../src/mycormarl/environments/base_mycor.py)).
 Tests verify the calculated ceiling, the substep schedule, non-negativity, and
 conservation through repeated substeps
-([`test_phosphate_diffusion.py`, lines 337–347](../tests/test_phosphate_diffusion.py#L337-L347);
-[`test_phosphate_diffusion.py`, lines 410–424](../tests/test_phosphate_diffusion.py#L410-L424)).
+([`test_phosphate_diffusion.py`, lines 337–347](../../tests/test_phosphate_diffusion.py);
+[`test_phosphate_diffusion.py`, lines 410–424](../../tests/test_phosphate_diffusion.py)).
 
 ### What CFL does—and does not—tell us
 
@@ -280,10 +293,10 @@ The deterministic qualification matrix contains several complementary checks:
 | Performance | compilation, warmed runtime, array memory, annual projection | Test whether the selected resolution is usable |
 
 The scenario construction is visible in
-[`run_studies`](../scripts/phosphate_qualification.py#L441-L575). The study uses a
+[`run_studies`](../../scripts/phosphate_qualification.py). The study uses a
 reduced 2 cm by 2 cm domain with an internal topsoil front for the convergence
 matrix, then benchmarks the full 500 by 1000-cell target grid
-([qualification results, lines 55–63](../docs/qualification/phosphate-numerical-qualification.md#L55-L63)).
+([qualification results, lines 55–63](../qualification/phosphate-numerical-qualification.md)).
 
 The fixed-density scenarios isolate diffusion and uptake from changing organism
 geometry. The coupled scenarios then test whether a numerically modest local
@@ -305,7 +318,7 @@ Refinement is not the only requirement. Every scenario also reports or tests:
 - deterministic repeatability.
 
 The executable contracts are in
-[`tests/test_phosphate_qualification.py`, lines 61–280](../tests/test_phosphate_qualification.py#L61-L280).
+[`tests/test_phosphate_qualification.py`, lines 61–280](../../tests/test_phosphate_qualification.py).
 The present coupled balance fixture sets carbon maintenance and irreversible
 free-P loss to zero so the timestep comparison isolates growth and uptake.
 Paid irreversible-loss P has explicit plant and fungal counters and is included
@@ -333,9 +346,9 @@ T_{\mathrm{year}}=N_{\mathrm{year}}T_{\mathrm{step}}.
 \]
 
 It is implemented by
-[`annual_runtime_projection`](../mycormarl/mycormarl/soil/phosphate_qualification.py#L26-L46),
+[`annual_runtime_projection`](../../src/mycormarl/soil/phosphate_qualification.py),
 while measurement and memory accounting are performed by
-[`benchmark_environment`](../scripts/phosphate_qualification.py#L370-L438).
+[`benchmark_environment`](../../scripts/phosphate_qualification.py).
 The projection excludes policy inference, learning, logging, data transfer, and
 other training overhead, so it is a core-model estimate rather than a complete
 experiment budget.

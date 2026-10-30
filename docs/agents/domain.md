@@ -16,7 +16,7 @@ This is a single-context repository:
 /
 ├── CONTEXT.md
 ├── docs/adr/
-└── mycormarl/
+└── src/mycormarl/
 
 ## Use the glossary’s vocabulary
 

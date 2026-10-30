@@ -47,4 +47,5 @@ Future changes to either value must be justified and tested separately.
 ## Evidence
 
 The primary-source comparison and derivation are recorded in
-[`carrot-growth-biomass-cap-and-carbon-fixation.md`](../research/carrot-growth-biomass-cap-and-carbon-fixation.md).
+[`carrot-growth-biomass-cap-and-carbon-fixation.md`](https://github.com/isaachcamp/REDbyRBD/blob/main/docs/research/carrot-growth-biomass-cap-and-carbon-fixation.md)
+in REDbyRBD.

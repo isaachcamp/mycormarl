@@ -1,5 +1,10 @@
 # Action-space and action-application design review
 
+> **Implementation update, 22 October 2026:** This is the historical design review and decision record; its selected three-rate subset is now implemented.
+> The current action/reproduction baseline is [ADR-0020](../adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md),
+> verified in the [allocation report](../qualification/three-rate-allocation.md).
+> Original analysis is retained below with its original provenance.
+
 Prepared 2026-10-15; reproductive-model decision updated 2026-10-21. No environment implementation has been changed. Code and existing design documents are the evidence for the findings below. Mathematical examples are derived directly from their equations.
 
 ## Accepted reproductive-model decision — 21 October 2026

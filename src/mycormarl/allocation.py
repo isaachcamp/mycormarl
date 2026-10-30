@@ -1,0 +1,51 @@
+"""Coupled trade and essential-resource allocation, in physical C/P units."""
+
+import jax
+import jax.numpy as jnp
+
+
+def integrate_allocation(pools, rates, costs, reproduction_scales, growth_room,
+                         dt, rate_step, max_substeps):
+    """Return C, P, growth, reproductive expenditure, trade, C/P offers, output.
+
+    SSPRK3 substeps obey h * maximum outgoing hazard <= rate_step <= 1.
+    Each Euler stage is therefore nonnegative. Paired transfer and biological
+    extents use the same stage weights, preserving both elemental balances.
+    Rates are held constant while pools and the limiting resource are updated.
+    """
+    required = jnp.maximum(1, jnp.ceil(jnp.max(jnp.sum(rates, axis=1))*(dt/rate_step)))
+    converged = required <= max_substeps
+    n = jnp.where(converged, required, 0).astype(jnp.int32)
+    h = dt / jnp.maximum(n, 1)
+    initial = jnp.concatenate((pools, jnp.zeros((2, 5), dtype=pools.dtype)), axis=1)
+
+    def flux(y):
+        available = jnp.min(y[:, :2] / costs, axis=1)
+        growth = jnp.minimum(rates[:, 1] * available,
+                             jnp.maximum(growth_room-y[:, 2], 0.) / h)
+        reproductive_expenditure = rates[:, 2] * available
+        used = growth + reproductive_expenditure
+        trade = rates[:, 0] * jnp.stack((y[0, 0], y[1, 1]))
+        c = -costs[:, 0]*used + jnp.stack((-trade[0], trade[0]))
+        p = -costs[:, 1]*used + jnp.stack((trade[1], -trade[1]))
+        # Offers retain limitation information without spending the surplus.
+        offers = rates[:, 1, None] * y[:, :2]
+        return jnp.concatenate((jnp.stack((c, p, growth, reproductive_expenditure, trade), axis=1), offers), axis=1)
+
+    def advance(_, carry):
+        y, correction = carry
+        first = h * flux(y)
+        second = h * flux(y + first)
+        third = h * flux(y + .25*(first+second))
+        # Compensate long float32 ledgers without clipping stocks or rates.
+        increment = (first + second + 4.*third) / 6. - correction
+        updated = y + increment
+        return updated, (updated-y)-increment
+
+    result, _ = jax.lax.fori_loop(0, n, advance, (initial, jnp.zeros_like(initial)))
+    output = jnp.where(result[:, 3] == 0., 0., result[:, 3] / reproduction_scales)
+    result = jnp.concatenate((result, output[:, None]), axis=1)
+    converged = converged & jnp.all(jnp.isfinite(result))
+    # An exhausted budget is an explicit failed numerical transition, never
+    # a silently capped action or an accepted under-resolved approximation.
+    return jnp.where(converged, result, jnp.nan), converged, n

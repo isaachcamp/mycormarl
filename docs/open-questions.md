@@ -24,10 +24,12 @@ verification records are retained under [`archive/`](archive/).
 ## Organism parameters and geometry
 
 - Obtain a direct *R. irregularis* external-mycelium dry-mass measurement to
-  validate or replace the current `0.0001 g` early-established fixture. The
+  validate or replace the current `0.001 g` total-biomass early-established fixture. The
   prior `7.97e-7 g` cross-species spore estimate remains a sensitivity case;
-  at reset, the model maps the configured fungal biomass to external
-  absorptive hyphae rather than simulating spores or inoculum.
+  at reset, the model maps only the ERM fraction of configured fungal biomass
+  to external absorptive hyphae rather than simulating spores or inoculum.
+  The static `irm_fraction=0` reference is not a measured biological allocation;
+  nonzero IRM/ERM fractions and their shared tissue economics need calibration.
 - Corroborate the provisional *Daucus carota* P concentration independently of
   the current MDPI source and obtain a whole-plant carbon measurement if
   possible.
@@ -37,8 +39,8 @@ verification records are retained under [`archive/`](archive/).
   marginal growth allocation and whether its SRL is compatible with the plant
   representation.
 - Determine when the stacked-disc root and saturated-hemisphere fungal
-  closures need explicit branching, directional growth, or intraradical and
-  spore compartments.
+  closures need explicit branching, directional growth, spatial intraradical
+  colonisation beyond the implicit static IRM allocation, or spore compartments.
 - Re-run the canonical numerical qualification when the `2,000 cm cm^-3`
   fungal saturation density or deep-soil fixture changes; the current run
   includes the deep-soil confinement and extended-P balance check. Continue

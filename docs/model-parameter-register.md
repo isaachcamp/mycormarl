@@ -1,7 +1,7 @@
 # MycorMARL model parameter register
 
 > **Scope:** This register covers every user-configurable field currently declared by
-> `PlantTraits`, `FungusTraits`, and `EnvConfig` (49 fields in total). It excludes PPO
+> `PlantTraits`, `FungusTraits`, and `EnvConfig` (53 fields in total). It excludes PPO
 > optimiser and network hyperparameters, policy actions, state variables, diagnostic
 > tolerances, and physical conversion constants. Those quantities do not parameterise
 > the biological or soil model.
@@ -12,6 +12,14 @@
 > values for which the repository currently has no empirical source.
 
 ## Executive summary
+
+The implemented action/reproduction baseline is
+[ADR-0020](adr/0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md).
+Retained calibration and older coupled-resolution results below keep their
+original source-model provenance. They explain inherited parameter choices;
+new scientific experiments must qualify their declared strategy under the
+three-rate model. [Current allocation evidence](qualification/three-rate-allocation.md)
+is separate from those historical calibration outcomes.
 
 MycorMARL's defaults combine several evidence levels. The strongest organism-specific
 anchors are carrot carbon and phosphorus measurements,
@@ -38,7 +46,7 @@ ceiling was about `0.0199 d^-1`. The leaf-level `amass=0.05` remains defensible
 for its named reference light regime; the larger mismatch was the fixed
 `kleaf=0.30`, because the same trajectory's leaf fraction declined from about
 `0.81` to `0.23`. See
-the [growth-scale research note](research/carrot-growth-biomass-cap-and-carbon-fixation.md).
+the [growth-scale research note](https://github.com/isaachcamp/REDbyRBD/blob/main/docs/research/carrot-growth-biomass-cap-and-carbon-fixation.md).
 The corrected static-allocation qualification selects `kleaf=0.68`: its
 high-P, all-growth control reaches `31.38 g DM` at day 120, inside the
 `25--35 g` favourable trajectory envelope and below the `50 g` numerical
@@ -61,21 +69,24 @@ been removed because it was a scenario convention rather than a calibrated profi
 | **Unsupported** | No literature source or documented quantitative derivation currently backs the value. |
 | **Inconsistent** | Code and active scientific documentation disagree or the declared default is invalid. |
 
-The declarations are in [`PlantTraits`](../mycormarl/mycormarl/plant/traits.py#L7-L44),
-[`FungusTraits`](../mycormarl/mycormarl/fungus/traits.py#L7-L33), and
-[`EnvConfig`](../mycormarl/mycormarl/params.py#L15-L45). Construction-time validation
+The declarations are in [`PlantTraits`](../src/mycormarl/plant/traits.py#L7-L44),
+[`FungusTraits`](../src/mycormarl/fungus/traits.py#L7-L33), and
+[`EnvConfig`](../src/mycormarl/params.py#L15-L45). Construction-time validation
 is immediately below the two trait classes and in
-[`BaseMycorMarl._validate_soil_config`](../mycormarl/mycormarl/environments/base_mycor.py#L731-L796).
+[`BaseMycorMarl._validate_soil_config`](../src/mycormarl/environments/base_mycor.py#L731-L796).
 
 ## Core equations: how parameters affect the model
 
-For either organism, allocated carbon and phosphorus produce dry biomass according to
+For either organism, free carbon and phosphorus constrain instantaneous
+growth and reproductive output according to
 
 $$
-\Delta G=\min\left(\frac{C_g}{\gamma_C},\frac{P_g}{\gamma_P}\right).
+Q=\min\left(\frac{C}{\gamma_C},\frac{P}{\gamma_P}\right),
+\qquad \dot G=k_gQ,\qquad \dot R=k_rQ/s.
 $$
 
-Larger `gamma_c` or `gamma_p` therefore reduces growth from a fixed allocation and
+Here `s=reproduction_cost_scale`. Larger `gamma_c` or `gamma_p` reduces
+growth and reproductive availability from fixed stocks and
 increases the structural resource represented by a unit of biomass. The same
 stoichiometries convert maintenance deficits to biomass loss. Automatic standing costs
 are
@@ -85,8 +96,8 @@ C_m^*=G\kappa_C\Delta t,\qquad P_{loss}^*=G\kappa_P\Delta t.
 $$
 
 They are deducted before trade and allocation. The implementation is
-[`_pay_maintenance`](../mycormarl/mycormarl/environments/base_mycor.py#L607-L644)
-and [`_apply_allocation`](../mycormarl/mycormarl/environments/base_mycor.py#L646-L700).
+[`_pay_maintenance`](../src/mycormarl/environments/base_mycor.py)
+and the [coupled allocation integrator](../src/mycormarl/allocation.py).
 
 Plant carbon input is
 
@@ -97,20 +108,22 @@ $$
 Here `amass` is an apparent-gross carbon budget for a 16-hour-light reference day,
 spread uniformly through the current numerical time axis. It is not grams, nor a direct
 area-based gas-exchange rate. This is implemented in
-[`photosynthesise`](../mycormarl/mycormarl/plant/photosynthesis.py#L10-L22).
+[`photosynthesise`](../src/mycormarl/plant/photosynthesis.py#L10-L22).
 
 Biomass-derived absorbing lengths are
 
 $$
 L_{root}=G_p k_{root}SRL,
 \qquad
-L_h=\frac{G_f\gamma_{C,f}}{M_C\pi r_h^2}.
+L_h=\frac{(1-\texttt{irm_fraction})G_f\gamma_{C,f}}{M_C\pi r_h^2}.
 $$
 
+Here $G_f$ is total IRM plus ERM dry mass; only ERM is passed to the low-level
+external length conversion. Both fractions pay the same existing fungal costs.
 Root length is distributed through stacked discs; fungal length fills a hemisphere at
 `saturation_density`. See
-[`root_length_from_plant_biomass`](../mycormarl/mycormarl/plant/roots.py#L9-L21)
-and [`hyphal_length_from_fungal_biomass`](../mycormarl/mycormarl/fungus/mycelium.py#L7-L26).
+[`root_length_from_plant_biomass`](../src/mycormarl/plant/roots.py#L9-L21)
+and [`hyphal_length_from_fungal_biomass`](../src/mycormarl/fungus/mycelium.py#L7-L26).
 
 Soil labile P and solution concentration are linked by
 
@@ -149,6 +162,7 @@ continuous closures are blended using `uptake_reference_time_days` and
 | `max_rooting_depth_cm` | `150 cm` | Normalisation horizon and hard lower boundary for the analytical root profile. Roots assigned below the simulated soil retain biomass cost but provide no in-domain uptake. | Described as a provisional near-infinite rooting horizon rather than a measured carrot maximum. **Unsupported model choice.** |
 | `gamma_c` | `0.402 g C g⁻¹ DM` | Structural C per unit plant biomass; sets C-limited growth, structural C accounting, initial C reserve, and C-deficit biomass loss. | Carbon elemental analysis of untreated dry carrot-root material ([Kaur et al. 2022](https://doi.org/10.1038/s41598-022-20971-5)). Root-dominated material is used as a whole-plant proxy. **Transferred within species.** |
 | `gamma_p` | `1.92 mg P g⁻¹ DM` | Structural/frozen plant P per unit biomass; sets P-limited growth, initial P reserve, mortality P accounting, and P-deficit biomass loss. It is not a daily P loss. | Dry-mass-weighted value derived from unfertilised-soil carrot root (`1.975 mg g⁻¹`) and leaf (`1.688 mg g⁻¹`) P concentrations and their reported dry masses ([Kováčik et al. 2022](https://doi.org/10.3390/agronomy12112770)). **Derived; independent corroboration remains needed.** |
+| `reproduction_cost_scale` | `1` (dimensionless, positive) | Multiplies both growth C/P costs per reproductive output unit. At fixed physical rates, increasing it reduces output reciprocally while expenditure remains unchanged. | Chosen shared growth/reproduction cost baseline; independently configurable per organism. **Model abstraction, not empirically calibrated reproduction.** |
 | `kappa_c` | `0.007 g C g⁻¹ whole-plant DM d⁻¹` | Unavoidable standing-biomass C maintenance paid before action; deficits remove biomass. It intentionally excludes a future construction-efficiency term. | `0.402 × (0.38×0.021 + 0.62×0.015) = 0.00694`, rounded to `0.007`, using carrot shoot/root maintenance coefficients at 20 °C ([Reid 2019](https://doi.org/10.1080/01140671.2019.1588134)). **Derived.** |
 | `kappa_p` | `0 mg P g⁻¹ whole-plant DM d⁻¹` | No default irreversible free-P loss is paid before action. This preserves P conservation absent explicit transfer, structural immobilisation, or configured loss. | No carrot study directly estimates a daily irreversible-P loss. Carrot time courses show continued P accumulation and redistribution ([Fernández-Pérez et al. 2023](https://doi.org/10.17584/rcch.2023v17i3.16508); [Cecílio Filho et al. 2013](https://acervodigital.unesp.br/handle/11449/75622)). A positive loss remains an explicit sensitivity, not a default maintenance cost. **Model choice, not literature-backed.** |
 | `death_fraction` | `0.20` | The plant dies when post-maintenance biomass falls below 20% of its historical maximum. It is a deterministic termination threshold, not daily mortality. | No empirical derivation is recorded. **Unsupported.** |
@@ -159,12 +173,14 @@ continuous closures are blended using `uptake_reference_time_days` and
 
 | Runtime field | Default and units | Description and model effect | Evidence, derivation, and status |
 |---|---:|---|---|
-| `initial_biomass` | `0.001 g DM` | Fungal dry biomass at reset, interpreted as living external mycelium in an already operating symbiosis; spores and inoculum are not represented. | Early-established fixture, still below the approximately `3–17 mg` mature external-mycelium measurements in *R. irregularis* root-organ microcosms ([Sun et al. 2024](https://doi.org/10.1007/s00572-024-01154-8)). **Qualification-informed modelling choice; not a direct initial-condition measurement.** |
+| `irm_fraction` | `0` (dimensionless) | Fixed IRM / total fungal dry mass, finite in `[0, 1)` and zero in `fungus-only` mode. Only complementary ERM yields external uptake geometry. Growth and mortality preserve the split; all tissue pays existing costs. | Legacy allocation reference; experiments explicitly choose nonzero values. **Model choice, not an empirical zero-colonisation estimate.** |
+| `initial_biomass` | `0.001 g DM` | Total fungal dry biomass at reset (IRM plus ERM; all external at default `irm_fraction=0`) in an already operating symbiosis; spores and inoculum are not represented. | Early-established fixture, still below the approximately `3–17 mg` mature external-mycelium measurements in *R. irregularis* root-organ microcosms ([Sun et al. 2024](https://doi.org/10.1007/s00572-024-01154-8)). **Qualification-informed modelling choice; not a direct initial-condition measurement.** |
 | `initial_c_pool` | Derived at reset: `3.75e-7 g C` at `dt=0.025 d` | Free fungal C at reset, additional to structural C implicit in biomass. | When unspecified, exactly one next-step maintenance requirement: `kappa_c × initial_biomass × dt`. A supplied numeric value is an explicit override. **Derived model initial condition.** |
 | `initial_p_pool` | Derived at reset: `0 mg P` | Free fungal P at reset, additional to structural P implicit in biomass. | The default `kappa_p=0` therefore supplies no free P. A supplied numeric value is an explicit override. **Derived model initial condition.** |
 | `gamma_c` | `0.5 g C g⁻¹ DM` | Structural fungal C per unit biomass; controls C-limited growth, initial reserve, deficit mortality, and conversion of biomass to hyphal tissue volume. | Provisional fungal carbon fraction used by [Bisot et al. (2026)](https://doi.org/10.1073/pnas.2512182123). Its precise AMF value is acknowledged as uncertain. **Transferred/provisional.** |
 | `gamma_p` | `1.3 mg P g⁻¹ DM` | Fixed structural/frozen P per unit fungal biomass. Lower values reduce P cost of growth but increase biomass loss per unit unmet P-loss demand. It does not specify P maintenance. | Low-P spores of *Glomus intraradices*, from the lineage now called *Rhizophagus irregularis*, contained `1.3±0.35 mg P g⁻¹` ([Olsson et al. 2008](https://doi.org/10.1128/AEM.00376-08)). The direct low-P value is the evidence-led default for this low-P model; the measurement is a spore proxy, not a whole-extraradical-mycelium mean. Selected young-hypha regions were `2.4–9.6 mg g⁻¹`, so the study does not support a claim that spores are generally more P-dense than extraradical mycelium. **Direct lineage observation used as a fixed whole-fungus stoichiometry proxy.** |
-| `kappa_c` | `0.015 g C g⁻¹ DM d⁻¹` | Standing external-mycelium carbon loss paid before action; it reduces the free C received from the plant and can cause biomass loss when unpaid. It is a broader operating-respiration proxy, not a pure basal-maintenance measurement. | Transferred from direct external-mycelium respiration of *Funneliformis mosseae*: `1.5–3.8 ng C m⁻¹ h⁻¹` and `3.6 µg DM m⁻¹` convert to `0.010–0.025 g C g⁻¹ DM d⁻¹`; the ambient `0.016` rounds to `0.015` ([Heinemeyer et al. 2006](https://doi.org/10.1111/j.1469-8137.2006.01730.x)). The model represents external mycelium, but there is no direct biomass-normalised *R. irregularis* measurement. **Transferred/derived.** |
+| `reproduction_cost_scale` | `1` (dimensionless, positive) | Multiplies both growth C/P costs per reproductive output unit. At fixed physical rates, increasing it reduces output reciprocally while expenditure remains unchanged. | Chosen shared growth/reproduction cost baseline; independently configurable per organism. **Model abstraction, not empirically calibrated reproduction.** |
+| `kappa_c` | `0.015 g C g⁻¹ DM d⁻¹` | Standing total-fungal-biomass carbon loss paid before action, with the same coefficient for IRM and ERM; it reduces the free C received from the plant and can cause biomass loss when unpaid. It is a broader operating-respiration proxy, not a pure basal-maintenance measurement. | Transferred from direct external-mycelium respiration of *Funneliformis mosseae*: `1.5–3.8 ng C m⁻¹ h⁻¹` and `3.6 µg DM m⁻¹` convert to `0.010–0.025 g C g⁻¹ DM d⁻¹`; the ambient `0.016` rounds to `0.015` ([Heinemeyer et al. 2006](https://doi.org/10.1111/j.1469-8137.2006.01730.x)). Applying this external-mycelium proxy to both IRM and ERM is an explicit shared-tissue approximation; there is no direct biomass-normalised *R. irregularis* measurement. **Transferred/derived.** |
 | `kappa_p` | `0 mg P g⁻¹ DM d⁻¹` | No default irreversible free-P loss is paid; P transfer to the plant and structural P in biomass remain separately represented. | There is no direct biomass-normalised daily irreversible-P loss for *R. irregularis*. Zero is the conservation default; a positive loss is an explicit sensitivity, not a fungal maintenance measurement. **Model choice, not literature-backed.** |
 | `death_fraction` | `0.05` | Fungus dies when post-maintenance biomass falls below 5% of historical maximum. It is not hyphal turnover or stochastic mortality. | No empirical derivation is recorded. **Unsupported.** |
 | `hyphal_radius` | `5e-4 cm` (`5 µm`) | Converts fungal tissue volume to cylindrical length and length to absorbing area; also enters sparse resistance and depletion-zone overlap. | Adopted from [Schnepf & Roose (2006)](https://doi.org/10.1111/j.1469-8137.2006.01771.x), not identified as a direct *R. irregularis* measurement. **Transferred.** |
@@ -178,12 +194,12 @@ continuous closures are blended using `uptake_reference_time_days` and
 | Runtime field | Default and units | Description and model effect | Evidence, derivation, and status |
 |---|---:|---|---|
 | `max_steps` | `14,600 steps` | Administrative episode limit. At the default timestep it represents `14,600×0.025=365 d`; truncation is not biological death. | Arithmetic one-year scenario, not literature-derived. **Numerical/model choice.** |
-| `dt` | `0.025 d` (`0.6 h`) | Biological/action step and basis for maintenance, photosynthesis, uptake, and termination timing. Diffusion is internally subcycled if required. | Operational default retained pending issue #24, which will separate the policy decision interval from numerical integration. The standard fixed-geometry soil qualification supports `0.05 d`, but coupled fixed-action timestep comparisons change action frequency and are diagnostic only. **Numerical/model choice, not a biological parameter estimate.** |
+| `dt` | `0.025 d` (`0.6 h`) | Numerical environment step and basis for maintenance, photosynthesis, uptake, and termination timing. Diffusion is internally subcycled if required; a policy interval may hold a rate command across several numerical steps. | Largest tested eligible timestep passing the retained fixed-soil and coupled fixed-policy qualification against both next-finer and finest references. See the [qualification tables](qualification/phosphate-numerical-qualification.md). **Numerical/model choice, not a biological parameter estimate.** |
 | `consumer_mode` | `"mixed"` | Activates plant and fungus together; alternatives are `plant-only` and `fungus-only`. It changes which organisms are operational and which uptake/trade processes occur. | Experimental scenario selection. **Model choice.** |
 | `soil_radius_cm` | `50 cm` | Outer radius of the axisymmetric cylinder; controls cell count, soil volume, radial boundary, available P, and clipping of organism geometry. | No literature or experimental-vessel source is recorded for the default. **Unsupported scenario geometry.** |
 | `soil_depth_cm` | `100 cm` | Cylinder depth; controls soil volume, vertical boundary, and the represented fraction of the analytical root profile. | No literature or experimental-vessel source is recorded for the default. **Unsupported scenario geometry.** |
-| `radial_interval_cm` | `0.1 cm` | Exact uniform radial cell spacing. Smaller values increase resolution and cost; extent must be evenly divisible. | Existing spatial qualification retained `0.1 cm` against finer candidates for the reduced test problem. **Numerical choice; not universal convergence evidence.** |
-| `depth_interval_cm` | `0.1 cm` | Exact uniform depth spacing with the same cost and divisibility implications. | Same qualification basis and limitation as radial spacing. **Numerical choice.** |
+| `radial_interval_cm` | `0.05 cm` | Exact uniform radial cell spacing. Smaller values increase resolution and cost; extent must be evenly divisible. | Retained spatial qualification selects `0.05 cm` against next-finer and finest references; `0.1 cm` fails the finest-reference coupled comparison. **Numerical choice for the tested fixture; not universal convergence evidence.** |
+| `depth_interval_cm` | `0.05 cm` | Exact uniform depth spacing with the same cost and divisibility implications. The default cylinder now has `1000 × 2000` cells. | Same qualification basis and limitation as radial spacing. **Numerical choice.** |
 | `initial_solution_p_um` | `1 µM` | Initial soil-solution inorganic phosphate. With no depth profile it applies uniformly through the represented domain; a supplied profile scales it by depth. Through buffering it sets total initial labile inventory. It is not extractable or total soil P. | Order-of-magnitude low-P condition associated with [Vance et al. (2003)](https://doi.org/10.1046/j.1469-8137.2003.00695.x), not a universal mean. **Transferred/provisional.** |
 | `initial_solution_p_depth_profile` | `None` (uniform) | Optional `(depth cm, relative factor)` knots, linearly interpolated by cell-centre depth. | The selected grassland-derived shape is a structural scenario, not a calibrated pore-water profile. |
 | `phosphate_diffusion_coefficient_cm2_s` | `1e-5 cm² s⁻¹` | Solution diffusion coefficient in finite-volume transport; with water, impedance, and buffering it determines amount conductance and apparent propagation. | Provisional parameterisation from [Schnepf & Roose (2006)](https://doi.org/10.1111/j.1469-8137.2006.01771.x). **Transferred.** |
@@ -193,7 +209,8 @@ continuous closures are blended using `uptake_reference_time_days` and
 | `uptake_reference_time_days` | `1 d` | Limits sparse depletion-zone propagation and sets the exposure scale in the sparse-to-continuous transition. Chosen from a reference length density away from the default root and hyphal densities, where the static blend is negligibly different from the dynamic-timescale blend; maximum divergence occurs near the reference density. At `1,000 cm cm⁻³`, default soil parameters give `t_diff ≈ 0.90 d`, rounded to `1 d`. It is neither the timestep nor a measured absorber lifetime. | Explicit provisional modelling choice. **Not literature-backed.** |
 | `uptake_transition_exponent` | `2` | Sharpness of `w=1/[1+(t_diff/T_ref)^p]`; larger values make the sparse/continuous switch steeper. | Explicit smooth-transition choice; sensitivity values `1` and `4` were proposed. **Not literature-backed.** |
 | `theta_water` | `0.3 cm³ water cm⁻³ bulk soil` | Volumetric water content; raises dissolved capacity and flux conductance and contributes with `b_p` to total labile capacity. It is static in the current model. | Provisional value used by [Schnepf & Roose (2006)](https://doi.org/10.1111/j.1469-8137.2006.01771.x). **Transferred; soil-specific calibration required.** |
-| `alpha` | `0.5` | Carbon exponent in Cobb–Douglas reproductive fitness, `R=(C_rep/gamma_c)^alpha(P_rep/gamma_p)^(1-alpha)`. At `0.5`, scaled C and P contribute symmetrically. Reward is a fitness index, not conserved offspring biomass. | No empirical reproductive-allocation calibration is recorded. **Model choice.** |
+| `allocation_rate_step` | `0.02` | Maximum dimensionless outgoing-hazard step used to select allocation substeps. Lower values refine allocation while holding physical commands fixed; finite values must lie in `(0,1]`. | Qualified against independent references and limiting-resource switches. **Numerical control.** |
+| `allocation_max_substeps` | `65,536` | Finite allocation iteration budget. Exhaustion invalidates the transition and is rejected by public workflows. It never caps action rates or repairs stocks. | Explicit failure boundary, separate from soil CFL scheduling. **Numerical control.** |
 
 ## Parameters that are not currently literature-backed
 
@@ -205,12 +222,13 @@ The following defaults should not be presented as measurements:
   maximum; fungal `death_fraction`.
 - **Explicit biological abstractions:** plant and fungal `kappa_p`. Literature
   informs their scale and interpretation, but not the selected irreversible fraction.
-- **Explicit uptake/reward choices:** `uptake_reference_time_days`,
-  `uptake_transition_exponent`, and `alpha`.
+- **Explicit uptake/reproduction choices:** `uptake_reference_time_days`,
+  `uptake_transition_exponent`, and both `reproduction_cost_scale` values.
 - **Scenario geometry and initial field:** `soil_radius_cm`, `soil_depth_cm`,
   and the optional `initial_solution_p_depth_profile`.
 - **Numerical/experimental controls rather than empirical traits:** `max_steps`, `dt`,
-  `consumer_mode`, both grid intervals, and `diffusion_cfl_safety`.
+  `consumer_mode`, both grid intervals, `diffusion_cfl_safety`,
+  `allocation_rate_step`, and `allocation_max_substeps`.
 
 Several literature-linked parameters also remain weakly transferred: root and fungal
 uptake kinetics are not species-specific; root radius is derived from unmatched
@@ -255,7 +273,7 @@ focused tests listed in the [phosphate model](phosphate-model.md#numerical-quali
 
 This register is a consolidation of the runtime declarations and the existing
 [growth model](growth-model.md), [phosphate model](phosphate-model.md), and
-[parameter research review](research/default-biomass-stoichiometry-and-photosynthesis-parameters.md).
+[parameter research review](https://github.com/isaachcamp/REDbyRBD/blob/main/docs/research/default-biomass-stoichiometry-and-photosynthesis-parameters.md).
 It does not turn a repository assumption into literature evidence merely because that
 assumption has already been documented.
 
