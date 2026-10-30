@@ -66,6 +66,8 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
 
         plant.validate_plant_growth_geometry_traits(self.species.plant)
         fungus.validate_fungus_growth_geometry_traits(self.species.fungus)
+        if self.config.consumer_mode == "fungus-only" and self.species.fungus.irm_fraction != 0.0:
+            raise ValueError("fungus irm_fraction must be zero in fungus-only mode")
         self._validate_soil_config(self.config)
         self.r_edges, self.z_edges = axisymmetric_edges_from_intervals(
             self.config.soil_radius_cm,
@@ -148,13 +150,12 @@ class BaseMycorMarl(AutoResetMixin, MultiAgentEnv):
             self.species.plant.biomass_observation_reference
         )
 
-        # Calculate ref biomass based on maximum radius possible constrained by
-        # grid boundaries.
+        # Preserve the legacy biomass encoding independently of IRM allocation.
         fungus_biomass_reference = (
             0.5
             * fungus.fungal_biomass_for_colony_radius(
                 self.config.soil_radius_cm,
-                self.species.fungus,
+                self.species.fungus.replace(irm_fraction=0.0),
             )
         )
 

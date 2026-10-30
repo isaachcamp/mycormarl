@@ -141,7 +141,7 @@ def _depth_band_losses(env, initial_soil, final_soil) -> tuple[DepthBandLoss, ..
 def _outside_colony_metrics(env: BaseMycorMarl, state):
     """Observe fungal density and calculated request in wholly exterior cells."""
     total_length = hyphal_length_from_fungal_biomass(
-        state.fungus_biomass,
+        state.fungus_biomass * (1.0 - env.species.fungus.irm_fraction),
         env.species.fungus.gamma_c,
         env.species.fungus.hyphal_tissue_carbon_density,
         env.species.fungus.hyphal_radius,

@@ -181,6 +181,9 @@ def main():
         expected = json.loads(path.read_text()) if args.command == 'check' else None
         declaration, result, timing = run(name)
         if expected is not None:
+            # Historical all-external fixtures predate the optional IRM trait.
+            # Interpret its documented zero default without rewriting evidence.
+            expected['scenario']['species']['fungus'].setdefault('irm_fraction', 0.0)
             failures.extend(differences(expected['scenario'], declaration, name + '.scenario', TOLERANCE))
             failures.extend(differences(expected['result'], result, name, expected['tolerance']))
         else:

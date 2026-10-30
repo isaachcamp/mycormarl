@@ -15,9 +15,14 @@ class FungusTraits:
     saturation density is cm hypha per cm³ bulk soil. ``kappa_p`` is
     irreversible free-P loss in mg P per g dry biomass per day; structural P
     is represented only by ``gamma_p``. ``jmax`` is µmol P cm^-2 s^-1 and
-    ``km`` is µmol P cm^-3. Initial biomass is an early-established living
-    external-mycelium fixture; spores, inoculum, and colonized-root mass are
-    not represented. An unspecified initial free pool is derived at reset as
+    ``km`` is µmol P cm^-3. Biomass includes implicit intraradical mycelium
+    (IRM) at the fixed ``irm_fraction`` and external mycelium (ERM) at its
+    complement. Only ERM gives soil-uptake geometry. Both fractions share
+    construction/maintenance coefficients and change proportionally with
+    growth or mortality. The fraction must be finite in [0, 1), defaults to
+    zero, and must be zero in fungus-only mode. Initial biomass is total living
+    IRM plus ERM in an early-established fixture; spores and inoculum are not
+    represented. An unspecified initial free pool is derived at reset as
     one configured maintenance timestep; a numeric value is an explicit
     override.
     """
@@ -36,10 +41,13 @@ class FungusTraits:
     saturation_density: float = 2_000.0
     jmax: float = 3.26e-6  # µmol P cm^-2 s^-1
     km: float = 5.8e-3  # µmol P cm^-3
+    irm_fraction: float = 0.0
 
 
 def validate_fungus_growth_geometry_traits(traits: FungusTraits) -> None:
     """Validate every fungal trait that forms state or controls a rate."""
+    if not math.isfinite(traits.irm_fraction) or not 0.0 <= traits.irm_fraction < 1.0:
+        raise ValueError("fungus irm_fraction must be finite and in [0, 1)")
     for name in (
         "gamma_c",
         "gamma_p",
