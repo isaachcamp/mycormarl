@@ -23,6 +23,8 @@ record existing model decisions retrospectively, with their recording date.
 | [0018](0018-account-for-structural-phosphorus-and-explicit-biological-exports.md) | Structural P, biological exports, death and reset resource accounts |
 | [0019](0019-separate-policy-numerical-and-soil-clocks-and-qualify-resolution.md) | Separate clocks, explicit numerical splitting and qualified resolution |
 | [0020](0020-use-three-rate-actions-and-stoichiometric-reproductive-output.md) | Three-rate coupled allocation, stoichiometric reproductive output and declared static intensity |
+| [0021](0021-treat-internal-transport-capacity-as-non-limiting.md) | Non-limiting internal transport capacity; density loss does not add throughput limits or compensatory carbon costs |
+| [0022](0022-separate-fine-root-mortality-from-persistent-backbone-connectivity.md) | No fine-root density floor; implicit persistent backbone and nearest root-containing cell for fungal cost distance |
 
 The assumption catalogue, equations, units and parameter provenance belong in
 the [model overview](../model-overview.md), [growth model](../growth-model.md),
