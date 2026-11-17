@@ -25,9 +25,7 @@ The transport shell is the current step's new radial growth, with no retreat
 correction. Zero growth gives zero construction-related carbon-transport charge;
 ongoing P transport has zero explicit cost, eliminating the pending front-surface
 P-distance fallback. Standing maintenance continues. Carbon-delivery cost
-coefficients and its resource-funded transaction remain to be designed. Earlier
-transport alternatives below are historical discussion, superseded where they
-conflict with this clarification.
+coefficients and its resource-funded transaction remain to be designed. The selected transport model below incorporates this clarification.
 
 ## Agreed changes
 
@@ -154,57 +152,23 @@ non-fine-root density estimate has been selected. Explicit
 transport-carbon coefficients, cost ownership and update timing remain a
 separate extension. Do not introduce those costs as part of mortality work.
 
-## Updated transport-shell proposal, 30 October 2026
+## Selected transport-shell model
 
-The user proposes using the radial expansion realised in the current numerical
-step as shell width, replacing the free physical-width choice below. Measure
-from the post-maintenance front to the post-growth front, so retreat does not
-cancel construction. This naturally prices new-growth delivery under the
-existing prescribed-front geometry, with no uptake change or extra width
-parameter. It is a numerical new-growth increment whose normalised distance
-must converge under timestep refinement, not a fixed biological dispersion
-width. Zero growth means no construction stream but does not eliminate P
-uptake/trade or maintenance; a front-surface mean for those ongoing transport
-streams remains a proposed fallback pending discussion.
+Use the current numerical step's realised radial expansion as the transport
+shell width. Under the non-retracting operational-front rule, this is the band
+between the old and new outer fronts, with no retreat correction or free width
+parameter. Weight delivery distance by new absorbing length: nearest persistent
+root footprint plus reference-density spacing for fungi, and straight-line
+distance to the stem base for fine roots. Price delivered construction carbon
+with a linear distance charge, using separate, unfitted organism coefficients.
 
-## Earlier transport-shell scope, 28 October 2026
-
-Use a configurable physical shell width in cm for transport-distance averaging;
-its numerical baseline remains unset. The shell is anchored at the outer front
-and intersected with surviving tissue, so its inner radius is
-`max(a,b-w,0)`. This changes only the transport-demand proxy: existing uptake,
-outer-boundary growth, global actions and cohort-budget rules remain in scope.
-It does not spread actual tissue deposition over the band. Width must be
-independent of timestep and grid spacing. FWHM estimation and Edelstein tip-field
-dynamics are deferred; neither blocks refinement of the existing mortality plan.
-
-### Earlier FWHM proposal (deferred)
-
-Uptake is explicitly unchanged. The user proposes deriving a transport-shell
-width from the FWHM of the uptake peak behind the front as a proxy for a
-spatially dispersed growth front. The [derivation notes](../technical-summaries/transport-shell-geometries/README.md)
-record the mathematical proposal and the distinction between the measured peak
-band and borrowing its width for a shell anchored at the growth front. Profile
-normalisation, multiple/absent peaks, truncated peaks and a no-uptake fallback
-remain to be specified. This does not restrict active uptake or change where
-new tissue is constructed; explicit transport expenditure remains separate
-from the mortality implementation.
-
-## Edelstein-style alternative (deferred, 28 October 2026)
-
-The user asked whether evolving growing-tip and hyphal-length densities would
-produce a dispersed growth front directly. The [primary-source assessment](../technical-summaries/edelstein-tip-density-front.md)
-finds conditional support for a finite-width tip pulse, with gross deposition
-`v*n` supplying a direct growth-transport weight. The user chose a parameterised
-transport width instead of this morphology change for now.
-This would replace the sharp outer-shell spatial-growth rule, require exact
-coupling to policy-funded C/P construction and alter age-history storage because
-new birth cohorts overlap in space. Neither tip/length fields alone nor their
-anastomosis terms implement oldest-first structural mortality, root attachment
-or internal resource transport. The uptake law remains unchanged; geometry-driven
-uptake outcomes can still differ. Those changes are deferred; the selected
-parameterised transport shell preserves disjoint outer-boundary birth shells
-as the current growth approximation.
+Zero construction has zero construction-related transport charge. Explicit
+fungal polyphosphate-translocation cost is zero, so no ongoing P-distance
+fallback is required. Uptake and ordinary maintenance continue unchanged.
+The [selected model and figures](../technical-summaries/transport-shell-geometries/README.md)
+record the equations, scope and remaining funded-budget integration decisions.
+This numerical growth increment requires cumulative-cost convergence under
+timestep refinement; it is not a fixed biological active-zone width.
 
 ## Ticket reconciliation after discussion
 
