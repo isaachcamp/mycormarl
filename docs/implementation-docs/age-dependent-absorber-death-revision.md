@@ -6,6 +6,29 @@ records the accepted root assumptions. GitHub #89 and #90–93 remain the publis
 specification/tickets, but their root-floor requirements are stale relative to
 this decision and require reconciliation before implementation.
 
+## Latest transport/mortality clarification, 11 November 2026
+
+Assign zero explicit carbon cost to fungal polyphosphate translocation for now.
+Keep soil uptake, P exchange commands, structural requirements, conservation
+and contact-loss gates unchanged. This does not assert that every P-processing
+operation is free or remove existing maintenance expenditure.
+
+Preserve the outer front under oldest-first mortality while the organism is
+operational. The earlier provisional outer-retreat fallback is no longer the
+selected behaviour. Its removal is an explicit rule, not a consequence of the
+name age-dependent mortality alone. Reconcile any retained fungal floor with
+the required loss budget and non-retracting front before implementation; never
+silently forgive biomass loss. Whole-organism death/absence still disables
+active uptake geometry and bilateral exchange.
+
+The transport shell is the current step's new radial growth, with no retreat
+correction. Zero growth gives zero construction-related carbon-transport charge;
+ongoing P transport has zero explicit cost, eliminating the pending front-surface
+P-distance fallback. Standing maintenance continues. Carbon-delivery cost
+coefficients and its resource-funded transaction remain to be designed. Earlier
+transport alternatives below are historical discussion, superseded where they
+conflict with this clarification.
+
 ## Agreed changes
 
 1. Remove the positive fine-root density floor. Maintenance-induced fine-root
@@ -100,7 +123,8 @@ availability decision; the existing organism-level trade abstraction remains.
 
 The root-floor, exchange-availability, provisional density proxy and permission
 for contact loss are resolved. A central empty fungal zone is under discussion;
-the exact floor/removal geometry remains to be finalised. Assess fungal
+the exact floor/removal geometry remains to be finalised subject to the latest
+non-retracting-front decision. Assess fungal
 self-connectivity separately from root contact: a hollow connected shell can
 lose every root connection. The user accepts that outcome, with trade disabled
 rather than artificial preservation of contact.
@@ -130,7 +154,20 @@ non-fine-root density estimate has been selected. Explicit
 transport-carbon coefficients, cost ownership and update timing remain a
 separate extension. Do not introduce those costs as part of mortality work.
 
-## Accepted transport-shell scope, 28 October 2026
+## Updated transport-shell proposal, 30 October 2026
+
+The user proposes using the radial expansion realised in the current numerical
+step as shell width, replacing the free physical-width choice below. Measure
+from the post-maintenance front to the post-growth front, so retreat does not
+cancel construction. This naturally prices new-growth delivery under the
+existing prescribed-front geometry, with no uptake change or extra width
+parameter. It is a numerical new-growth increment whose normalised distance
+must converge under timestep refinement, not a fixed biological dispersion
+width. Zero growth means no construction stream but does not eliminate P
+uptake/trade or maintenance; a front-surface mean for those ongoing transport
+streams remains a proposed fallback pending discussion.
+
+## Earlier transport-shell scope, 28 October 2026
 
 Use a configurable physical shell width in cm for transport-distance averaging;
 its numerical baseline remains unset. The shell is anchored at the outer front

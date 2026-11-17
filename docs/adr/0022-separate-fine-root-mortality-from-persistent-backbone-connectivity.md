@@ -15,6 +15,13 @@ in this footprint is assumed available for fungal exchange without separately
 tracked colonisation or an establishment delay. The nearest cell therefore
 provides an eligible exchange endpoint, not merely a distance proxy.
 
+**Mortality follow-up, 11 November 2026:** the user selected preservation of
+the outer front under oldest-first loss while the organism is operational,
+removing the provisional outer-retreat fallback. Any retained fungal-floor
+semantics must be reconciled with that decision and exact biomass accounting.
+The [revision discussion](../implementation-docs/age-dependent-absorber-death-revision.md)
+records the latest scope; organism death and root-contact loss gates remain.
+
 ## Reasoning
 
 Absorbing fine-root density and stem connectivity describe different functions.

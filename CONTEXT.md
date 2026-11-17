@@ -31,9 +31,12 @@ See [ADR-0021](docs/adr/0021-treat-internal-transport-capacity-as-non-limiting.m
 ### Oldest-first maintenance mortality
 
 Tissue loss triggered by insufficient maintenance resources, allocated to the
-oldest eligible living tissue first. The planned fungal rule retains a minimum
-living density; the revised fine-root rule permits complete cohort removal,
-with stem connectivity supplied by an implicit conducting-root backbone.
+oldest eligible living tissue first. The revised spatial rule preserves the
+outer front while the organism remains operational; the earlier provisional
+outer-retreat fallback is no longer selected. Fine-root cohorts can disappear
+completely, with connectivity supplied by the implicit conducting-root backbone.
+Any fungal floor must be reconciled with prescribed loss and a non-retracting
+front; it must not silently forgive mortality or restore retreat.
 This is not current production behaviour. [Issue #89](https://github.com/isaachcamp/mycormarl/issues/89)
 and dependent tickets #90–93 require reconciliation with
 [ADR-0022](docs/adr/0022-separate-fine-root-mortality-from-persistent-backbone-connectivity.md)
@@ -64,12 +67,15 @@ independently of post-mortality absorbing density. See
 
 ### Transport-front shell
 
-A finite-width band of living hyphae immediately behind the outer growth front,
-used as a proxy for transport source/destination distance. Its width is a
-physical parameter in cm, independent of timestep or grid spacing. It does not
-restrict phosphate uptake or spread actual new tissue construction over that
-band. Uptake-FWHM and tip-density dynamics are deferred alternatives; no width
-value or energetic coefficient is selected. See the
+The newly constructed band at the outer hyphal boundary, used for the
+proposed carbon-delivery-to-growth distance. Its width is the current numerical
+step's radial expansion; oldest-first mortality preserves the operational
+organism's outer front. It is a numerical growth increment, not a fixed
+biological active-zone width. Zero growth has zero construction-related
+transport charge. Polyphosphate translocation is assigned zero explicit carbon
+cost, so no P-distance fallback is required on zero-growth steps. Uptake and
+ordinary maintenance continue unchanged. Uptake-FWHM and tip-density dynamics
+are deferred; no carbon-transport coefficient is selected. See the
 [transport-shell derivation](docs/technical-summaries/transport-shell-geometries/README.md).
 
 ### Front-only absorber growth

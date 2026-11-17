@@ -10,6 +10,39 @@ congestion penalty or compensatory carbon charge. This keeps the proposed
 transport-cost extension focused on energetic expenditure without adding an
 uncalibrated capacity mechanism.
 
+**Further scope decision, 11 November 2026:** explicit fungal polyphosphate
+transport expenditure is set to zero for now. P uptake, exchange, structural
+requirements, conservation and host-contact gates remain. Proposed extra
+transport expenditure concerns carbon delivery to new growth; ordinary
+maintenance is retained. The growth shell is the current step's radial
+expansion under the revised non-retracting operational front. No P-distance
+fallback is required on steps without growth. See the
+[current cost scope](../technical-summaries/transport-shell-geometries/README.md).
+
+## Selected energetic closure, 17 November 2026
+
+Use the linear carbon-delivery charge `Cdot_transport = b * F_C * mean_route_distance`
+for the first transport-cost implementation. Here `F_C` is realised carbon delivery
+to new growth [g C/day], distance is delivery-weighted [cm], and `b` is [cm^-1].
+Assume constant effective transport velocity across routes, times and delivery
+rates within this closure. Its energetic effect is absorbed into `b`; the model
+does not resolve velocity, pressure or transit time. Also assume a constant
+incremental expenditure per unit carbon per unit route distance: constant
+velocity alone does not establish that law. No numerical velocity or calibrated
+coefficient is selected. This replaces the previously open choice of functional
+form, while coefficient, precise delivery basis, payer and funded-growth timing
+remain to be specified.
+
+Prioritise a small, replaceable transport-cost module: keep route/demand
+construction separate from the constitutive cost calculation and the shared
+resource-budget transaction. Changing the energetic law should be local to its
+implementation/configuration, without rewriting uptake, mortality, contact
+eligibility or policy code. Preserve compiled/batched execution and explicit
+model/parameter provenance. This does not approve capacity limits, dynamic
+transport stocks or a general plugin framework; those would need a separate
+scope decision. Replacement checks must demonstrate that the integration is not
+hard-wired to the linear equation. See [implementation ticket #99](https://github.com/isaachcamp/mycormarl/issues/99).
+
 ## Reasoning and alternatives
 
 The alternatives considered included distance-dependent expenditure, shared-route throughput limits,
