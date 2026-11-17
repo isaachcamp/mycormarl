@@ -1,0 +1,60 @@
+{
+  "status": "Illustrative mathematical figure, not a fitted transport model",
+  "assumed_transport_stream": "Carbon delivered for growth",
+  "extra_P_translocation_cost": 0,
+  "carbon_cost_law": "Delta_C_tr = epsilon_C * Delta_C_G * mean_distance",
+  "epsilon_C_units": "g C spent / (g C delivered * cm)",
+  "epsilon_C_value": null,
+  "reference_root_density_cm_cm3": 1.0,
+  "spacing_closure": "2/(3*sqrt(pi*lambda_root))",
+  "spacing_cm": 0.37612638903183754,
+  "geometry": "30 stacked root discs, beta .96, first-layer radius18cm",
+  "coarse_resolution": [
+    320,
+    320
+  ],
+  "fine_resolution": [
+    640,
+    640
+  ],
+  "refinement_errors_cm": [
+    0.0,
+    6.747138391993701e-06
+  ],
+  "cases": [
+    {
+      "case": "A",
+      "old_front_cm": 11.0,
+      "new_front_cm": 12.0,
+      "growth_width_cm": 1.0,
+      "mean_footprint_gap_cm": 0.0,
+      "mean_root_distance_cm": 0.37612638903183754,
+      "shell_fraction_inside_roots": 1.0000000000000002,
+      "new_shell_volume_cm3": 831.4748556500986
+    },
+    {
+      "case": "B",
+      "old_front_cm": 23.0,
+      "new_front_cm": 24.0,
+      "growth_width_cm": 1.0,
+      "mean_footprint_gap_cm": 4.2115747953459195,
+      "mean_root_distance_cm": 4.587701184377757,
+      "shell_fraction_inside_roots": 0.14169992373706947,
+      "new_shell_volume_cm3": 3470.4126846655245
+    }
+  ],
+  "mean_radius_checks": [
+    {
+      "inner": 11.0,
+      "outer": 12.0,
+      "mean_radius_exact": 11.51448362720403,
+      "mean_radius_numeric": 11.514483627208374
+    },
+    {
+      "inner": 23.0,
+      "outer": 24.0,
+      "mean_radius_exact": 23.507091128545564,
+      "mean_radius_numeric": 23.50709112854769
+    }
+  ]
+}
