@@ -51,6 +51,8 @@ scripts and tests remain outside the importable package.
 | `scripts/phosphate_qualification.py` | Regenerates the convergence, conservation, sensitivity, and performance evidence. |
 | [mycormarl-animations](https://github.com/isaachcamp/mycormarl-animations) | Owns geometry/video preparation, scenes and validators against installed core. |
 | `scripts/train_ppo.py` | Runs a reproducible JIT PPO development job in mixed or single-consumer mode and saves a versioned policy bundle. |
+| `scripts/sweep_ppo.py` | Declares and executes controlled PPO batching comparisons with fixed episode horizons and evaluation spacing. |
+| `tests/test_ppo_sweeps.py` | Protects public training/sweep configuration, actual execution, timing, resume and comparison alignment. |
 | `tests/test_training_history.py` | Protects compact/debug agreement, disk resume, episode aggregates, recovery and evaluation retention. |
 | `tests/test_policy_artifacts.py` | Protects saved-policy compatibility and the public training CLI. |
 | `tests/test_phosphate_*.py` | Protects units, state, diffusion, uptake, competition, and qualification contracts. |

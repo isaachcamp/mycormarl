@@ -66,6 +66,11 @@ uv run python scripts/train_ppo.py --finite-horizon-returns \
   --mode mixed --total-timesteps 256 --num-steps 128 --num-envs 1 --seed 42
 ```
 
+The CLI baseline is 16 environments × 128 rollout steps, four epochs and four
+minibatches, with an independent episode horizon. See the
+[PPO batching audit](docs/ppo-batching-audit.md) for configuration previews,
+fixed-batch/fixed-rollout sweeps, timing and evaluation evidence.
+
 Training now writes compact metrics and resumable checkpoints in bounded
 chunks. See [training history and restart](docs/training-history.md) for
 `--chunk-updates`, `--resume`, optional evaluation and debug output. Default

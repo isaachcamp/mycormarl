@@ -1,10 +1,12 @@
 # Training history and restart
 
-The training CLI uses compact, bounded PPO chunks. By default each chunk
+The training CLI uses compact, bounded PPO chunks. PPO baseline defaults and
+controlled sweeps are documented in the [batching audit](ppo-batching-audit.md). By default each chunk
 contains at most ten updates. Rollout trajectories are retained only while
 needed for the current PPO update; they are not stacked across the whole run.
 The PPO objective, numerical dynamics and global learning-rate schedule are
-unchanged by chunking.
+unchanged by chunking. Chunk records now separate compilation from synchronous
+execution time and retain a cumulative compute clock across restart.
 
 ## Run a training job
 
