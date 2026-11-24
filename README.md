@@ -66,6 +66,11 @@ uv run python scripts/train_ppo.py --finite-horizon-returns \
   --mode mixed --total-timesteps 256 --num-steps 128 --num-envs 1 --seed 42
 ```
 
+Training now writes compact metrics and resumable checkpoints in bounded
+chunks. See [training history and restart](docs/training-history.md) for
+`--chunk-updates`, `--resume`, optional evaluation and debug output. Default
+outputs live outside this checkout in `../mycormarl-data/training/`.
+
 The trainer also accepts `--mode plant-only` and `--mode fungus-only` while
 retaining the fixed two-agent API. Saved bundles must be loaded with
 `mycormarl.policy_artifacts.load_policy_artifact`; unversioned policies and

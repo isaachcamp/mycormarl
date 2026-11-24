@@ -6,9 +6,8 @@ import argparse
 import json
 from pathlib import Path
 
-import jax
-
-from mycormarl.algos.ppo import PPOConfig, make_train
+from mycormarl.algos.ppo import PPOConfig
+from mycormarl.training import run_training
 from mycormarl.environments.base_mycor import BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
 from mycormarl.params import EnvConfig, SpeciesParams
@@ -31,12 +30,21 @@ def main() -> None:
         help="Consumer configuration; the fixed plant/fungus API is retained.",
     )
     parser.add_argument(
-        "--output", type=Path, default=Path("outputs/ppo_parameters.msgpack")
+        "--output", type=Path, default=Path("../mycormarl-data/training/ppo_parameters.msgpack")
     )
     parser.add_argument(
         "--finite-horizon-returns", action="store_true",
         help="Treat the declared episode horizon as the PPO return boundary.",
     )
+    parser.add_argument('--run-dir', type=Path, help='Metrics and resumable checkpoint directory.')
+    parser.add_argument('--chunk-updates', type=int, default=10)
+    continuation = parser.add_mutually_exclusive_group()
+    continuation.add_argument('--resume', action='store_true', help='Resume latest checkpoint in run-dir.')
+    continuation.add_argument('--resume-from', type=Path, help='Explicit checkpoint, e.g. previous.msgpack.')
+    parser.add_argument('--debug-history', action='store_true', help='Save detailed output for each chunk.')
+    parser.add_argument('--evaluate-every', type=int, default=0,
+                        help='Evaluate at chunk boundaries crossing this update interval; 0 disables.')
+    parser.add_argument('--evaluation-episodes', type=int, default=1)
     args = parser.parse_args()
     config = EnvConfig(
         max_steps=args.num_steps,
@@ -58,7 +66,13 @@ def main() -> None:
         FINITE_HORIZON_RETURNS=args.finite_horizon_returns,
     )
     random_streams = derive_random_streams(args.seed)
-    output = jax.jit(make_train(env, ppo, random_streams))(jax.random.PRNGKey(args.seed))
+    run_dir = args.run_dir or args.output.parent / (args.output.stem + '-run')
+    output = run_training(
+        env, ppo, seed=args.seed, run_dir=run_dir,
+        chunk_updates=args.chunk_updates, resume=args.resume_from or args.resume,
+        debug=args.debug_history, evaluate_every=args.evaluate_every,
+        evaluation_episodes=args.evaluation_episodes,
+    )
     train_state = output["runner_state"][0]
     parameters = {name: state.params for name, state in train_state.items()}
     save_policy_artifact(
@@ -72,6 +86,8 @@ def main() -> None:
         "consumer_mode": args.mode,
         "output": str(args.output),
         "seed": args.seed,
+        "run_dir": str(run_dir),
+        "completed_updates": output["completed_updates"],
         "total_timesteps": args.total_timesteps,
     }, sort_keys=True))
 

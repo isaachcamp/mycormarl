@@ -455,18 +455,58 @@ def initialize_runner_state(
     obs, env_state = jax.vmap(env.reset, in_axes=(0,))(reset_rng)
     return train_state, env_state, obs, (action_rng, environment_rng, minibatch_rng)
 
+
+def initial_episode_state(num_envs):
+    """Small per-environment counters carried across rollouts and checkpoints."""
+    return {
+        agent: {"fitness": jnp.zeros(num_envs),
+                "length": jnp.zeros(num_envs, dtype=jnp.int32)}
+        for agent in (PLANT, FUNGUS)
+    }
+
+
+def update_episode_state(state, rewards, fields):
+    """Aggregate completed organism lifetimes without keeping their traces.
+
+    A biological death ends that organism's summary immediately. An already
+    dead or absent organism does not produce another summary at truncation.
+    """
+    updated, summaries = {}, {}
+    for agent in (PLANT, FUNGUS):
+        valid = fields[agent].critic_valid
+        finished = valid & (fields[agent].terminated | fields[agent].truncated)
+        fitness = state[agent]["fitness"] + jnp.where(valid, rewards[agent], 0.)
+        length = state[agent]["length"] + valid.astype(jnp.int32)
+        summaries[agent] = {
+            "count": finished.astype(jnp.int32),
+            "fitness_sum": jnp.where(finished, fitness, 0.),
+            "length_sum": jnp.where(finished, length, 0),
+            "biological_terminations": (finished & fields[agent].terminated).astype(jnp.int32),
+            "administrative_truncations": (finished & fields[agent].truncated).astype(jnp.int32),
+        }
+        updated[agent] = {"fitness": jnp.where(finished, 0., fitness),
+                          "length": jnp.where(finished, 0, length)}
+    return updated, summaries
+
+
 def make_train(
     env,
     config,
     random_streams: RandomStreamContract | None = None,
     initial_runner_state=None,
+    *,
+    retain_history: bool = True,
 ):
     """Build a JIT-compatible independent-PPO trainer for the fixed agent API.
 
     Each policy consumes its own bounded observation and learns only from the
     validity, bootstrap, and trace controls derived from typed Transitions.
     The returned training output contains both policy states, trajectories,
-    losses, advantages, targets, and returns for smoke validation.
+    losses, advantages, targets, and returns for smoke validation. Set
+    ``retain_history=False`` for compact production chunks. Pass the returned
+    ``episode_state`` as the third dynamic argument when continuing a chunk to
+    preserve episode summaries spanning rollouts. The runner-state ABI stays
+    unchanged for existing callers.
     """
 
     gamma = discount_from_half_life(
@@ -533,7 +573,7 @@ def make_train(
     # compiled executable across updates instead of recompiling per checkpoint.
     resume_mode = initial_runner_state is not None
 
-    def train(rng, resumed_runner_state=initial_runner_state):
+    def train(rng, resumed_runner_state=initial_runner_state, resumed_episode_state=None):
         """
         Main training function for PPO. 
         --- Steps ---
@@ -571,12 +611,17 @@ def make_train(
             train_state, env_state, obs, runner_rngs = resumed_runner_state
             action_rng, environment_rng, minibatch_rng = runner_rngs
 
-        def _update_step(runner_state, x):
+        episode_state = resumed_episode_state
+        if episode_state is None:
+            episode_state = initial_episode_state(config.NUM_ENVS)
+
+        def _update_step(carry, x):
             """
             Full update step for environment and network.
             Collects trajectories using lax.scan, calculates GAE advantages.
             """
-            def _env_step(runner_state, x):
+            runner_state, episode_state = carry
+            def _env_step(carry, x):
                 """
                 Execute a single step in the environment.
                 
@@ -584,6 +629,7 @@ def make_train(
                 2. Step the environment with the sampled actions.
                 3. Collect Transition for the trajectory.
                 """
+                runner_state, episode_state = carry
                 train_state, env_state, last_obs, rngs = runner_state
                 action_rng, environment_rng, minibatch_rng = rngs
                 action_rng, plant_act_rng, fungus_act_rng = jax.random.split(
@@ -750,12 +796,26 @@ def make_train(
                     (action_rng, environment_rng, minibatch_rng),
                 )
 
-                return runner_state, (plant_trajectory, fungus_trajectory)
+                episode_state, endings = update_episode_state(
+                    episode_state, reward,
+                    {PLANT: plant_fields, FUNGUS: fungus_fields},
+                )
+                return (runner_state, episode_state), (
+                    plant_trajectory, fungus_trajectory, endings,
+                )
 
             # Scan over the number of steps to collect trajectories for parallel envs, per update.
-            runner_state, (plant_traj, fungus_traj) = jax.lax.scan(
-                _env_step, runner_state, None, config.NUM_STEPS
+            (runner_state, episode_state), (plant_traj, fungus_traj, endings) = jax.lax.scan(
+                _env_step, (runner_state, episode_state), None, config.NUM_STEPS
             )
+            episodes = jax.tree.map(lambda values: jnp.sum(values), endings)
+            qualification = {
+                "allocation_converged": (
+                    jnp.all(plant_traj.info['allocation_converged'])
+                    & jnp.all(fungus_traj.info['allocation_converged'])
+                ),
+                "biomass_guard_contact": jnp.any(plant_traj.info['biomass_guard_contact']),
+            }
 
             train_state, env_state, last_obs, rngs = runner_state
             _, plant_bootstrap_values = plant_policy.apply(
@@ -1047,32 +1107,48 @@ def make_train(
             )
 
             runner_state = (train_state, env_state, last_obs, rngs)
-            return runner_state, (
+            if not retain_history:
+                return (runner_state, episode_state), (
+                    (plant_metrics, fungus_metrics), episodes, qualification,
+                )
+            return (runner_state, episode_state), (
                 (plant_traj, fungus_traj),
                 (plant_metrics, fungus_metrics),
                 (plant_advantages, fungus_advantages),
                 (plant_targets, fungus_targets),
+                episodes, qualification,
             )
 
         # Scan over update steps. Each stochastic subsystem retains its own key.
         if not resume_mode:
             runner_rngs = (action_rng, environment_rng, minibatch_rng)
         runner_state = (train_state, env_state, obs, runner_rngs)
-        runner_state, (
-            (plant_traj, fungus_traj),
-            (plant_metrics, fungus_metrics),
-            (plant_advantages, fungus_advantages),
-            (plant_targets, fungus_targets),
-        ) = jax.lax.scan(
-            _update_step, runner_state, None, NUM_UPDATES
+        (runner_state, episode_state), history = jax.lax.scan(
+            _update_step, (runner_state, episode_state), None, NUM_UPDATES
         )
-        jax.debug.callback(_require_numerical_qualification,
-            jnp.all(plant_traj.info['allocation_converged'])
-            & jnp.all(fungus_traj.info['allocation_converged']),
-            jnp.any(plant_traj.info['biomass_guard_contact']))
+        if retain_history:
+            ((plant_traj, fungus_traj), (plant_metrics, fungus_metrics),
+             (plant_advantages, fungus_advantages), (plant_targets, fungus_targets),
+             episodes, qualification) = history
+        else:
+            (plant_metrics, fungus_metrics), episodes, qualification = history
+        jax.debug.callback(
+            _require_numerical_qualification,
+            jnp.all(qualification['allocation_converged']),
+            jnp.any(qualification['biomass_guard_contact']),
+        )
+        compact = {
+            "runner_state": runner_state,
+            "episode_state": episode_state,
+            "episode_summaries": episodes,
+            "qualification": qualification,
+            "metrics": {PLANT: plant_metrics, FUNGUS: fungus_metrics},
+        }
+        if not retain_history:
+            return compact
 
         return {
-            "runner_state": runner_state,
+            **compact,
             "trajectories": (plant_traj, fungus_traj),
             "metrics": {PLANT: plant_metrics, FUNGUS: fungus_metrics},
             "advantages": {

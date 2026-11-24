@@ -40,6 +40,7 @@ scripts and tests remain outside the importable package.
 | `allocation.py` | Coupled trade, essential-resource growth and stoichiometric reproduction. | Environment allocation after maintenance. |
 | `observations.py` | Finite bounded transforms for the stable five-feature actor observations. | Environment observation construction. |
 | `algos/ppo.py` | Two-policy PPO integration using the `plant` and `fungus` interfaces. | Training launcher and experiments. |
+| `training.py` | Bounded PPO execution, compact history, resumable checkpoints and selected evaluation retention. | Training launcher. |
 | `policy_artifacts.py` | Versioned persistence and compatibility checks for the current actor and environment-state contracts. | Training launcher and policy consumers. |
 
 ## Executable and evidence modules
@@ -50,6 +51,7 @@ scripts and tests remain outside the importable package.
 | `scripts/phosphate_qualification.py` | Regenerates the convergence, conservation, sensitivity, and performance evidence. |
 | [mycormarl-animations](https://github.com/isaachcamp/mycormarl-animations) | Owns geometry/video preparation, scenes and validators against installed core. |
 | `scripts/train_ppo.py` | Runs a reproducible JIT PPO development job in mixed or single-consumer mode and saves a versioned policy bundle. |
+| `tests/test_training_history.py` | Protects compact/debug agreement, disk resume, episode aggregates, recovery and evaluation retention. |
 | `tests/test_policy_artifacts.py` | Protects saved-policy compatibility and the public training CLI. |
 | `tests/test_phosphate_*.py` | Protects units, state, diffusion, uptake, competition, and qualification contracts. |
 | `tests/test_environment_phosphate_uptake.py` | Protects soil-to-organism pool credit, competition, loss accounting, and environment integration. |

@@ -40,21 +40,23 @@ def test_policy_evaluation_rejects_numerical_guard_contact(evaluate):
         evaluate(env,parameters,episodes=1,actor=actor)
 
 
-def test_jitted_ppo_rejects_a_chunk_containing_allocation_solver_failure():
+@pytest.mark.parametrize('retain_history', [True, False])
+def test_jitted_ppo_rejects_a_chunk_containing_allocation_solver_failure(retain_history):
     env = pool_environment(dt=1.,max_steps=1,allocation_max_substeps=1)
     config = PPOConfig(TOTAL_TIMESTEPS=1,NUM_STEPS=1,NUM_ENVS=1,
                        NUM_MINIBATCHES=1,UPDATE_EPOCHS=1,FINITE_HORIZON_RETURNS=True)
     with pytest.raises(RuntimeError,match='allocation'):
-        output = jax.jit(make_train(env,config))(jax.random.PRNGKey(1))
+        output = jax.jit(make_train(env,config,retain_history=retain_history))(jax.random.PRNGKey(1))
         jax.block_until_ready(output)
 
 
-def test_jitted_ppo_rejects_a_chunk_containing_numerical_guard_contact():
+@pytest.mark.parametrize('retain_history', [True, False])
+def test_jitted_ppo_rejects_a_chunk_containing_numerical_guard_contact(retain_history):
     env = pool_environment(dt=1.,max_steps=1,plant=dict(biomass_cap=1.001))
     config = PPOConfig(TOTAL_TIMESTEPS=1,NUM_STEPS=1,NUM_ENVS=1,
                        NUM_MINIBATCHES=1,UPDATE_EPOCHS=1,FINITE_HORIZON_RETURNS=True)
     with pytest.raises(RuntimeError,match='guard'):
-        output = jax.jit(make_train(env,config))(jax.random.PRNGKey(1))
+        output = jax.jit(make_train(env,config,retain_history=retain_history))(jax.random.PRNGKey(1))
         jax.block_until_ready(output)
 
 
