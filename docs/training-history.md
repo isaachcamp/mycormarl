@@ -23,6 +23,12 @@ Without explicit paths, files go to the sibling
 `../mycormarl-data/training/` directory, outside the Git checkout.
 
 Run the same command with `--resume` to continue from `latest.msgpack`.
+If interrupted after `run.json` is saved but before the first checkpoint,
+`--resume` validates that manifest and recreates the initial state from the
+recorded seed. Any first-chunk metrics written without a committed checkpoint
+are discarded before that chunk is repeated. Explicit `--resume-from` paths
+still require the selected checkpoint to exist.
+
 Interruption loses only the unfinished chunk. `--chunk-updates` may change on
 resume; environment, species, PPO settings, seed, core source hash and recorded
 dependency versions must match. Completed runs can be reopened to regenerate

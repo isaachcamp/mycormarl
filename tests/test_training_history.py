@@ -142,3 +142,37 @@ def test_invalid_ppo_configuration_does_not_create_run_history(tmp_path):
         run_training(_small_environment(), replace(config(), NUM_MINIBATCHES=3),
                      seed=7, run_dir=tmp_path/'invalid')
     assert not (tmp_path/'invalid').exists()
+
+
+@pytest.mark.parametrize('interrupted_file', ['run.json.tmp', 'latest.msgpack.tmp'])
+def test_resume_recovers_interruption_before_first_checkpoint(tmp_path, monkeypatch, interrupted_file):
+    from pathlib import Path
+
+    env = _small_environment()
+    directory = tmp_path/'interrupted'
+    expected = run_training(env, config(), seed=11, run_dir=tmp_path/'full', chunk_updates=1)
+    original_replace = Path.replace
+
+    def interrupt_persistence(path, target):
+        if path == directory/interrupted_file:
+            # Stop after the manifest is durable, or before the first completed
+            # chunk's checkpoint is committed (its metrics are already flushed).
+            if interrupted_file == 'run.json.tmp':
+                original_replace(path, target)
+            raise KeyboardInterrupt('simulated first-chunk preemption')
+        return original_replace(path, target)
+
+    with monkeypatch.context() as fault:
+        fault.setattr(Path, 'replace', interrupt_persistence)
+        with pytest.raises(KeyboardInterrupt, match='preemption'):
+            run_training(env, config(), seed=11, run_dir=directory, chunk_updates=1)
+
+    with pytest.raises(ValueError, match='configuration'):
+        run_training(env, replace(config(), LR=.1), seed=11,
+                     run_dir=directory, chunk_updates=1, resume=True)
+    resumed = run_training(env, config(), seed=11, run_dir=directory,
+                           chunk_updates=1, resume=True)
+    assert_tree_close(expected['runner_state'], resumed['runner_state'])
+    assert_tree_close(expected['episode_state'], resumed['episode_state'])
+    records = [json.loads(line) for line in (directory/'metrics.jsonl').read_text().splitlines()]
+    assert [row['update'] for row in records] == [1, 2, 3]

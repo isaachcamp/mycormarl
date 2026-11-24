@@ -126,21 +126,29 @@ def run_training(env, config, *, seed, run_dir, chunk_updates=10, resume=False,
     resume_path = Path(resume) if isinstance(resume, (str, Path)) else latest
     backup_path = resume_path if resume else latest
     if resume:
-        payload = serialization.msgpack_restore(resume_path.read_bytes())
-        if (payload.get('format') != 'mycormarl-ppo-checkpoint'
-                or payload.get('format_version') != 1
-                or payload.get('retention_version') != 1):
-            raise ValueError('incompatible resumable training checkpoint')
-        saved = payload['metadata']
+        if (resume is True and not latest.exists()
+                and not (directory / 'previous.msgpack').exists()):
+            # Before the first checkpoint, the manifest identifies the seeded
+            # initial state. Any flushed metrics are still uncommitted.
+            payload = None
+            saved = json.loads((directory / 'run.json').read_text())
+        else:
+            payload = serialization.msgpack_restore(resume_path.read_bytes())
+            if (payload.get('format') != 'mycormarl-ppo-checkpoint'
+                    or payload.get('format_version') != 1
+                    or payload.get('retention_version') != 1):
+                raise ValueError('incompatible resumable training checkpoint')
+            saved = payload['metadata']
         for field in ('configuration', 'actor_interface_version',
                       'environment_state_schema_version', 'dependencies', 'source_tree_sha256'):
             if saved.get(field) != metadata[field]:
                 raise ValueError(f'checkpoint {field} differs from requested configuration')
-        runner = jax.device_put(serialization.from_state_dict(runner, payload['runner_state']))
-        episodes = jax.device_put(serialization.from_state_dict(episodes, payload['episode_state']))
-        completed = payload['completed_updates']
-        if not 0 <= completed <= total_updates:
-            raise ValueError('invalid completed update count')
+        if payload is not None:
+            runner = jax.device_put(serialization.from_state_dict(runner, payload['runner_state']))
+            episodes = jax.device_put(serialization.from_state_dict(episodes, payload['episode_state']))
+            completed = payload['completed_updates']
+            if not 0 <= completed <= total_updates:
+                raise ValueError('invalid completed update count')
     # Validate the PPO contract before creating logs or a fresh run directory.
     first_count = min(chunk_updates, max(total_updates - completed, 1))
     first_updater = make_train(
