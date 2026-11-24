@@ -94,6 +94,8 @@ manifests must match the requested experiment. A dry-run preview can be
 followed by execution in the same output directory. Use one writer per sweep
 directory; separate directories are needed for independently scheduled jobs.
 
+For JASMIN Orchid, see the [single-GPU Slurm submission guide](slurm-batching-audit.md).
+
 ## Retained evidence
 
 - `manifest.json`: configurations, seed identities, suite membership, fixed

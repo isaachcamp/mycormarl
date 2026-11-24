@@ -51,6 +51,7 @@ scripts and tests remain outside the importable package.
 | `scripts/phosphate_qualification.py` | Regenerates the convergence, conservation, sensitivity, and performance evidence. |
 | [mycormarl-animations](https://github.com/isaachcamp/mycormarl-animations) | Owns geometry/video preparation, scenes and validators against installed core. |
 | `scripts/train_ppo.py` | Runs a reproducible JIT PPO development job in mixed or single-consumer mode and saves a versioned policy bundle. |
+| `scripts/slurm/batching_audit.sbatch` | Runs a fresh batching audit on one Orchid GPU and saves logs, provenance and sweep artifacts. |
 | `scripts/sweep_ppo.py` | Declares and executes controlled PPO batching comparisons with fixed episode horizons and evaluation spacing. |
 | `tests/test_ppo_sweeps.py` | Protects public training/sweep configuration, actual execution, timing, resume and comparison alignment. |
 | `tests/test_training_history.py` | Protects compact/debug agreement, disk resume, episode aggregates, recovery and evaluation retention. |
