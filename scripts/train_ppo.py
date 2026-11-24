@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 import json
 from pathlib import Path
 
-from mycormarl.algos.ppo import PPOConfig
+from mycormarl.algos.ppo import PPOConfig, make_train
 from mycormarl.training import run_training
 from mycormarl.environments.base_mycor import BaseMycorMarl
 from mycormarl.fungus.traits import FungusTraits
@@ -19,9 +20,19 @@ from mycormarl.policy_artifacts import save_policy_artifact
 def main() -> None:
     """Train on a small explicit domain and save both policy parameter trees."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--total-timesteps", type=int, default=256)
+    parser.add_argument("--total-timesteps", type=int, default=16384)
     parser.add_argument("--num-steps", type=int, default=128)
-    parser.add_argument("--num-envs", type=int, default=1)
+    parser.add_argument("--num-envs", type=int, default=16)
+    parser.add_argument('--env-config', type=Path, help='JSON EnvConfig overrides; episode-steps and mode take precedence.')
+    parser.add_argument('--episode-steps', type=int, default=14600,
+                        help='Fixed episode horizon, independent of rollout length.')
+    parser.add_argument('--update-epochs', type=int, default=4)
+    parser.add_argument('--num-minibatches', type=int, default=4)
+    parser.add_argument('--learning-rate', type=float, default=2.5e-4)
+    parser.add_argument('--clip-eps', type=float, default=.2)
+    parser.add_argument('--gae-lambda', type=float, default=.95)
+    parser.add_argument('--vf-coef', type=float, default=.5)
+    parser.add_argument('--dry-run', action='store_true', help='Validate and print configuration without training.')
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--mode",
@@ -46,25 +57,37 @@ def main() -> None:
                         help='Evaluate at chunk boundaries crossing this update interval; 0 disables.')
     parser.add_argument('--evaluation-episodes', type=int, default=1)
     args = parser.parse_args()
-    config = EnvConfig(
-        max_steps=args.num_steps,
-        dt=0.025,
-        soil_radius_cm=1.0,
-        soil_depth_cm=1.0,
-        radial_interval_cm=0.1,
-        depth_interval_cm=0.1,
-        consumer_mode=args.mode,
-    )
+    environment = dict(dt=.025, soil_radius_cm=1., soil_depth_cm=1.,
+                       radial_interval_cm=.1, depth_interval_cm=.1)
+    if args.env_config:
+        environment.update(json.loads(args.env_config.read_text()))
+    environment.update(max_steps=args.episode_steps, consumer_mode=args.mode)
+    config = EnvConfig(**environment)
     species = SpeciesParams(plant=PlantTraits(), fungus=FungusTraits())
     env = BaseMycorMarl(config, species)
     ppo = PPOConfig(
         TOTAL_TIMESTEPS=args.total_timesteps,
         NUM_STEPS=args.num_steps,
         NUM_ENVS=args.num_envs,
-        NUM_MINIBATCHES=1,
-        UPDATE_EPOCHS=1,
+        NUM_MINIBATCHES=args.num_minibatches,
+        UPDATE_EPOCHS=args.update_epochs,
+        LR=args.learning_rate, CLIP_EPS=args.clip_eps,
+        GAE_LAMBDA=args.gae_lambda, VF_COEF=args.vf_coef,
         FINITE_HORIZON_RETURNS=args.finite_horizon_returns,
     )
+    if any(value < 1 for value in (args.num_envs, args.num_steps, args.episode_steps,
+                                   args.update_epochs, args.num_minibatches)):
+        parser.error('environment, rollout and optimiser counts must be positive')
+    batch_size = args.num_envs * args.num_steps
+    if args.total_timesteps < batch_size or args.total_timesteps % batch_size:
+        parser.error('total timesteps must contain whole PPO updates')
+    make_train(env, ppo, retain_history=False)  # Validate the same PPO contract as execution.
+    if args.dry_run:
+        print(json.dumps(dict(environment=asdict(config), ppo=asdict(ppo),
+                              batch_size=batch_size,
+                              minibatch_size=batch_size // args.num_minibatches,
+                              seed=args.seed), sort_keys=True))
+        return
     random_streams = derive_random_streams(args.seed)
     run_dir = args.run_dir or args.output.parent / (args.output.stem + '-run')
     output = run_training(

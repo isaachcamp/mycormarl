@@ -98,6 +98,8 @@ def run_training(env, config, *, seed, run_dir, chunk_updates=10, resume=False,
     budget and LR schedule remain fixed. Evaluation is opt-in and uses a fixed
     latent-location protocol/seed independent of training random streams.
     """
+    invocation_start = time.perf_counter()
+    wall_elapsed_seconds = 0.0
     if chunk_updates < 1 or (max_chunks is not None and max_chunks < 1):
         raise ValueError('chunk_updates and max_chunks must be positive')
     if evaluate_every < 0 or evaluation_episodes < 1:
@@ -123,6 +125,7 @@ def run_training(env, config, *, seed, run_dir, chunk_updates=10, resume=False,
     runner = initialize_runner_state(env, config, streams, key)
     episodes = initial_episode_state(config.NUM_ENVS)
     completed = 0
+    compute_elapsed_seconds = 0.0
     resume_path = Path(resume) if isinstance(resume, (str, Path)) else latest
     backup_path = resume_path if resume else latest
     if resume:
@@ -147,8 +150,18 @@ def run_training(env, config, *, seed, run_dir, chunk_updates=10, resume=False,
             runner = jax.device_put(serialization.from_state_dict(runner, payload['runner_state']))
             episodes = jax.device_put(serialization.from_state_dict(episodes, payload['episode_state']))
             completed = payload['completed_updates']
+            compute_elapsed_seconds = payload.get('compute_elapsed_seconds', 0.0)
+            wall_elapsed_seconds = payload.get('wall_elapsed_seconds', 0.0)
             if not 0 <= completed <= total_updates:
                 raise ValueError('invalid completed update count')
+            # Evaluation follows checkpointing. Include its saved time when
+            # present, but optional missing/partial output must not block resume.
+            try:
+                evaluation = json.loads((directory/'evaluations'/f'update-{completed:08d}.json').read_text())
+            except (FileNotFoundError, json.JSONDecodeError):
+                evaluation = {}
+            wall_elapsed_seconds = max(wall_elapsed_seconds, evaluation.get(
+                'summary', {}).get('evaluation_configuration', {}).get('wall_elapsed_seconds', 0.0))
     # Validate the PPO contract before creating logs or a fresh run directory.
     first_count = min(chunk_updates, max(total_updates - completed, 1))
     first_updater = make_train(
@@ -160,6 +173,7 @@ def run_training(env, config, *, seed, run_dir, chunk_updates=10, resume=False,
     if not resume:
         _atomic_write(directory / 'run.json', (json.dumps(metadata, indent=2) + '\n').encode())
     executables = {first_count: jax.jit(first_updater)}
+    compiled = {}
     chunks = 0
     while completed < total_updates and (max_chunks is None or chunks < max_chunks):
         count = min(chunk_updates, total_updates - completed)
@@ -169,10 +183,18 @@ def run_training(env, config, *, seed, run_dir, chunk_updates=10, resume=False,
                                  initial_runner_state=runner, retain_history=debug)
             executables[count] = jax.jit(updater)
         start = time.perf_counter()
-        result = jax.block_until_ready(executables[count](key, runner, episodes))
+        first_execution = count not in compiled
+        compile_seconds = 0.0
+        if first_execution:
+            compiled[count] = executables[count].lower(key, runner, episodes).compile()
+            compile_seconds = time.perf_counter() - start
+        execution_start = time.perf_counter()
+        result = jax.block_until_ready(compiled[count](key, runner, episodes))
         # debug.callback effects must succeed before any successful record is written.
         jax.effects_barrier()
+        execution_seconds = time.perf_counter() - execution_start
         elapsed = time.perf_counter() - start
+        compute_elapsed_seconds += elapsed
         for leaf in jax.tree.leaves(result):
             if not np.isfinite(np.asarray(leaf)).all():
                 raise ValueError('non-finite training output; checkpoint not saved')
@@ -185,7 +207,13 @@ def run_training(env, config, *, seed, run_dir, chunk_updates=10, resume=False,
                              for a, m in result['metrics'].items()},
                     episodes=_plain(jax.tree.map(lambda x: x[i], result['episode_summaries'])),
                     qualification=_plain(jax.tree.map(lambda x: x[i], result['qualification'])),
+                    compute_elapsed_seconds=(compute_elapsed_seconds if i == count - 1 else None),
+                    wall_elapsed_seconds=(wall_elapsed_seconds + time.perf_counter() - invocation_start
+                                          if i == count - 1 else None),
                     chunk=(dict(
+                        compile_seconds=compile_seconds, execution_seconds=execution_seconds,
+                        first_execution=first_execution,
+                        device_memory_stats=[dict(id=d.id, stats=d.memory_stats()) for d in jax.devices()],
                         start_update=completed + 1, end_update=completed + count,
                         seconds_including_first_compile=elapsed,
                         **metadata['retention_configuration'],
@@ -201,6 +229,8 @@ def run_training(env, config, *, seed, run_dir, chunk_updates=10, resume=False,
             runner_state=serialization.to_state_dict(runner),
             episode_state=serialization.to_state_dict(episodes),
             chunk_seconds_including_first_compile=elapsed,
+            compute_elapsed_seconds=compute_elapsed_seconds,
+            wall_elapsed_seconds=wall_elapsed_seconds + time.perf_counter() - invocation_start,
         )
         if backup_path.exists():
             previous_temp = directory / 'previous.msgpack.tmp'
@@ -229,6 +259,7 @@ def run_training(env, config, *, seed, run_dir, chunk_updates=10, resume=False,
             )
             summary['evaluation_configuration'] = dict(
                 seed=seed, episodes=evaluation_episodes, update=completed,
+                wall_elapsed_seconds=wall_elapsed_seconds + time.perf_counter() - invocation_start,
                 actor_configuration=metadata['actor_configuration'],
             )
             if debug:
