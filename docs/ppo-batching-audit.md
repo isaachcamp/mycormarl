@@ -94,7 +94,13 @@ manifests must match the requested experiment. A dry-run preview can be
 followed by execution in the same output directory. Use one writer per sweep
 directory; separate directories are needed for independently scheduled jobs.
 
-For JASMIN Orchid, see the [single-GPU Slurm submission guide](slurm-batching-audit.md).
+For JASMIN Orchid, the [single-GPU Slurm wrapper](slurm-batching-audit.md)
+automatically generates the production `EnvConfig` (currently 50 cm radius ×
+100 cm depth at 0.05 cm spacing). Its default submission therefore uses two
+million cells per environment, whereas the direct Python CLI remains a small-
+grid development command unless supplied an environment configuration. The
+wrapper cleans up its temporary input and cache after the run; the audit keeps
+its own configuration copy and results.
 
 ## Retained evidence
 

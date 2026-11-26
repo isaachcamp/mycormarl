@@ -2,7 +2,9 @@
 
 [scripts/slurm/batching_audit.sbatch](../scripts/slurm/batching_audit.sbatch)
 runs the existing batching sweep sequentially on one GPU and retains its
-outputs in a fresh directory for the Slurm job.
+outputs in a fresh directory for the Slurm job. It generates the current
+production `EnvConfig` automatically: 50 cm soil radius, 100 cm depth and
+0.05 cm spacing (1,000 × 2,000 cells). No manually created JSON is needed.
 
 The directives use `partition=orchid`, `account=orchid`, `qos=orchid` and
 `gres=gpu:1`, following the [Orchid submission guidance](https://help.jasmin.ac.uk/docs/batch-computing/orchid-gpu-cluster/).
@@ -22,6 +24,26 @@ packages or change CUDA modules during the job. To select another interpreter:
 ```bash
 export MYCORMARL_PYTHON=/absolute/path/to/environment/bin/python
 ```
+
+If JAX reports `Backend 'cuda' is not in the list of known backends:
+['cpu', 'tpu']`, the environment has no registered CUDA backend. Plain `jax`
+in the project lock does not request the GPU extras. On JASMIN, install CUDA
+support in that same environment before submission. For a Linux NVIDIA driver
+>=525, use CUDA 12 while preserving the installed JAX version:
+
+```bash
+audit_jax_version=$(.venv/bin/python -c 'from importlib.metadata import version; print(version("jax"))')
+uv pip install --python .venv/bin/python "jax[cuda12]==${audit_jax_version}"
+```
+
+CUDA 13 instead requires driver >=580, as documented by
+[JAX](https://docs.jax.dev/en/latest/installation.html#nvidia-gpu).
+Check the saved `nvidia-smi.txt` for the allocation's driver. Use the selected
+interpreter path instead of `.venv/bin/python` if it differs. CUDA extras are
+not in the project lock: an exact `uv sync` can remove them; reinstall them
+after syncing, or use `uv sync --frozen --inexact` to retain extra packages.
+Unsetting the requested CUDA platform would only allow CPU fallback; it does
+not add GPU support. GPU verification must happen on a GPU node/allocation.
 
 Submit from the repository root on a JASMIN science server. The checkout,
 Python environment, configuration inputs and output directory must be visible
@@ -52,8 +74,9 @@ The scheduler log records the path to the detailed job log. Without the
 in the submission directory; the audit outputs still go under the supplied
 output root.
 
-For representative measurements, pass the same qualified environment to all
-cases:
+The default submission already supplies production defaults to every case.
+To use a different study configuration, explicitly replace the generated
+configuration:
 
 ```bash
 sbatch --output="$audit_root/slurm-%j.out" \
@@ -62,10 +85,17 @@ sbatch --output="$audit_root/slurm-%j.out" \
   --episode-steps 14600 --seeds 42 43 44
 ```
 
-Without `--env-config`, the sweep uses its small development soil grid.
-See the [batching guide](ppo-batching-audit.md) for its defaults and the fixed-
-batch/fixed-rollout comparisons. The script leaves those experiment defaults
-unchanged. For a short execution check, append:
+The Slurm wrapper serialises `EnvConfig()` in a temporary directory, without
+constructing a soil grid. The actual audit still requires CUDA. Its copied
+configuration is retained in `audit/manifest.json` and, for an executing sweep,
+`audit/environment.json`. An explicit `--env-config` replaces the generated
+file; unspecified fields in that custom file follow the Python training CLI's
+fallbacks, so specify all grid fields for a custom domain.
+
+See the [batching guide](ppo-batching-audit.md) for the fixed-batch/fixed-rollout
+comparisons. The standalone Python sweep still uses the small development grid
+without `--env-config`; the Slurm wrapper now supplies production defaults.
+For a short execution check on the production grid, append:
 
 ```bash
 --suite fixed-rollout --case n4-t128 --seeds 42 \
@@ -83,12 +113,20 @@ Each submission creates `<output-root>/job-<SLURM_JOB_ID>/` containing:
 
 - `job.log`: wrapper output and all sweep stdout/stderr, including failure messages.
 - `source-revision.txt`, `worktree-status.txt`, `started-at-utc.txt`: source and start provenance.
-- `nvidia-smi.txt`, `runtime.json`: driver/GPU details, Python/package versions,
-  visible JAX device, Slurm job identity and forwarded audit arguments.
+- `nvidia-smi.txt`, `runtime.json`: driver/GPU details, Python/package versions
+  (including installed CUDA plugins), visible JAX device, Slurm job identity and
+  forwarded audit arguments. CUDA initialisation errors are saved in the runtime
+  JSON and reported with a version-matched installation command.
 - `exit-code.txt`: exit status when the shell's exit trap runs; forced process
   termination may prevent this file from being written.
 - `audit/`: sweep manifest, environment snapshot, per-run metrics/checkpoints,
   evaluation policies/summaries and `results.json` as successful runs complete.
+
+The generated input JSON and Matplotlib cache live in a job-owned temporary
+directory under `SLURM_TMPDIR`, `TMPDIR` or `/tmp`. The exit handler removes
+that directory on success or ordinary failure, and on handled INT/TERM signals.
+A forced kill can bypass cleanup. Audit configurations and results in the
+persistent output directory are retained.
 
 A nonzero sweep exit propagates to the Slurm job. Existing job directories are
 never overwritten. The script does not automatically resume or requeue old
