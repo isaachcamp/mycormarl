@@ -14,7 +14,9 @@ SCRIPT = ROOT/'scripts/slurm/batching_audit.sbatch'
 @pytest.mark.parametrize(('device','arguments','exit_code'), [
     ('gpu', ['--dry-run'], 0),
     ('gpu', ['--dry-run', '--env-config', 'CUSTOM_ENVIRONMENT'], 0),
+    ('gpu', ['--dry-run', '--evaluation-interval-timesteps', '4096'], 0),
     ('cpu', ['--dry-run'], 1),
+    ('no-cpu', ['--dry-run'], 1),
     ('unavailable', ['--dry-run'], 1),
     ('gpu', ['--not-an-audit-option'], 2),
 ])
@@ -32,12 +34,18 @@ def test_batch_wrapper_saves_outputs_and_propagates_failures(tmp_path, device, a
         'import os\n'
         'class Device:\n'
         '    id=0\n'
-        '    platform=os.environ["TEST_DEVICE"]\n'
+        '    platform="gpu" if os.environ["TEST_DEVICE"] == "no-cpu" else os.environ["TEST_DEVICE"]\n'
         '    device_kind="simulated device"\n'
         'def devices():\n'
         '    if os.environ["TEST_DEVICE"] == "unavailable":\n'
         '        raise RuntimeError("Backend cuda is not in the list of known backends: cpu, tpu")\n'
         '    return [Device()]\n'
+        'def local_devices(backend=None):\n'
+        '    if backend == "cpu":\n'
+        '        if "cpu" not in os.environ["JAX_PLATFORMS"].split(","):\n'
+        '            raise RuntimeError("CPU backend disabled for callbacks")\n'
+        '        return [] if os.environ["TEST_DEVICE"] == "no-cpu" else [Device()]\n'
+        '    return devices()\n'
     )
     # Only the GPU preflight uses the stub. Configuration generation and the
     # sweep CLI run with the real interpreter and installed project modules.
@@ -68,18 +76,23 @@ def test_batch_wrapper_saves_outputs_and_propagates_failures(tmp_path, device, a
     job = output/'job-1234'
     assert (job/'exit-code.txt').read_text().strip() == str(exit_code)
     runtime = json.loads((job/'runtime.json').read_text())
-    assert runtime['jax_platforms'] == 'cuda'
+    assert runtime['jax_platforms'] == 'cuda,cpu'
     if device == 'unavailable':
         assert runtime['devices'] == []
         assert 'known backends' in runtime['backend_error']
     else:
-        assert runtime['devices'][0]['platform'] == device
+        assert runtime['devices'][0]['platform'] == ('gpu' if device == 'no-cpu' else device)
     assert (job/'source-revision.txt').read_text().strip()
     assert 'simulated GPU diagnostic' in (job/'nvidia-smi.txt').read_text()
     log = (job/'job.log').read_text()
     if exit_code == 0:
+        assert runtime['callback_cpu_devices'] > 0
         manifest = json.loads((job/'audit/manifest.json').read_text())
         assert len(manifest['runs']) == 18
+        expected_interval = 4096 if '--evaluation-interval-timesteps' in arguments else 0
+        assert all(row['evaluation_interval_timesteps'] == expected_interval for row in manifest['runs'])
+        if expected_interval == 0:
+            assert all(row['evaluate_every_updates'] == 0 for row in manifest['runs'])
         grid = manifest['environment_overrides']
         if '--env-config' in arguments:
             assert grid == json.loads(custom.read_text())
@@ -101,6 +114,9 @@ def test_batch_wrapper_saves_outputs_and_propagates_failures(tmp_path, device, a
     elif device == 'unavailable':
         assert 'jax[cuda12]==' in log
         assert 'uv pip install' in log
+        assert not (job/'audit').exists()
+    elif device == 'no-cpu':
+        assert 'local CPU device for numerical callbacks' in log
         assert not (job/'audit').exists()
     elif device == 'cpu':
         assert 'requires exactly one visible JAX GPU' in log

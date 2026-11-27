@@ -100,7 +100,13 @@ automatically generates the production `EnvConfig` (currently 50 cm radius ×
 million cells per environment, whereas the direct Python CLI remains a small-
 grid development command unless supplied an environment configuration. The
 wrapper cleans up its temporary input and cache after the run; the audit keeps
-its own configuration copy and results.
+its own configuration copy and results. Its default job is throughput-only:
+policy evaluation is disabled, so timings/metrics/checkpoints are saved but
+`learning_curve` is empty. Explicit `--evaluation-interval-timesteps 4096`
+re-enables learning evaluations. The standalone Python sweep retains its
+4096-transition evaluation default for qualified learning experiments.
+A full 365-day evaluation may reach the plant's 50 g numerical guard; such a
+trajectory is rejected and must not be interpreted as biological saturation.
 
 ## Retained evidence
 

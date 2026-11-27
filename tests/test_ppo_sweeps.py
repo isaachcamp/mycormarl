@@ -101,3 +101,21 @@ def test_sweep_cli_rejects_chunking_that_would_misalign_evaluation_times(tmp_pat
     assert result.returncode != 0
     assert 'align' in result.stderr
     assert not output.exists()
+
+
+def test_throughput_only_sweep_saves_measurements_without_policy_evaluation(tmp_path):
+    output = tmp_path/'throughput'
+    cli('sweep_ppo.py', '--output-dir', output, '--suite', 'fixed-rollout',
+        '--case', 'n4-t128', '--seeds', 5, '--total-timesteps', 1024,
+        '--episode-steps', 4, '--evaluation-interval-timesteps', 0)
+    result, = json.loads((output/'results.json').read_text())
+    assert result['learning_curve'] == []
+    assert result['compile_seconds'] > 0
+    assert result['warmed_environment_transitions_per_second'] > 0
+    run_dir = Path(result['run_dir'])
+    assert (run_dir/'latest.msgpack').exists()
+    assert not (run_dir/'evaluations').exists()
+    records = [json.loads(line) for line in (run_dir/'metrics.jsonl').read_text().splitlines()]
+    assert [row['timesteps'] for row in records] == [512,1024]
+    assert all(row['qualification']['allocation_converged'] for row in records)
+    assert not any(row['qualification']['biomass_guard_contact'] for row in records)

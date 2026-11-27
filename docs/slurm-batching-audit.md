@@ -5,6 +5,8 @@ runs the existing batching sweep sequentially on one GPU and retains its
 outputs in a fresh directory for the Slurm job. It generates the current
 production `EnvConfig` automatically: 50 cm soil radius, 100 cm depth and
 0.05 cm spacing (1,000 × 2,000 cells). No manually created JSON is needed.
+This Slurm job measures training throughput by default; optional full-horizon
+policy evaluation is disabled (`--evaluation-interval-timesteps 0`).
 
 The directives use `partition=orchid`, `account=orchid`, `qos=orchid` and
 `gres=gpu:1`, following the [Orchid submission guidance](https://help.jasmin.ac.uk/docs/batch-computing/orchid-gpu-cluster/).
@@ -49,8 +51,12 @@ Submit from the repository root on a JASMIN science server. The checkout,
 Python environment, configuration inputs and output directory must be visible
 on the compute node. `MYCORMARL_REPO_DIR` can select a different checkout.
 
-The wrapper forces `JAX_PLATFORMS=cuda` and checks for exactly one visible JAX
-GPU before starting the sweep. It preserves Slurm's `CUDA_VISIBLE_DEVICES`.
+The wrapper sets `JAX_PLATFORMS=cuda,cpu`: CUDA is the default for training,
+while the CPU backend remains available for `jax.debug.callback` numerical
+qualification checks. It verifies exactly one visible GPU and an available
+local CPU device before starting the sweep, and preserves Slurm's
+`CUDA_VISIBLE_DEVICES`. Setting only `cuda` disables the callback's required
+CPU backend and causes training to fail even when the GPU is detected.
 JAX's [platform configuration](https://docs.jax.dev/en/latest/config_options.html#platforms)
 raises an error when a requested backend cannot initialise, preventing silent
 CPU measurements. GPU/driver diagnostics and Python package versions are saved.
@@ -59,7 +65,8 @@ CPU measurements. GPU/driver diagnostics and Python package versions are saved.
 
 The first argument is an output root on persistent storage. Remaining arguments
 are forwarded to `sweep_ppo.py`; the wrapper supplies the job-specific
-`--output-dir` itself.
+`--output-dir` itself. User arguments can override the wrapper's production
+configuration and throughput-only evaluation setting.
 
 ```bash
 # Replace this with a persistent directory you can write on JASMIN.
@@ -95,6 +102,18 @@ fallbacks, so specify all grid fields for a custom domain.
 See the [batching guide](ppo-batching-audit.md) for the fixed-batch/fixed-rollout
 comparisons. The standalone Python sweep still uses the small development grid
 without `--env-config`; the Slurm wrapper now supplies production defaults.
+It disables policy evaluation by default, preserving all training numerical
+checks. Compilation/execution timings, memory diagnostics, training metrics and
+checkpoints are still saved; `learning_curve` is empty without evaluations.
+
+To opt into learning curves, pass `--evaluation-interval-timesteps 4096` with an
+appropriate, qualified episode horizon. The default horizon is 365 days; an
+evaluation policy can reach the 50 g plant biomass numerical guard over that
+horizon and correctly abort. This is not a GPU error or biological saturation.
+A throughput audit does not require those evaluation episodes. Training still
+aborts if it contacts the guard; disabling evaluation does not accept invalid
+training transitions.
+
 For a short execution check on the production grid, append:
 
 ```bash

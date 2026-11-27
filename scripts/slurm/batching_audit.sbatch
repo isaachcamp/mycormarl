@@ -48,7 +48,7 @@ printf 'Job log: %s/job.log\n' "$job_dir"
 exec > "$job_dir/job.log" 2>&1
 
 export PYTHONUNBUFFERED=1
-export JAX_PLATFORMS=cuda
+export JAX_PLATFORMS=cuda,cpu
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-4}"
 export MPLBACKEND=Agg
 scratch_dir="$(mktemp -d "${SLURM_TMPDIR:-${TMPDIR:-/tmp}}/mycormarl-batching-$SLURM_JOB_ID.XXXXXX")"
@@ -65,8 +65,10 @@ from mycormarl.params import EnvConfig
 
 Path(sys.argv[1]).write_text(json.dumps(asdict(EnvConfig()), indent=2) + '\n')
 PYCONFIG
-# Later user arguments can explicitly override this generated configuration.
-set -- --env-config "$scratch_dir/production-environment.json" "$@"
+# A throughput audit does not run full-horizon policy evaluations by default.
+# Later user arguments can explicitly override either default.
+set -- --env-config "$scratch_dir/production-environment.json" \
+    --evaluation-interval-timesteps 0 "$@"
 
 printf 'Audit output: %s\n' "$job_dir"
 date -u '+%Y-%m-%dT%H:%M:%SZ' > "$job_dir/started-at-utc.txt"
@@ -84,8 +86,10 @@ import sys
 import jax
 
 backend_error = None
+callback_cpus = []
 try:
     devices = jax.devices()
+    callback_cpus = jax.local_devices(backend="cpu")
 except RuntimeError as error:
     devices = []
     backend_error = str(error)
@@ -97,6 +101,7 @@ metadata = dict(
     packages={name: version(name) for name in ('jax','jaxlib','flax','optax','jaxmarl')},
     devices=[dict(id=d.id, platform=d.platform, kind=d.device_kind) for d in devices],
     audit_arguments=sys.argv[2:], backend_error=backend_error,
+    callback_cpu_devices=len(callback_cpus),
 )
 for name in ('jax-cuda12-plugin', 'jax-cuda12-pjrt', 'jax-cuda13-plugin', 'jax-cuda13-pjrt'):
     try:
@@ -115,7 +120,9 @@ if backend_error:
     )
 if len(devices) != 1 or devices[0].platform != 'gpu':
     raise SystemExit('This audit requires exactly one visible JAX GPU')
-print(f'JAX GPU: {devices[0].device_kind}', flush=True)
+if not callback_cpus:
+    raise SystemExit('This audit requires a local CPU device for numerical callbacks')
+print(f'JAX GPU: {devices[0].device_kind}; callback CPUs: {len(callback_cpus)}', flush=True)
 PY
 
 srun --unbuffered "$python_bin" scripts/sweep_ppo.py "$@" --output-dir "$job_dir/audit"
